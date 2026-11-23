@@ -1,0 +1,12 @@
+node_modules/
+dist/
+dist-even/
+*.ehpk
+.env
+.env.*
+!.env.example
+.data/
+demo/out/
+demo/shots/tmp/
+.DS_Store
+*.log

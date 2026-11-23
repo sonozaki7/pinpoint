@@ -1,0 +1,78 @@
+// Shared types between apps/glasses and apps/server. Owner: Opus. Request changes in docs/requests.md.
+
+export type ThreadAttention = 'question' | 'plan' | 'failed' | 'report';
+
+export interface InboxItem {
+  threadId: string;
+  title: string; // e.g. "auth-refresh-fix"
+  project: string;
+  attention: ThreadAttention;
+  summary: string; // <= 30 chars, ASCII, e.g. "plan, 7 steps"
+  updatedAt: string; // ISO
+  deckReady: boolean;
+  pointCount: number;
+  draftNotes: number; // notes already saved for this thread
+}
+
+export type PointKind = 'step' | 'claim' | 'question' | 'risk' | 'draft';
+
+export interface Point {
+  id: string; // "p1", "p2", ...
+  index: number; // 1-based display number
+  kind: PointKind;
+  glance: string; // <= 44 chars, ASCII, one display line
+  quote: string; // exact substring of the source text (verified)
+  options?: string[]; // kind === 'question': 2-4 options, <= 24 chars, recommended first
+  questionId?: string; // T3 user_input question id, when the point maps to one
+  risk?: 'low' | 'high';
+}
+
+export interface Deck {
+  threadId: string;
+  sourceMessageId: string;
+  title: string;
+  attention: ThreadAttention;
+  headline: string; // <= 44 chars
+  points: Point[];
+  createdAt: string;
+  splitter: string; // provider that built it, e.g. "opencode:deepseek-v4.1-flash" or "fixture"
+}
+
+export type Verdict = 'object' | 'note' | 'answer';
+
+export interface Note {
+  pointId: string;
+  verdict: Verdict;
+  text?: string; // transcript or typed text
+  option?: string; // chosen option for questions
+  audioMs?: number;
+}
+
+export interface ReviewDraft {
+  threadId: string;
+  sourceMessageId: string;
+  notes: Note[]; // at most one per point
+  seen: string[]; // point ids the user focused
+  updatedAt: string;
+}
+
+export interface PreviewResult {
+  message: string; // full composed review (section 8 of SPEC)
+  preview: [string, string]; // two ASCII lines for the glasses
+  counts: { objections: number; answers: number; notes: number; agreed: number };
+}
+
+export interface SendResult {
+  ok: boolean;
+  delivered: 't3' | 'demo-log';
+  telegramLink?: string;
+  error?: string;
+}
+
+export interface Health {
+  ok: boolean;
+  mode: 'demo' | 'live';
+  t3: 'ok' | 'unreachable' | 'unauthorized' | 'off';
+  telegram: 'ok' | 'dry-run' | 'error';
+  splitter: string;
+}
