@@ -23,15 +23,16 @@ function Underline({draw}: {draw: number}) {
 
 export function Close() {
   const f = useCurrentFrame();
-  const converge = phase(f, 0.35, 0.95, easeInOut);
-  const paperIn = phase(f, 1.0, 1.55);
-  const darkOut = 1 - phase(f, 1.1, 1.6);
-  const titleIn = phase(f, 1.35, 1.95, easeOut);
-  const line1 = phase(f, 2.0, 2.7, easeInOut);
-  const line2 = phase(f, 2.6, 3.3, easeInOut);
-  const metaIn = phase(f, 3.4, 4.0);
-  const urlIn = phase(f, 4.3, 4.9);
-  const finalIn = phase(f, 5.6, 6.2);
+  const converge = phase(f, 0.35, 1.1, easeInOut);
+  const paperIn = phase(f, 1.0, 1.8);
+  const darkOut = 1 - phase(f, 1.1, 1.8);
+  const titleIn = phase(f, 1.8, 2.6, easeOut);
+  const line1 = phase(f, 2.6, 3.4, easeInOut);
+  const line2 = phase(f, 3.2, 4.0, easeInOut);
+  const metaIn = phase(f, 4.4, 5.0);
+  const urlIn = phase(f, 5.2, 5.8);
+  const finalIn = phase(f, 6.0, 6.6);
+  const proofIn = phase(f, 9.0, 9.8);
 
   return (
     <div className="pp-stage pp-close">
@@ -87,6 +88,27 @@ export function Close() {
         <div className="pp-close-meta" style={{opacity: metaIn}}>
           <i />
           Even G2 + R1 · T3 Code · Telegram · open source
+        </div>
+
+        <div
+          style={{
+            position: "absolute",
+            right: 112,
+            top: 782,
+            textAlign: "right",
+            fontFamily: "IBM Plex Mono, monospace",
+            fontSize: 15,
+            lineHeight: 1.7,
+            letterSpacing: "0.01em",
+            color: "#3c4f46",
+            opacity: proofIn,
+          }}
+        >
+          <div style={{fontSize: 9.5, letterSpacing: "0.18em", color: "#7b897c", marginBottom: 8}}>
+            MEASURED · REAL RUN · 24 NOV 2026
+          </div>
+          <div>7-step plan · 1 objection · 1 note · 5 agreed</div>
+          <div>Reviewed in 20 s · 2 notes · agent replied in 7 s</div>
         </div>
 
         <div className="pp-close-urls" style={{opacity: urlIn}}>

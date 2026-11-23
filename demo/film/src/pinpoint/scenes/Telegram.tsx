@@ -72,7 +72,7 @@ export function Telegram() {
                 <div className="pp-tg-text">
                   <b>Review from G2 (Pinpoint) — 7 points</b>
                   <br />
-                  2 objections · 5 agreed · sent to Codex
+                  1 objection · 1 note · 5 agreed · sent to the agent
                 </div>
                 <div
                   className="pp-tg-btn"
@@ -98,7 +98,7 @@ export function Telegram() {
                   <span>08:11</span>
                 </div>
                 <div className="pp-tg-quote-src">“Force-logout every user by truncating the sessions table”</div>
-                <div className="pp-tg-replytext">No. Migrate existing sessions instead.</div>
+                <div className="pp-tg-replytext">No. Don't log everyone out. Migrate the existing sessions instead.</div>
               </div>
 
               <div
@@ -113,8 +113,8 @@ export function Telegram() {
                   <b>PINPOINT</b>
                   <span>08:12</span>
                 </div>
-                <div className="pp-tg-quote-src">“Wrap refreshToken() in a mutex”</div>
-                <div className="pp-tg-replytext">Use a request queue; a mutex deadlocks with the retry path.</div>
+                <div className="pp-tg-quote-src">“Wrap refreshToken() in a mutex.”</div>
+                <div className="pp-tg-replytext">Use a request queue. A mutex deadlocks with the retry path.</div>
               </div>
             </div>
 

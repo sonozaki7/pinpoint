@@ -1,52 +1,14 @@
 import {useCurrentFrame} from "remotion";
-import fixture from "../fixtures/inbox-morning.json";
-import {Lens, SourceRenderer, easeOut, phase, sceneSource} from "../ui";
-
-const points = fixture.deck.points.slice(1, 5);
-
-type Draft = {
-  index: number;
-  sender: string;
-  glance: string;
-  corrected: boolean;
-  delay: number;
-};
-
-const DRAFTS: Draft[] = points.map((point, i) => {
-  const [head, ...tail] = point.glance.split(": ");
-  const sender = ["Priya Raman", "Tomas Okafor", "Cassie Lin", "Airbnb"][i] ?? head;
-  return {
-    index: point.index,
-    sender,
-    glance: tail.length ? tail.join(": ") : point.glance,
-    corrected: i === 1,
-    delay: 0.5 + i * 0.9,
-  };
-});
+import {GestureChip, Lens, SourceRenderer, easeOut, phase, sceneSource, useActiveInput} from "../ui";
 
 export function Inbox() {
   const f = useCurrentFrame();
-  const corrected = f / 30 >= 4.2;
-  const noteIn = phase(f, 4.3, 4.75, easeOut);
-  const sent = phase(f, 12.2, 12.7, easeOut);
-  const summary = phase(f, 13.6, 14.2, easeOut);
+  const seconds = f / 30;
+  const corrected = seconds >= 10.9;
+  const noteIn = phase(f, 10.9, 11.35, easeOut);
   const enter = phase(f, 0.2, 0.7, easeOut);
   const source = sceneSource("inbox");
-
-  if (source) {
-    return (
-      <div className="pp-stage pp-dark">
-        <div className="pp-grain" />
-        <div className="pp-vignette" />
-        <Lens style={{left: 354, top: 204}} label="EVEN G2 · INBOX AGENT" meta="INBOX-MORNING · REAL CAPTURE">
-          <SourceRenderer source={source} />
-        </Lens>
-        <div style={{position: "absolute", left: 360, top: 880, fontFamily: "IBM Plex Mono, monospace", fontSize: 11, letterSpacing: "0.16em", color: "#8fa79b"}}>
-          INBOX AGENT · inbox-morning
-        </div>
-      </div>
-    );
-  }
+  const active = useActiveInput("inbox", f);
 
   return (
     <div className="pp-stage pp-dark">
@@ -70,93 +32,78 @@ export function Inbox() {
           </div>
           <div className={`pp-inbox-stat ${corrected ? "x" : ""}`}>
             <b>{corrected ? "1" : "0"}</b>
-            <span>correction · “Thursday, not Tuesday.”</span>
+            <span>correction · “Make it Thursday, not Tuesday.”</span>
           </div>
         </div>
         <div className="pp-inbox-time">
           TRIAGE AGENT · 06:40
           <br />
-          CLEARED IN 25 SECONDS
+          4 DRAFTS IN 25 SECONDS
         </div>
-      </div>
-
-      <div className="pp-inbox-rows">
-        {DRAFTS.map((draft, i) => {
-          const reveal = phase(f, draft.delay, draft.delay + 0.45, easeOut);
-          const flip = draft.corrected ? phase(f, 4.15, 4.45) : 0;
-          const dim = corrected && !draft.corrected ? 1 - phase(f, 4.3, 4.9) * 0.45 : 1;
-          return (
-            <div
-              key={draft.index}
-              className={`pp-draft ${corrected && draft.corrected ? "corrected" : "agreed"}`}
-              style={{
-                opacity: reveal * dim,
-                transform: `translateY(${(1 - reveal) * 12}px)`,
-              }}
-            >
-              <div className="pp-draft-index">{String(draft.index).padStart(2, "0")}</div>
-              <div>
-                <div className="pp-draft-sender">{draft.sender}</div>
-                <div className="pp-draft-glance">{draft.glance}</div>
-              </div>
-              <div className="pp-draft-mark">{draft.corrected && flip > 0.4 ? "x" : "+"}</div>
-              {draft.corrected ? (
-                <div
-                  className="pp-draft-note"
-                  style={{
-                    maxHeight: noteIn * 54,
-                    overflow: "hidden",
-                    opacity: noteIn,
-                  }}
-                >
-                  <b>CORRECTION</b>
-                  “Thursday, not Tuesday.” Sent as a cited note.
-                </div>
-              ) : null}
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="pp-inbox-leftover" style={{opacity: phase(f, 5.2, 5.75, easeOut)}}>
-        <span>06</span>
-        <span>
-          TWO LEFT FOR YOU · <b>NORTHWIND, RECRUITER</b>
-        </span>
-      </div>
-
-      <div
-        className="pp-inbox-send"
-        style={{
-          opacity: 0.22 + 0.78 * phase(f, 4.3, 4.9, easeOut),
-          borderColor: sent > 0 ? "rgba(185,252,169,.5)" : undefined,
-        }}
-      >
-        <span className="lbl">SEND REVIEW</span>
-        <span className="txt">{corrected ? "1 correction · 3 agreed" : "4 drafts · reading"}</span>
-        <span className="right">
-          <i />
-          {sent > 0 ? "SENT TO AGENT" : corrected ? "TAP TO SEND" : "READING"}
-        </span>
       </div>
 
       <div
         style={{
           position: "absolute",
-          right: 100,
-          top: 862,
-          textAlign: "right",
+          left: 840,
+          top: 196,
           fontFamily: "IBM Plex Mono, monospace",
           fontSize: 10,
-          letterSpacing: "0.14em",
-          color: "#8aa095",
-          opacity: summary,
+          letterSpacing: "0.16em",
+          color: "#7f9588",
+          opacity: enter,
         }}
       >
-        ONE CORRECTION, CITED ON DRAFT 02
-        <br />
-        THREE OTHERS PASSED IN SILENCE
+        EVEN G2 · INBOX-MORNING · REAL CAPTURE
       </div>
+
+      <div
+        style={{
+          position: "absolute",
+          left: 840,
+          top: 230,
+          width: 800,
+          height: 420,
+          opacity: enter,
+          transform: `translateY(${(1 - enter) * 16}px)`,
+        }}
+      >
+        <div style={{transform: "scale(0.66)", transformOrigin: "top left"}}>
+          <Lens style={{left: 0, top: 0}} label={null} meta={null}>
+            {source ? <SourceRenderer source={source} /> : null}
+          </Lens>
+        </div>
+      </div>
+
+      <div
+        style={{
+          position: "absolute",
+          left: 844,
+          top: 666,
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          fontFamily: "IBM Plex Mono, monospace",
+          fontSize: 10,
+          letterSpacing: "0.13em",
+          color: "#7f9588",
+          opacity: enter,
+        }}
+      >
+        <span style={{width: 6, height: 6, borderRadius: "50%", background: "#b9fca9"}} />
+        16.1 S · 4 DRAFTS · 1 NOTE · 3 AGREED
+      </div>
+
+      <div className="pp-inbox-send" style={{left: 100, right: 1020, top: 790, opacity: 0.55 + 0.45 * phase(f, 13.8, 14.4, easeOut)}}>
+        <span className="lbl">SEND REVIEW</span>
+        <span className="txt">{corrected ? "1 correction · 3 agreed" : "4 drafts · reading"}</span>
+        <span className="right">
+          <i />
+          {corrected ? "READY TO SEND" : "READING"}
+        </span>
+      </div>
+
+      {active ? <GestureChip compact input={active} localFrame={f} style={{left: 100, top: 880}} /> : null}
     </div>
   );
 }

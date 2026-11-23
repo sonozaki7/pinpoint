@@ -1,76 +1,108 @@
-# Pinpoint demo film
+# Pinpoint demo film — v2
 
-The 2:45 draft for the Pinpoint hackathon submission. 1920×1080, 30 fps, burned-in
-captions, draft voice. Composition `PinpointDemo` in `src/index.tsx`.
+The 2:20 cut for the Pinpoint hackathon submission. 1920×1080, 30 fps, burned-in
+captions, Kokoro voice, real simulator footage. Composition `PinpointDemo` in
+`src/index.tsx`; the vertical teaser is `PinpointTeaser` (1080×1920, 41 s).
 
 It reuses the Agent Relay film’s fonts (Inter, IBM Plex Mono), paper and ink,
 caption pill, and accent jade — but the stage is a G2 lens, not a photo plate.
 
-## Scenes
+## Scenes (140 s)
 
-| Time | Scene | On screen | Source in this draft |
+| Time | Scene | On screen | Source |
 |---|---|---|---|
-| 0:00–0:12 | Hook | The real 511-word plan as a scrolling wall, collapsing into the 7 real glances in the lens | Real fixture text + designed motion |
-| 0:12–0:24 | Problem | Generic “Apply the plan?” Yes/No card, then “Approval isn’t feedback.” | Illustration |
-| 0:24–0:33 | Alert | Lock-screen notification mirrored into the glasses inbox | Designed phone + real simulator still |
-| 0:33–1:33 | Hero | Inbox → point 1 → point 4 → record → transcript → step 6 note → preview → sent → inbox | Real simulator stills |
-| 1:33–1:47 | Payoff | The cited review lands in a T3 Code thread; the agent revises the plan | Placeholder T3 UI |
-| 1:47–2:00 | Question | deps-upgrade options → one tap → “Stay on 6 for now” | Real simulator stills |
-| 2:00–2:18 | Inbox agent | Four drafts, three pass, one correction | Placeholder board from the real fixture |
-| 2:18–2:32 | Telegram | Pinpoint Desk topic with quote-replies | Placeholder Telegram UI |
-| 2:32–2:45 | Close | “Ring for where. Voice for what.”, stack line, site + GitHub | Designed |
+| 0:00–0:12 | Hook | The real 510-word plan as a scrolling wall, collapsing into 7 real glances | Real fixture text + designed motion |
+| 0:12–0:23 | Problem | Generic “Apply the plan?” Yes/No card, then “Approval isn’t feedback.” | Illustration |
+| 0:23–0:32 | Alert | Lock-screen notification (illustrative phone) mirrored into the real glasses inbox | Real `clips/inbox.mp4` + designed phone |
+| 0:32–0:59 | Hero | Real `live-hero.mp4` (0–22.0 s): inbox → points 1–3 → point 4 objection → point 6 note → preview → sent, then the cleared inbox (`inbox-after.mp4`) | Real live recording + real cleared inbox |
+| 0:59–1:16 | Payoff | The real cited review and the agent’s real reply, in T3 Code | `t3-live-thread.json` export |
+| 1:16–1:26 | Question | `deps-upgrade` options → one tap → “Stay on 6 for now” | Real `clips/deps.mp4` |
+| 1:26–1:46 | Inbox agent | Four drafts, one correction, three agreed; board beside the real lens | Real `clips/inbox-morning.mp4` |
+| 1:46–2:00 | Telegram | Pinpoint Desk topic with quote-replies | Placeholder (TODO-real) |
+| 2:00–2:20 | Close | “Ring for where. Voice for what.” + measured proof + site/GitHub | Designed |
 
-The exact status labels also live in `src/clips.json` (`status` per scene).
+The live run’s counts appear everywhere as **1 objection, 1 note, 5 agreed**. The
+payoff and close show **Reviewed in 20 s · 2 notes · agent replied in 7 s** from
+`docs/recording-log.md`; the close also speaks that line.
 
-## Swapping in real captures
+## Real footage and clips.json
 
-Everything visual is wired through **`src/clips.json`**. A scene renders one of four
-sources:
+Everything visual is wired through **`src/clips.json`**. A scene renders one of
+four sources:
 
 - `{"kind": "design"}` — built in Remotion (hook, problem, close, and the
-  placeholder T3/Telegram/inbox boards).
-- `{"kind": "stills", ...}` — actually each scene has a `stills` map; the scene’s
-  beat table picks the file. Change a path here to reorder or replace a still.
-- `{"kind": "clip", "src": "clips/auth.mp4", "startAt": 0}` — an mp4 inside the
-  lens. Copy it under `public/clips/`.
+  placeholder Telegram board).
+- `{"kind": "stills", ...}` — each scene has a `stills` map; the scene’s beat
+  table picks the file. These are now fallbacks, not the delivered path.
+- `{"kind": "clip", "src": "clips/live-hero.mp4", "delay": 1.1}` — an mp4 inside
+  the lens. `delay` starts it later than the scene; `startAt` trims its head.
 - `{"kind": "frames", "dir": "clips/auth", "fps": 9.91, "count": 182}` — a frame
-  folder from `demo/scripts/record-sim.mjs`. Optional `meta` or `timeline` +
-  `sceneId` make it read `meta.json` / `timeline.json` instead of the numbers.
-  Copy the folder under `public/clips/`.
+  folder from `demo/scripts/record-sim.mjs`.
 
-Examples:
+The v2 sources are the real recordings copied from `demo/recordings/`:
 
-```json
-"alert": { "source": { "kind": "clip", "src": "clips/inbox.mp4" } }
-"hero":  { "source": { "kind": "frames", "dir": "clips/auth",
-                       "timeline": "clips/timeline.json", "sceneId": "auth" } }
-```
+| Scene | File | Duration |
+|---|---|---|
+| Alert glasses | `clips/inbox.mp4` | 2.667 s |
+| Hero | `clips/live-hero.mp4` | 22.8 s |
+| Hero cleared inbox | `clips/inbox-after.mp4` | 1.933 s |
+| Question | `clips/deps.mp4` | 8.167 s |
+| Inbox agent | `clips/inbox-morning.mp4` | 16.1 s |
 
-Set `"source": null` to return to the stills. For the hero and question scenes,
-keep the `inputs` array in sync with the new recording; `at` is seconds from the
-scene’s first frame and drives the ring-gesture chip. The scene boundaries live in
-`src/pinpoint/timeline.ts` (165 s). If a real recording is a different length,
-change the scene’s start/end there and re-time the caption cues.
-
-Copy new simulator stills into the film and refresh the fixture copies:
+`demo/recordings/` is git-ignored scratch, so the film keeps its own copy under
+`public/clips/`. Re-sync after a new recording:
 
 ```sh
 cd demo/film
-node scripts/sync-shots.mjs
+node scripts/sync-recordings.mjs
 ```
+
+That script copies the five mp4s, copies the T3 proof export to
+`src/pinpoint/fixtures/t3-live-thread.json`, and **regenerates every `inputs`
+array from the matching `*.timeline.json`**. The ring-gesture chips are therefore
+exact: swipe/tap/talk appear at the recording’s own input timestamps, not on a
+hand-written schedule. Do not add an input the recording does not contain.
+
+Scene boundaries live in `src/pinpoint/timeline.ts` (140 s). The hero is 27 s:
+the real live run to the sent toast (22.0 s of the 22.8 s clip) plus the 1.9 s
+cleared-inbox cut, with a short hold. The question is 10 s (8.2 s clip), the
+inbox 20 s (16.1 s clip).
+
+## Payoff: the real thread
+
+`demo/recordings/t3-live-thread.json` is the export of
+`mcp:0cc3681c-17ba-4d06-8a88-d9218fcd4d4e` (“auth-refresh-fix”, project
+“pinpoint”). The scene reads it through `src/pinpoint/t3.ts`:
+
+- the review is shown line-for-line from `review.text`;
+- the reply is shown from `reply.text`, cut only at paragraph boundaries and
+  ended with `…` — never reworded;
+- the plan title, 18:49:03 UTC / 18:49:10 UTC timestamps, project, provider
+  (`opencode`) and `completed` status are the real ones;
+- the label is **Real thread · exported from T3 Code**, not “illustration”.
+
+If the export changes, re-run `sync-recordings.mjs`; the excerpt markers throw at
+render time if a cut no longer matches the text.
 
 ## Audio
 
-The film plays `audio.narration` and `audio.bed` from `clips.json`. The draft voice
-is macOS `say` (Samantha, 170 wpm); the bed is a quiet synthesized drone. Both are
-drafts. See `docs/narration.md` for the lines, timings, and how to swap the voice.
+The film plays `audio.narration` and `audio.bed` from `clips.json`. The v2 voice
+is **Kokoro `af_heart`** (Apache-2.0, `kokoro-onnx`, 24 kHz, speed 1.0), generated
+locally with `scripts/build-audio.mjs`; the bed is a quiet synthesized drone at
+`bedVolume: 0.32`. The macOS `say` fallback remains (`--tts say --voice Samantha`).
+See `docs/narration.md` for the lines, timings, install steps, and how to swap in
+the author’s own recording. The swap point is still one line in `clips.json`.
 
-```sh
-node scripts/build-audio.mjs    # regenerate the draft voice + captions
-```
+The Kokoro voice, bed and teaser voice are git-ignored (like the old draft) and
+can be regenerated with `npm run voice` plus the teaser command in
+`docs/narration.md`. The model and `.venv` are local only.
 
-If the final recording moves a line, update the start/end in
-`src/pinpoint/captions.generated.json`; captions and audio are independent.
+## Vertical teaser
+
+`PinpointTeaser` is a 41 s 1080×1920 cut: hook → the real hero footage (p4 and p6
+notes, sent) → the real review/reply → close. It uses the real clips at native
+speed and the same Kokoro voice; the teaser lines are in
+`src/pinpoint/teaser-narration.json`.
 
 ## Render
 
@@ -81,35 +113,41 @@ by hand if you run the CLI directly.
 ```sh
 cd demo/film
 npm run check                  # tsc, must stay green
-npm run render:pinpoint        # → demo/out/pinpoint-demo-draft.mp4, h264, crf 20
-npm run poster                 # → demo/out/poster.png, 1280×720, frame 1425
+npm run render:pinpoint        # → demo/out/pinpoint-demo-v2.mp4, h264 crf 20, AAC
+npm run poster                 # → demo/out/poster-v2.png, 1920×1080
+npm run render:teaser          # → demo/out/pinpoint-teaser-9x16.mp4
+npm run sheet                  # → demo/out/v2-sheet.png, 4×4 contact sheet
 ```
 
 Equivalent direct command:
 
 ```sh
-npx remotion render src/index.tsx PinpointDemo ../out/pinpoint-demo-draft.mp4 \
-  --codec=h264 --crf=20 --pixel-format=yuv420p --concurrency=4 \
+npx remotion render src/index.tsx PinpointDemo ../out/pinpoint-demo-v2.mp4 \
+  --codec=h264 --crf=20 --pixel-format=yuv420p --concurrency=6 \
   --browser-executable="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 ```
 
 `demo/out/` is git-ignored. The raw simulator frames stay in `demo/shots/tmp/`
-(also ignored); only `demo/shots/glasses-*.png` are copied into
-`public/shots/` for the film.
+(also ignored); only `demo/shots/glasses-*.png` are copied into `public/shots/`
+for fallbacks.
 
-The delivered cut has one post-fix: a three-frame Chrome compositor artifact at
-50.0 s was replaced from the next clean frame. The stills are now keyed per beat
-in the source so a re-render remounts the image instead of swapping its `src`,
-which is the likely cause.
+The contact sheet is a QA gate, not decoration: check it for cut-off text,
+mismatched counters, black frames and wrong scene order before submitting.
 
-## Still to replace before submission
+## Real vs placeholder
 
-1. **Hero**: the current stills show one objection (the captured run had one
-   note). The storyboard wants two; a fresh capture with both notes will make the
-   send-row counter and this cut agree.
-2. **Payoff**: the T3 Code window is an illustration, labelled as such on screen.
-3. **Telegram**: the topic and quote-replies are an illustration, labelled.
-4. **Inbox agent**: no `inbox-morning` capture exists yet; the board uses the
-   fixture’s real glances and is labelled illustrative.
-5. **Voice**: replace the TTS draft with the author’s recording.
-6. **Proof line**: add the real run’s numbers to the close once recorded.
+**Real:** the simulator clips (live-hero, deps, inbox, inbox-after,
+inbox-morning), their timelines and gesture overlays; the T3 thread export (cited
+review + agent reply, timestamps, provider, status); the measured numbers; the
+plan fixture text; the Kokoro voice.
+
+**Still placeholder (labelled, and listed under `todoReal` in `clips.json`):**
+
+1. **Alert phone** — the lock-screen notification is built in Remotion; no real
+   phone push capture exists.
+2. **Telegram topic** — the Pinpoint Desk topic and quote-replies are an
+   illustration until the real bot exists and is recorded.
+
+The author’s own voice can replace Kokoro without touching a scene. The hero
+deck order is still the pinned 7-point fixture (`live-auth-refresh-fix.deck.json`);
+the thread, review send and 7 s reply are real (see `docs/recording-log.md`).

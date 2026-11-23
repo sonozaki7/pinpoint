@@ -4,7 +4,7 @@ import {SCENES, type SceneDef, type SceneId} from "./timeline";
 
 export type SourceConfig =
   | {kind: "design"}
-  | {kind: "clip"; src: string; startAt?: number}
+  | {kind: "clip"; src: string; startAt?: number; delay?: number}
   | {
       kind: "frames";
       dir: string;
@@ -27,8 +27,19 @@ export type SceneConfig = {
   status?: string;
   note?: string;
   source?: SourceConfig | null;
+  sourceAfter?: SourceConfig | null;
+  afterAt?: number;
   stills?: Record<string, string>;
   inputs?: RingInput[];
+  recording?: {
+    clip: string;
+    timeline: string;
+    duration: number;
+    fps?: number;
+    frames?: number;
+    inputs: number;
+    note?: string;
+  };
 };
 
 export type Clips = {

@@ -179,6 +179,10 @@
 .pp-input-label { display: block; margin-top: 6px; font: 560 17px/1.16 var(--sans); letter-spacing: -0.018em; color: #eef4ec; }
 .pp-input-note { display: block; margin-top: 3px; font: 400 11px/1.2 var(--mono); color: #8aa096; letter-spacing: 0.04em; }
 .pp-input.pulse .pp-input-icon { animation: none; }
+.pp-input.compact { padding: 6px 13px 6px 6px; gap: 10px; border-radius: 9px; }
+.pp-input.compact .pp-input-icon { width: 34px; height: 34px; border-radius: 7px; }
+.pp-input.compact .pp-input-kicker { font-size: 8.5px; }
+.pp-input.compact .pp-input-label { margin-top: 4px; font-size: 13px; }
 
 /* ------------------------------------------------------------------- hook */
 .pp-wall-mask { position: absolute; inset: 0; overflow: hidden; }
@@ -366,8 +370,12 @@
 .pp-t3-line .q { color: #46564a; }
 .pp-t3-line .arrow { color: #7e8c7c; }
 .pp-t3-line.object b, .pp-t3-line.object .q { color: #94502f; }
+.pp-t3-line.note b { color: #a97a3f; }
+.pp-t3-line.note span { color: #4a5546; }
 .pp-t3-line.agreed { color: #3c6640; font-size: 13.5px; }
 .pp-t3-line.agreed b { color: #4f8a54; }
+.pp-t3-bullet { margin-top: 5px; }
+.pp-t3-bullet b, .pp-t3-reply-body b { color: #2c4a31; font-weight: 600; }
 .pp-t3-reply { margin-top: 12px; border: 1px solid #ded8ca; border-radius: 9px; background: #fffdf8; padding: 13px 15px; }
 .pp-t3-reply-head { display: flex; align-items: center; gap: 8px; font: 500 9.5px/1 var(--mono); letter-spacing: 0.08em; color: #7d897e; }
 .pp-t3-reply-head b { font-weight: 500; color: #41524b; }
@@ -398,6 +406,8 @@
 .pp-rail-ticks i { height: 4px; flex: 1; border-radius: 2px; background: rgba(255, 255, 255, 0.13); }
 .pp-rail-ticks i.on { background: #8ce083; }
 .pp-rail-ticks i.x { background: #e0a273; }
+.pp-rail-ticks i.n { background: #b9fca9; box-shadow: inset 0 0 0 1px rgba(7, 11, 12, 0.55); }
+.pp-rail-ticks i.risk { background: rgba(224, 162, 115, 0.42); }
 .pp-rail-legend { margin-top: 10px; display: flex; justify-content: space-between; font: 400 9px/1 var(--mono); letter-spacing: 0.12em; color: #7d9286; }
 .pp-rail-ghost { position: absolute; right: -8px; top: 300px; font: 400 210px/0.8 var(--mono); letter-spacing: -0.09em; color: rgba(185, 252, 169, 0.045); pointer-events: none; }
 .pp-hero-chip { left: 84px; top: 826px; }

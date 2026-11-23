@@ -13,3 +13,5 @@ demo/shots/tmp/
 apps/site/review/
 demo/recordings/
 demo/film/public/audio/*-draft.mp3
+demo/film/.venv/
+demo/film/models/

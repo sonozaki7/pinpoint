@@ -1,12 +1,18 @@
-# Pinpoint demo — narration (draft)
+# Pinpoint demo — narration (v2)
 
-The draft voice track for the 2:45 cut. Thirty short lines, **66.8 s spoken** across
-165 s (about 40% of the film), so the pictures and the room have time to breathe.
-The burned-in captions are generated from this same text.
+The voice track for the 2:20 cut. **29 short lines, ~68 s spoken across 140 s**
+(about 48% of the film, measured after generation), so the pictures and the room
+still have time to breathe.
 
-**Voice:** macOS `say`, `Samantha` (en_US), 170 wpm, synthesized locally. It is a
-timing draft, not the final performance. The author’s own recording is the better
-voice; the cut is built so it can be swapped without touching a scene.
+**Voice:** Kokoro `af_heart` (Apache-2.0 model, `kokoro-onnx`, 24 kHz, speed 1.0),
+synthesized locally on this Mac. It replaces the macOS `say` draft. The author’s
+own recording is still the better voice; the cut is built so it can be swapped
+without touching a scene. If Kokoro is not installed, the builder falls back to
+macOS `say` with `Samantha` at 170 wpm.
+
+All on-screen counts are the measured live run: **1 objection, 1 note, 5 agreed**.
+The payoff and the close both show **reviewed in 20 s · 2 notes · agent replied in
+7 s**, from `docs/recording-log.md`.
 
 ## Files
 
@@ -15,68 +21,93 @@ voice; the cut is built so it can be swapped without touching a scene.
 | Human-readable script (this file) | `docs/narration.md` |
 | Machine-readable lines and start times | `demo/film/src/pinpoint/narration.json` |
 | Burned-in caption cues (generated) | `demo/film/src/pinpoint/captions.generated.json` |
-| Draft voice track | `demo/film/public/audio/pinpoint-voice-draft.mp3` |
-| Quiet ambient bed | `demo/film/public/audio/pinpoint-bed-draft.mp3` |
+| Voice track | `demo/film/public/audio/pinpoint-voice-kokoro.mp3` |
+| Quiet ambient bed | `demo/film/public/audio/pinpoint-bed-v2.mp3` |
 | Which audio the film plays | `audio` in `demo/film/src/clips.json` |
+| Vertical teaser lines | `demo/film/src/pinpoint/teaser-narration.json` |
+| Vertical teaser voice | `demo/film/public/audio/teaser-voice-kokoro.mp3` |
 
 ## Lines
 
 | ID | Time | Line | Scene |
 |---|---|---|---|
-| `hook-1` | 0:01.2 – 0:04.3 | Your agents write essays. You’re on a train. | Hook — the wall |
-| `hook-2` | 0:05.6 – 0:08.3 | Seven lines. Each one a decision. | Hook — the wall |
-| `gap-1` | 0:13.0 – 0:17.2 | On glasses today, you can approve, or say one sentence. | Problem — the yes/no card |
-| `gap-2` | 0:19.4 – 0:21.8 | A yes or no doesn’t steer an agent. | Problem — the yes/no card |
-| `alert-1` | 0:24.6 – 0:27.5 | When a thread needs you, it finds your phone. | Alert — phone → glasses |
-| `alert-2` | 0:28.4 – 0:30.1 | Your glasses mirror it. | Alert — phone → glasses |
-| `hero-1` | 0:33.4 – 0:36.0 | One thread. A seven-step plan. | Hero — plan review |
-| `hero-2` | 0:37.2 – 0:40.9 | Every point is one line, tied to the plan’s own words. | Hero — plan review |
-| `hero-3` | 0:44.4 – 0:46.7 | Step four would sign everyone out. | Hero — plan review |
-| `hero-4` | 0:49.8 – 0:51.4 | Tap. Talk. | Hero — plan review |
-| `hero-5` | 0:55.2 – 0:57.9 | Your objection lands on that exact step. | Hero — plan review |
-| `hero-6` | 1:03.4 – 1:07.4 | Step six: a mutex that deadlocks with the retry path. | Hero — plan review |
-| `hero-7` | 1:08.4 – 1:10.4 | The rest pass in silence. | Hero — plan review |
-| `hero-8` | 1:11.6 – 1:13.9 | Preview. One tap to send. | Hero — plan review |
-| `hero-9` | 1:18.6 – 1:20.1 | Sent to the agent. | Hero — plan review |
-| `hero-10` | 1:26.2 – 1:27.6 | Back to the train. | Hero — plan review |
-| `payoff-1` | 1:33.8 – 1:36.3 | It lands in the thread as a cited review. | Payoff — T3 Code |
-| `payoff-2` | 1:39.2 – 1:42.1 | The agent revises the plan and keeps working. | Payoff — T3 Code |
-| `payoff-3` | 1:43.4 – 1:46.6 | Laptop-quality feedback. From your glasses. | Payoff — T3 Code |
-| `question-1` | 1:47.8 – 1:49.8 | Questions come as options. | Question — deps-upgrade |
-| `question-2` | 1:51.2 – 1:53.9 | One tap: stay on six for now. | Question — deps-upgrade |
-| `inbox-1` | 2:00.6 – 2:03.0 | Four drafts from your inbox agent. | Inbox agent — inbox-morning |
-| `inbox-2` | 2:04.2 – 2:06.1 | Three pass in silence. | Inbox agent — inbox-morning |
-| `inbox-3` | 2:07.4 – 2:10.6 | One correction: Thursday, not Tuesday. | Inbox agent — inbox-morning |
-| `inbox-4` | 2:11.8 – 2:13.9 | Cleared in twenty-five seconds. | Inbox agent — inbox-morning |
-| `telegram-1` | 2:18.6 – 2:21.4 | The full plan waits in a Telegram topic. | Telegram |
-| `telegram-2` | 2:22.8 – 2:26.1 | Every note is a quote-reply on its exact sentence. | Telegram |
-| `telegram-3` | 2:27.4 – 2:30.1 | Read on phone, right where you stopped. | Telegram |
-| `close-1` | 2:32.8 – 2:35.2 | Ring for where. Voice for what. | Close |
-| `close-2` | 2:36.8 – 2:42.1 | Even G2, R1, T3 Code, Telegram. Open source. | Close |
+| `hook-1` | 0:01.2 – 0:04.1 | Your agents write essays. You’re on a train. | Hook — the wall |
+| `hook-2` | 0:05.6 – 0:08.2 | Seven lines. Each one a decision. | Hook — the wall |
+| `gap-1` | 0:12.8 – 0:16.5 | On glasses today, you can approve, or say one sentence. | Problem — the yes/no card |
+| `gap-2` | 0:18.2 – 0:20.9 | A yes or no doesn’t steer an agent. | Problem — the yes/no card |
+| `alert-1` | 0:23.6 – 0:26.4 | When a thread needs you, it finds your phone. | Alert — phone → glasses |
+| `alert-2` | 0:26.9 – 0:28.6 | Your glasses mirror it. | Alert — phone → glasses |
+| `hero-1` | 0:32.8 – 0:35.4 | One thread. A seven-step plan. | Hero — live review |
+| `hero-2` | 0:35.6 – 0:38.3 | Every point is one line from the plan. | Hero — live review |
+| `hero-3` | 0:39.2 – 0:41.4 | Step four signs everyone out. | Hero — live review |
+| `hero-4` | 0:42.6 – 0:44.9 | Your objection lands on that step. | Hero — live review |
+| `hero-5` | 0:46.0 – 0:48.6 | Step six: a mutex that deadlocks. | Hero — live review |
+| `hero-6` | 0:50.4 – 0:53.4 | Five points pass. One tap to send. | Hero — live review |
+| `hero-7` | 0:54.0 – 0:56.1 | Sent. Back to the train. | Hero — live review |
+| `payoff-1` | 0:59.8 – 1:02.5 | It lands in the thread as a cited review. | Payoff — real T3 Code thread |
+| `payoff-2` | 1:03.0 – 1:05.6 | Twenty seconds to review. Two notes. | Payoff — real T3 Code thread |
+| `payoff-3` | 1:06.8 – 1:09.3 | Seven seconds later, the revision. | Payoff — real T3 Code thread |
+| `payoff-4` | 1:10.0 – 1:13.1 | Laptop-quality feedback. From your glasses. | Payoff — real T3 Code thread |
+| `question-1` | 1:16.7 – 1:18.8 | Questions come as options. | Question — deps-upgrade |
+| `question-2` | 1:19.4 – 1:21.9 | One tap: stay on six for now. | Question — deps-upgrade |
+| `inbox-1` | 1:26.7 – 1:29.1 | Four drafts from your inbox agent. | Inbox agent — inbox-morning |
+| `inbox-2` | 1:29.8 – 1:31.5 | Three pass in silence. | Inbox agent — inbox-morning |
+| `inbox-3` | 1:32.6 – 1:35.8 | One correction: make it Thursday, not Tuesday. | Inbox agent — inbox-morning |
+| `inbox-4` | 1:37.6 – 1:39.7 | Cleared in twenty-five seconds. | Inbox agent — inbox-morning |
+| `telegram-1` | 1:46.8 – 1:49.7 | The full plan waits in a Telegram topic. | Telegram |
+| `telegram-2` | 1:50.3 – 1:53.6 | Every note is a quote-reply on its exact sentence. | Telegram |
+| `telegram-3` | 1:54.4 – 1:56.8 | Read on phone, right where you stopped. | Telegram |
+| `close-1` | 2:00.8 – 2:03.2 | Ring for where. Voice for what. | Close |
+| `close-2` | 2:04.4 – 2:08.9 | Even G2, R1, T3 Code, Telegram. Open source. | Close |
+| `close-3` | 2:09.0 – 2:15.2 | Seven steps. Reviewed in twenty seconds. Two notes. The agent replied in seven seconds. | Close — proof |
 
-## Replacing the voice
+The exact spoken lengths are measured by the builder; the table’s end times are
+the generated caption ends at the current speed. If a line is re-recorded, update
+its start/end in `captions.generated.json`.
 
-1. Record the lines, ideally at the same lengths. Keep each line inside its window
-   (a late line will run into the next).
-2. Save the take as `demo/film/public/audio/pinpoint-voice-final.mp3`.
-3. In `demo/film/src/clips.json`, set `audio.narration` to
-   `audio/pinpoint-voice-final.mp3`. Set `audio.bed` to `null` if the take has its
-   own music, or lower `bedVolume` (currently 0.5) to taste.
-4. If a line moved, update its start/end in
-   `demo/film/src/pinpoint/captions.generated.json`. Those are the only numbers the
-   captions use. Do **not** run the draft builder after adding the final file:
-   it regenerates the TTS draft and the generated captions. If you want the
-   builder to re-time the cut first, keep the final file under a different name.
+## Installing Kokoro (one-time)
 
-## Rebuilding the draft
+The model and voices are Apache-2.0. Everything stays on this Mac.
 
 ```sh
 cd demo/film
-node scripts/build-audio.mjs          # say → captions.generated.json → voice + bed
+python3.11 -m venv .venv
+.venv/bin/pip install kokoro-onnx soundfile
+mkdir -p .models
+# official kokoro-onnx model files (model-files-v1.1)
+curl -L -o .models/kokoro-v1.0.onnx \
+  https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.1/kokoro-v1.0.onnx
+curl -L -o .models/voices-v1.0.bin \
+  https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.1/voices-v1.0.bin
+```
+
+`.venv/` and `.models/` are git-ignored. The 24 kHz mono lines are written to
+`demo/out/audio-build/` and mixed with ffmpeg.
+
+## Replacing the voice
+
+1. Record the lines, ideally at the same lengths. Keep each line inside its
+   window (a late line runs into the next).
+2. Save the take as `demo/film/public/audio/pinpoint-voice-final.mp3`.
+3. In `demo/film/src/clips.json`, set `audio.narration` to
+   `audio/pinpoint-voice-final.mp3`. Set `audio.bed` to `null` if the take has its
+   own music, or lower `bedVolume` (currently 0.32) to taste.
+4. If a line moved, update its start/end in
+   `demo/film/src/pinpoint/captions.generated.json`. Those are the only numbers the
+   captions use. Do **not** run the draft builder after adding the final file:
+   it regenerates the TTS draft and the generated captions.
+
+## Rebuilding
+
+```sh
+cd demo/film
+node scripts/build-audio.mjs                              # Kokoro → captions + voice + bed
+node scripts/build-audio.mjs --tts say --voice Samantha  # macOS fallback
+node scripts/build-audio.mjs --script src/pinpoint/teaser-narration.json  # vertical teaser
 ```
 
 The script writes the mix, measures every line with `ffprobe`, and writes the
-caption cues. It does not overwrite anything outside `public/audio/` and the two
+caption cues. It does not overwrite anything outside `public/audio/` and the
 generated files.
 
 ## Timing notes
@@ -85,6 +116,9 @@ generated files.
 - The big on-screen line **“Approval isn’t feedback.”** is deliberately spoken as
   “A yes or no doesn’t steer an agent.” so the caption adds a thought instead of
   repeating the title.
-- The close holds the URLs for the last ~5 s with no narration.
-- The proof line from `docs/DEMO.md` is **not** spoken in this draft, because the
-  real recorded run’s numbers are not in yet. Add it at the close once they are.
+- The hero voice is timed to the real markers: point 4 at 0:39.2, the p4
+  transcript at 0:42.6, point 6 at 0:46.0, the p6 transcript at 0:48.8, preview
+  at 0:50.8, sent at 0:52.4. The clip is not slowed.
+- The close speaks the measured proof line for the first time: 20 s review,
+  2 notes, 7 s reply. The same numbers are shown in the payoff.
+- The close holds the URLs for the last ~4 s with no narration.

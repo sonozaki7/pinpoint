@@ -6,28 +6,41 @@
     "uses the `stills` map (real simulator screenshots) or remains a designed board.",
     "Hook, Problem and Close are always designed; the other six accept a source.",
     "Replace a scene by setting its `source`:",
-    "  { \"kind\": \"clip\",   \"src\": \"clips/auth.mp4\" }",
+    "  { \"kind\": \"clip\",   \"src\": \"clips/auth.mp4\", \"delay\": 1.1 }",
     "  { \"kind\": \"frames\", \"dir\": \"clips/auth\", \"fps\": 9.91, \"count\": 182 }",
     "    optional: \"meta\": \"clips/auth/meta.json\", \"timeline\": \"clips/timeline.json\"",
-    "Files must live under demo/film/public/. Use `npm run sync-shots` after new captures.",
+    "Files must live under demo/film/public/. Use `npm run sync-recordings` after new captures.",
     "",
-    "`inputs` are ring-gesture overlays, in seconds from the scene start. If a new",
-    "recording follows the same script, keep them; otherwise edit the `at` values.",
+    "`inputs` are ring-gesture overlays, in seconds from the scene start. They are",
+    "generated from each recording's timeline by `npm run sync-recordings`; do not",
+    "hand-edit them or add an input the recording does not contain.",
     "`status` is the honesty label reported in the render summary and shown in the",
     "top-right proof tag. Change it when a placeholder becomes a real capture.",
     "",
-    "Scene timings live in src/pinpoint/timeline.ts (165 s total, 30 fps)."
+    "Scene timings live in src/pinpoint/timeline.ts (140 s total, 30 fps)."
   ],
   "audio": {
-    "narration": "audio/pinpoint-voice-draft.mp3",
-    "bed": "audio/pinpoint-bed-draft.mp3",
-    "bedVolume": 0.5,
-    "note": "Swap narration for the author's recording, keeping the file name, or point this at a new file. Re-run `node scripts/build-audio.mjs` after editing narration.json to refresh burned-in captions."
+    "narration": "audio/pinpoint-voice-kokoro.mp3",
+    "bed": "audio/pinpoint-bed-v2.mp3",
+    "bedVolume": 0.32,
+    "note": "Kokoro af_heart draft, 29 lines. Swap narration for the author's recording, keeping the file name, or point this at a new file. Re-run `node scripts/build-audio.mjs` after editing narration.json to refresh burned-in captions."
   },
+  "todoReal": [
+    {
+      "scene": "alert",
+      "item": "Alert phone",
+      "what": "The lock-screen notification is built in Remotion. No real phone push capture exists yet."
+    },
+    {
+      "scene": "telegram",
+      "item": "Telegram topic",
+      "what": "The Pinpoint Desk topic and quote-replies are illustrative until the real bot exists and a screen capture is made."
+    }
+  ],
   "scenes": {
     "hook": {
-      "status": "real deck (auth-refresh-fix fixture), designed motion",
-      "note": "The wall is the fixture's real 511-word plan text; the seven lines are its real glances.",
+      "status": "real plan text + designed motion",
+      "note": "The wall is the fixture's real 510-word plan text; the seven lines are its real glances.",
       "source": null
     },
     "problem": {
@@ -35,16 +48,47 @@
       "source": null
     },
     "alert": {
-      "status": "real simulator still + illustrative phone",
-      "note": "Glasses screen is demo/shots/glasses-01-inbox.png. The lock-screen notification is built in Remotion.",
+      "status": "real simulator clip (inbox) + TODO-real phone UI",
+      "note": "The glasses screen is the real inbox.mp4 recording, delayed 1.1 s while the phone lands. The lock-screen notification is built in Remotion and labelled illustrative on screen.",
+      "source": {
+        "kind": "clip",
+        "src": "clips/inbox.mp4",
+        "delay": 1.1
+      },
       "stills": {
         "inbox": "shots/glasses-01-inbox.png"
+      },
+      "inputs": [
+        {
+          "at": 1.705,
+          "kind": "swipe",
+          "label": "focus auth-refresh-fix",
+          "note": "down",
+          "sourceLabel": "focus auth-refresh-fix"
+        }
+      ],
+      "recording": {
+        "clip": "clips/inbox.mp4",
+        "timeline": "demo/recordings/inbox.timeline.json",
+        "duration": 2.667,
+        "fps": 9.81,
+        "frames": 27,
+        "inputs": 1,
+        "note": "inputs are generated from the recording timeline by scripts/sync-recordings.mjs"
       }
     },
     "hero": {
-      "status": "real simulator stills (one-objection capture)",
-      "note": "Nine stills sequenced to the storyboard. This capture has one objection; the film's step-6 beat is the intended second note, so the send-row/preview counters differ until a two-note run is recorded. A single later recording can replace the whole hero by setting `source`.",
-      "source": null,
+      "status": "real simulator recording (live run: 1 objection, 1 note, 5 agreed)",
+      "note": "live-hero.mp4 is the real live take against the real server: notes on steps 4 and 6, preview 1 objection / 1 note / 5 agreed. At 22.0 s the cut lands on inbox-after.mp4 (the same fixture inbox with the reviewed thread gone) while the sent toast is still on screen.",
+      "source": {
+        "kind": "clip",
+        "src": "clips/live-hero.mp4"
+      },
+      "sourceAfter": {
+        "kind": "clip",
+        "src": "clips/inbox-after.mp4"
+      },
+      "afterAt": 22.0,
       "stills": {
         "inbox": "shots/glasses-01-inbox.png",
         "point1": "shots/glasses-02-review.png",
@@ -57,45 +101,281 @@
         "inboxAfter": "shots/glasses-10-inbox-after.png"
       },
       "inputs": [
-        { "at": 0.4, "kind": "swipe", "label": "move to auth-refresh-fix", "note": "focus" },
-        { "at": 2.7, "kind": "tap", "label": "open the plan", "note": "open" },
-        { "at": 4.7, "kind": "swipe", "label": "next point", "note": "move" },
-        { "at": 10.0, "kind": "swipe", "label": "to step 4", "note": "move" },
-        { "at": 10.9, "kind": "tap", "label": "start voice", "note": "talk" },
-        { "at": 16.8, "kind": "talk", "label": "speak the objection", "note": "talk" },
-        { "at": 22.8, "kind": "tap", "label": "stop recording", "note": "stop" },
-        { "at": 30.4, "kind": "swipe", "label": "to the send row", "note": "move" },
-        { "at": 38.5, "kind": "tap", "label": "open preview", "note": "open" },
-        { "at": 45.4, "kind": "tap", "label": "send the review", "note": "send" }
-      ]
+        {
+          "at": 0.017,
+          "kind": "tap",
+          "label": "open the plan",
+          "note": "click",
+          "sourceLabel": "open auth-refresh-fix"
+        },
+        {
+          "at": 2.153,
+          "kind": "swipe",
+          "label": "next point",
+          "note": "down",
+          "sourceLabel": "point 2"
+        },
+        {
+          "at": 3.071,
+          "kind": "swipe",
+          "label": "next point",
+          "note": "down",
+          "sourceLabel": "point 3"
+        },
+        {
+          "at": 3.973,
+          "kind": "swipe",
+          "label": "to step 4",
+          "note": "down",
+          "sourceLabel": "point 4, high risk"
+        },
+        {
+          "at": 5.476,
+          "kind": "talk",
+          "label": "start voice",
+          "note": "click",
+          "sourceLabel": "tap to record: No. Don't log everyone out. Migrate the existing sessions instead."
+        },
+        {
+          "at": 8.08,
+          "kind": "tap",
+          "label": "stop recording",
+          "note": "click",
+          "sourceLabel": "tap to stop"
+        },
+        {
+          "at": 10.081,
+          "kind": "swipe",
+          "label": "next point",
+          "note": "down",
+          "sourceLabel": "point 5"
+        },
+        {
+          "at": 10.985,
+          "kind": "swipe",
+          "label": "to step 6",
+          "note": "down",
+          "sourceLabel": "point 6, mutex"
+        },
+        {
+          "at": 12.188,
+          "kind": "talk",
+          "label": "start voice",
+          "note": "click",
+          "sourceLabel": "tap to record: Use a request queue. A mutex deadlocks with the retry path."
+        },
+        {
+          "at": 14.79,
+          "kind": "tap",
+          "label": "stop recording",
+          "note": "click",
+          "sourceLabel": "tap to stop"
+        },
+        {
+          "at": 16.793,
+          "kind": "swipe",
+          "label": "next point",
+          "note": "down",
+          "sourceLabel": "point 7"
+        },
+        {
+          "at": 17.697,
+          "kind": "swipe",
+          "label": "to the send row",
+          "note": "down",
+          "sourceLabel": "Send review row"
+        },
+        {
+          "at": 18.8,
+          "kind": "tap",
+          "label": "open preview",
+          "note": "click",
+          "sourceLabel": "open preview"
+        },
+        {
+          "at": 20.402,
+          "kind": "tap",
+          "label": "send the review",
+          "note": "click",
+          "sourceLabel": "send to agent"
+        }
+      ],
+      "recording": {
+        "clip": "clips/live-hero.mp4",
+        "timeline": "demo/recordings/live-hero.timeline.json",
+        "duration": 22.8,
+        "fps": 9.82,
+        "frames": 225,
+        "inputs": 14,
+        "note": "inputs are generated from the recording timeline by scripts/sync-recordings.mjs"
+      }
     },
     "payoff": {
-      "status": "placeholder — illustrative T3 Code thread until the real screen capture exists",
-      "note": "Replace with the real T3 Code window capture after the live run: set source to {kind:'clip',src:'clips/t3-review.mp4'}; it renders full-frame.",
+      "status": "real T3 Code thread export (t3-live-thread.json)",
+      "note": "Rendered from demo/recordings/t3-live-thread.json: the exact cited review and the agent's reply, trimmed with … only. Measured: reviewed in 20 s · 2 notes · agent replied in 7 s.",
       "source": null
     },
     "question": {
-      "status": "real simulator stills",
+      "status": "real simulator recording (deps-upgrade)",
+      "note": "deps.mp4: options on the glasses, one tap stays on 6, then back to the inbox.",
+      "source": {
+        "kind": "clip",
+        "src": "clips/deps.mp4"
+      },
       "stills": {
         "options": "shots/glasses-11-options.png",
         "answer": "shots/glasses-12-answer.png"
       },
       "inputs": [
-        { "at": 2.9, "kind": "tap", "label": "pick Stay on 6", "note": "choose" }
-      ]
+        {
+          "at": 0.706,
+          "kind": "tap",
+          "label": "open deps-upgrade",
+          "note": "click",
+          "sourceLabel": "open deps-upgrade"
+        },
+        {
+          "at": 3.011,
+          "kind": "tap",
+          "label": "open options",
+          "note": "click",
+          "sourceLabel": "open options"
+        },
+        {
+          "at": 5.216,
+          "kind": "tap",
+          "label": "pick Stay on 6",
+          "note": "click",
+          "sourceLabel": "pick Stay on 6 for now"
+        },
+        {
+          "at": 7.04,
+          "kind": "double",
+          "label": "back to inbox",
+          "note": "double_click",
+          "sourceLabel": "back to inbox"
+        }
+      ],
+      "recording": {
+        "clip": "clips/deps.mp4",
+        "timeline": "demo/recordings/deps.timeline.json",
+        "duration": 8.167,
+        "fps": 9.9,
+        "frames": 82,
+        "inputs": 4,
+        "note": "inputs are generated from the recording timeline by scripts/sync-recordings.mjs"
+      }
     },
     "inbox": {
-      "status": "placeholder — no inbox-morning capture yet; built from the real fixture deck",
-      "note": "Four draft glances are the fixture's own text. Replace the board with frames from demo/shots/tmp/inbox-morning when recorded.",
-      "source": null
+      "status": "real simulator recording (inbox-morning) + designed board",
+      "note": "inbox-morning.mp4: 4 drafted replies, one correction on Tomas, 3 agreed in silence. The left board keeps the summary readable beside the real lens.",
+      "source": {
+        "kind": "clip",
+        "src": "clips/inbox-morning.mp4"
+      },
+      "inputs": [
+        {
+          "at": 0.717,
+          "kind": "swipe",
+          "label": "to row 2",
+          "note": "down",
+          "sourceLabel": "row 2"
+        },
+        {
+          "at": 1.621,
+          "kind": "swipe",
+          "label": "to inbox-morning",
+          "note": "down",
+          "sourceLabel": "row 3 inbox-morning"
+        },
+        {
+          "at": 2.523,
+          "kind": "tap",
+          "label": "open inbox-morning",
+          "note": "click",
+          "sourceLabel": "open inbox-morning"
+        },
+        {
+          "at": 4.632,
+          "kind": "swipe",
+          "label": "draft 1 · Priya",
+          "note": "down",
+          "sourceLabel": "draft 1, Priya"
+        },
+        {
+          "at": 5.536,
+          "kind": "swipe",
+          "label": "draft 2 · Tomas",
+          "note": "down",
+          "sourceLabel": "draft 2, Tomas"
+        },
+        {
+          "at": 6.741,
+          "kind": "talk",
+          "label": "start voice",
+          "note": "click",
+          "sourceLabel": "tap to record: Make it Thursday, not Tuesday."
+        },
+        {
+          "at": 9.344,
+          "kind": "tap",
+          "label": "stop recording",
+          "note": "click",
+          "sourceLabel": "tap to stop"
+        },
+        {
+          "at": 11.348,
+          "kind": "swipe",
+          "label": "draft 3 · Cassie",
+          "note": "down",
+          "sourceLabel": "draft 3, Cassie"
+        },
+        {
+          "at": 12.251,
+          "kind": "swipe",
+          "label": "draft 4 · Airbnb",
+          "note": "down",
+          "sourceLabel": "draft 4, Airbnb"
+        },
+        {
+          "at": 13.152,
+          "kind": "swipe",
+          "label": "last point",
+          "note": "down",
+          "sourceLabel": "last point"
+        },
+        {
+          "at": 14.056,
+          "kind": "swipe",
+          "label": "send row",
+          "note": "down",
+          "sourceLabel": "Send review row"
+        },
+        {
+          "at": 15.166,
+          "kind": "double",
+          "label": "back to inbox",
+          "note": "double_click",
+          "sourceLabel": "back to inbox"
+        }
+      ],
+      "recording": {
+        "clip": "clips/inbox-morning.mp4",
+        "timeline": "demo/recordings/inbox-morning.timeline.json",
+        "duration": 16.1,
+        "fps": 9.87,
+        "frames": 160,
+        "inputs": 12,
+        "note": "inputs are generated from the recording timeline by scripts/sync-recordings.mjs"
+      }
     },
     "telegram": {
-      "status": "placeholder — illustrative Telegram topic until the real bot capture exists",
-      "note": "The review text and quote-reply sentences come from the fixture. Set source to a clip of the real phone to replace the whole scene full-frame.",
+      "status": "TODO-real — illustrative Telegram topic; real bot capture pending",
+      "note": "The review text and quote-reply sentences come from the recorded run. Set source to a clip of the real phone to replace the whole scene full-frame.",
       "source": null
     },
     "close": {
-      "status": "design",
+      "status": "design + measured proof line",
       "source": null
     }
   }

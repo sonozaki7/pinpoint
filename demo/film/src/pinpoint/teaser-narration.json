@@ -1,0 +1,25 @@
+{
+  "tts": "kokoro",
+  "voice": "af_heart",
+  "fallbackVoice": "Samantha",
+  "rate": 170,
+  "speed": 1.0,
+  "lang": "en-us",
+  "duration": 41,
+  "captions": false,
+  "voiceFile": "teaser-voice-kokoro.mp3",
+  "bedFile": null,
+  "note": "Vertical teaser voice. Same Kokoro af_heart model as the main film. No burned-in caption file: the teaser uses the designed statements on screen.",
+  "lines": [
+    { "id": "t-hook", "at": 0.8, "text": "Your agents write essays. You’re on a train." },
+    { "id": "t-talk", "at": 6.9, "text": "Say what’s wrong." },
+    { "id": "t-objection", "at": 11.3, "text": "One objection, cited." },
+    { "id": "t-more", "at": 14.0, "text": "One more." },
+    { "id": "t-note", "at": 17.9, "text": "One note. Five agree." },
+    { "id": "t-sent", "at": 21.6, "text": "Sent." },
+    { "id": "t-reply", "at": 24.8, "text": "The agent replied in seven seconds." },
+    { "id": "t-quality", "at": 28.6, "text": "Laptop-quality feedback. From your glasses." },
+    { "id": "t-close", "at": 35.2, "text": "Ring for where. Voice for what." },
+    { "id": "t-open", "at": 38.0, "text": "Even G2. Open source." }
+  ]
+}

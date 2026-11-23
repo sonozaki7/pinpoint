@@ -1,6 +1,6 @@
 import {useCurrentFrame} from "remotion";
 import {sceneConfig} from "../data";
-import {Lens, Mark, SourceRenderer, Still, easeOut, phase, sceneSource} from "../ui";
+import {GestureChip, Lens, Mark, SourceRenderer, Still, easeOut, phase, sceneSource, useActiveInput} from "../ui";
 
 export function Alert() {
   const f = useCurrentFrame();
@@ -11,6 +11,7 @@ export function Alert() {
   const config = sceneConfig("alert");
   const source = sceneSource("alert");
   const still = config.stills?.inbox;
+  const active = useActiveInput("alert", f);
 
   return (
     <div className="pp-stage pp-dark">
@@ -28,7 +29,7 @@ export function Alert() {
           transform: `translateY(${(1 - phoneIn) * 24}px) scale(${1 - lensIn * 0.012})`,
         }}
       >
-        <div className="pp-phone-label">PHONE · LOCKED</div>
+        <div className="pp-phone-label">PHONE · LOCKED · ILLUSTRATIVE</div>
         <div className="pp-phone-screen">
           <div className="pp-lock">
             <div className="pp-lock-time">08:12</div>
@@ -99,12 +100,27 @@ export function Alert() {
       <div
         style={{
           position: "absolute",
+          left: 596,
+          top: 174,
+          fontFamily: "IBM Plex Mono, monospace",
+          fontSize: 9,
+          letterSpacing: "0.14em",
+          color: "#71877a",
+          opacity: lensIn,
+        }}
+      >
+        ILLUSTRATIVE PHONE UI · REAL GLASSES CAPTURE
+      </div>
+
+      <div
+        style={{
+          position: "absolute",
           inset: 0,
           opacity: lensIn,
           transform: `translateY(${(1 - lensIn) * 18}px)`,
         }}
       >
-        <Lens style={{left: 590, top: 246}} label="EVEN G2 · ALERT" meta="PHONE NOTIFICATION · MIRRORED">
+        <Lens style={{left: 590, top: 246}} label="EVEN G2 · ALERT" meta={null}>
           {source ? (
             <SourceRenderer source={source} />
           ) : still ? (
@@ -113,24 +129,7 @@ export function Alert() {
         </Lens>
       </div>
 
-      <div
-        style={{
-          position: "absolute",
-          left: 596,
-          top: 930,
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          fontFamily: "IBM Plex Mono, monospace",
-          fontSize: 10,
-          letterSpacing: "0.16em",
-          color: "#8aa095",
-          opacity: phase(f, 3.1, 3.8),
-        }}
-      >
-        <span style={{width: 6, height: 6, borderRadius: "50%", background: "#b9fca9"}} />
-        PINPOINT DESK · ONE TOPIC PER THREAD
-      </div>
+      {active ? <GestureChip compact input={active} localFrame={f} style={{left: 596, top: 896}} /> : null}
     </div>
   );
 }

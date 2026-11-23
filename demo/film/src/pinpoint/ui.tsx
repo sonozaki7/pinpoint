@@ -3,6 +3,7 @@ import {
   Easing,
   Img,
   OffthreadVideo,
+  Sequence,
   continueRender,
   delayRender,
   interpolate,
@@ -109,7 +110,7 @@ export function SourceRenderer({
   fit?: "cover" | "contain";
 }) {
   if (source.kind === "clip") {
-    return (
+    const video = (
       <OffthreadVideo
         src={staticFile(source.src)}
         muted
@@ -117,6 +118,10 @@ export function SourceRenderer({
         style={{display: "block", width, height, objectFit: fit}}
       />
     );
+    if (source.delay) {
+      return <Sequence from={ff(source.delay)}>{video}</Sequence>;
+    }
+    return video;
   }
   if (source.kind === "frames") return <FrameFolder source={source} width={width} height={height} fit={fit} />;
   return null;
@@ -230,10 +235,12 @@ export function GestureChip({
   input,
   style,
   localFrame,
+  compact = false,
 }: {
   input: RingInput;
   style?: CSSProperties;
   localFrame: number;
+  compact?: boolean;
 }) {
   const t = localFrame / FPS - input.at;
   const enter = Math.min(1, Math.max(0, t / 0.22));
@@ -241,9 +248,12 @@ export function GestureChip({
   const scale = 0.97 + 0.03 * easeOut(t >= 0 ? Math.min(1, t / 0.3) : 0);
   const ripple = input.kind === "tap" ? Math.max(0, 1 - t / 0.7) : 0;
   return (
-    <div className="pp-input" style={{...style, opacity: enter * retire, transform: `translateY(${(1 - enter) * 10}px) scale(${scale})`}}>
+    <div
+      className={`pp-input ${compact ? "compact" : ""}`}
+      style={{...style, opacity: enter * retire, transform: `translateY(${(1 - enter) * 10}px) scale(${scale})`}}
+    >
       <div className="pp-input-icon" style={ripple > 0 ? {boxShadow: `0 0 0 ${ripple * 9}px rgba(185,252,169,${ripple * 0.16})`} : undefined}>
-        <RingGlyph kind={input.kind} />
+        <RingGlyph kind={input.kind} size={compact ? 24 : 30} />
       </div>
       <div>
         <div className="pp-input-kicker">{input.kind.toUpperCase()}</div>

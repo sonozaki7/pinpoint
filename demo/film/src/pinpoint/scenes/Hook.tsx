@@ -28,10 +28,10 @@ const points = fixture.deck.points.slice(0, 7);
 
 export function Hook() {
   const f = useCurrentFrame();
-  const collapse = phase(f, 3.15, 4.35, easeInOut);
-  const lineWidth = phase(f, 3.7, 4.4);
-  const lensIn = phase(f, 4.15, 5.0, easeInOut);
-  const wallFade = 1 - phase(f, 4.05, 4.5);
+  const collapse = phase(f, 3.15, 4.2, easeInOut);
+  const lineWidth = phase(f, 3.6, 4.2);
+  const lensIn = phase(f, 3.9, 4.7, easeInOut);
+  const wallFade = 1 - phase(f, 3.85, 4.3);
   const endFade = 1 - phase(f, 11.35, 12);
 
   const wallClip = interpolate(collapse, [0, 1], [0, 47]);
@@ -108,7 +108,7 @@ export function Hook() {
             </div>
             <div className="pp-hook-points">
               {points.map((point, index) => {
-                const reveal = phase(f, 5.0 + index * 0.16, 5.42 + index * 0.16);
+                const reveal = phase(f, 4.5 + index * 0.16, 4.95 + index * 0.16);
                 return (
                   <div
                     key={point.id}
@@ -141,7 +141,7 @@ export function Hook() {
           opacity: phase(f, 1.4, 2.2) * (1 - phase(f, 4.2, 4.8)),
         }}
       >
-        AUTH-REFRESH-FIX · 511 WORDS · T3 CODE
+        AUTH-REFRESH-FIX · 510 WORDS · T3 CODE
       </div>
       <div
         style={{

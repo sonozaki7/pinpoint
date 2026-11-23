@@ -8,6 +8,7 @@ import {Conversation, JourneyClose, JourneyOpen, PlatformSequence, WalkSequence}
 import {clamp, ff, fps, useTall} from "./ui";
 import captions from "./captions.json";
 import {PinpointDemo} from "./pinpoint/Film";
+import {PinpointTeaser, TEASER_DURATION} from "./pinpoint/Teaser";
 import {DURATION} from "./pinpoint/timeline";
 
 const duration = 82;
@@ -51,6 +52,7 @@ function Root() {
     <Composition id="Portrait" component={Film} width={1080} height={1920} fps={fps} durationInFrames={ff(duration)}/>
     <Composition id="Cover" component={Cover} width={1920} height={1080} fps={fps} durationInFrames={1}/>
     <Composition id="PinpointDemo" component={PinpointDemo} width={1920} height={1080} fps={30} durationInFrames={DURATION * 30}/>
+    <Composition id="PinpointTeaser" component={PinpointTeaser} width={1080} height={1920} fps={30} durationInFrames={TEASER_DURATION * 30}/>
   </>;
 }
 

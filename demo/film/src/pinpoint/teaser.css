@@ -1,0 +1,72 @@
+/* 1080×1920 teaser — same paper, ink, jade and mono as the 16:9 cut. */
+
+.pp-teaser-root { background: #070b0c; }
+
+.pp-teaser-wall {
+  position: absolute; inset: -12% -8%;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 18%, #000 82%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 18%, #000 82%, transparent 100%);
+}
+.pp-teaser-wall-col { width: 270px; flex: 0 0 270px; font: 400 13px/1.58 var(--mono); color: #83c47e; letter-spacing: -0.01em; }
+.pp-teaser-wall-col p { margin: 0 0 8px; }
+
+.pp-teaser-brand {
+  position: absolute; left: 78px; top: 96px; display: flex; align-items: center; gap: 12px;
+  font: 500 15px/1 var(--mono); letter-spacing: 0.26em; color: #e8efe9;
+}
+.pp-teaser-brand-right {
+  position: absolute; right: 78px; top: 100px;
+  font: 500 11px/1 var(--mono); letter-spacing: 0.17em; color: #849990;
+}
+.pp-teaser-kicker { font: 500 13px/1 var(--mono); letter-spacing: 0.22em; color: #8fa79b; }
+.pp-teaser-hook { margin-top: 28px; font: 540 104px/0.98 var(--sans); letter-spacing: -0.06em; color: #f2f5ee; }
+.pp-teaser-train { font: 540 84px/1.02 var(--sans); letter-spacing: -0.05em; color: var(--jade); }
+.pp-teaser-sub { margin-top: 22px; font: 500 24px/1.35 var(--sans); letter-spacing: -0.02em; color: #b9c6bd; }
+.pp-teaser-rule { position: absolute; height: 2px; background: linear-gradient(90deg, rgba(185, 252, 169, 0.95), rgba(185, 252, 169, 0.1)); box-shadow: 0 0 24px rgba(185, 252, 169, 0.35); }
+.pp-teaser-foot {
+  position: absolute; left: 78px; bottom: 64px;
+  font: 500 11px/1 var(--mono); letter-spacing: 0.18em; color: #7b9186;
+}
+
+.pp-teaser-counts { margin-top: 28px; font: 540 68px/1.16 var(--sans); letter-spacing: -0.05em; color: #f2f5ee; }
+.pp-teaser-counts div { margin-top: 4px; }
+.pp-teaser-quote { font: 520 34px/1.34 var(--sans); letter-spacing: -0.025em; color: #eef5e9; }
+.pp-teaser-gestures {
+  position: absolute; left: 78px; top: 1570px; display: flex; gap: 42px;
+  font: 500 11px/1 var(--mono); letter-spacing: 0.12em; color: #7f9588;
+}
+.pp-teaser-gestures span { display: flex; align-items: center; gap: 8px; }
+.pp-teaser-strip {
+  position: absolute; right: 78px; top: 1660px; text-align: right;
+  display: flex; flex-direction: column; gap: 8px;
+  font: 500 10px/1 var(--mono); letter-spacing: 0.15em; color: #7f9588;
+}
+
+.pp-teaser-payoff-title { margin-top: 24px; font: 540 96px/0.98 var(--sans); letter-spacing: -0.06em; color: #13212a; }
+.pp-teaser-card {
+  border-radius: 16px; border: 1.5px solid #d8d1c2; background: #fbfaf5;
+  padding: 24px 28px 26px; box-shadow: 0 30px 70px rgba(47, 55, 44, 0.13), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+.pp-teaser-card-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 14px;
+  font: 500 11px/1.2 var(--mono); letter-spacing: 0.1em; color: #7b887c;
+}
+.pp-teaser-card-head b { font-weight: 600; color: #2c4a31; letter-spacing: 0.02em; }
+.pp-teaser-review-line { display: flex; gap: 12px; margin-top: 12px; font-size: 25px; line-height: 1.42; color: #2a3a2c; letter-spacing: -0.02em; }
+.pp-teaser-review-line b { width: 18px; flex: 0 0 18px; font: 500 18px/1.5 var(--mono); }
+.pp-teaser-review-line.object b { color: #94502f; }
+.pp-teaser-review-line.note b { color: #a97a3f; }
+.pp-teaser-review-line.agreed { color: #3c6640; font-size: 20px; }
+.pp-teaser-review-line.agreed b { color: #4f8a54; }
+.pp-teaser-reply { margin-top: 12px; font-size: 22px; line-height: 1.45; color: #29383c; letter-spacing: -0.02em; }
+.pp-teaser-reply b { color: #2c4a31; font-weight: 600; }
+.pp-teaser-proof-kicker { font: 500 12px/1 var(--mono); letter-spacing: 0.2em; color: #6f7d72; }
+.pp-teaser-proof { margin-top: 10px; font: 600 44px/1.18 var(--sans); letter-spacing: -0.035em; color: #22352b; }
+
+.pp-teaser-close-title { font: 540 108px/0.98 var(--sans); letter-spacing: -0.06em; color: #13212a; }
+.pp-teaser-close-title span { color: #3f6a45; }
+.pp-teaser-url {
+  display: inline-block; padding-bottom: 5px; border-bottom: 1px solid #a9b5a6;
+  font: 500 24px/1.1 var(--mono); letter-spacing: 0.01em; color: #22343a;
+}
