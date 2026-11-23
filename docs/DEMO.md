@@ -8,7 +8,7 @@ Goal: in 2:30–2:50, a judge who has watched 40 "approve from your glasses" dem
 - One-liner: *Review your AI agents' work from Even G2 — point by point, with the precision of your laptop.*
 - Contrast line: *Everyone built "approve from your glasses". Approval isn't feedback.*
 - Principle: *Silence means agree. You only speak when something's wrong.*
-- Proof line at the end: real numbers from the recorded run, e.g. `7-step plan · reviewed in 38 s · 2 precise corrections · 0 laptops`.
+- Proof line at the end: real numbers from the recorded run, e.g. `7-step plan · reviewed in 20 s · 2 precise corrections · agent replied in 7 s` (measured in the live run, docs/recording-log.md).
 
 ## Storyboard (target 2:40, captions burned in — judges often watch muted)
 
