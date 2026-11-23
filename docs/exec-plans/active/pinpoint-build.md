@@ -10,7 +10,7 @@ Spec: `docs/SPEC.md` · Demo/pitch: `docs/DEMO.md` · Acceptance rows: SPEC §13
 - Current path: Wave 1 delegates running (see board).
 - Next three actions: integrate wave 1 → wave 2 (site deploy, demo recording, live T3 run) → polish + README.
 - Open blockers (need the user, deferred to morning): Telegram bot token + group, flip repo public, DNS for site (if needed), narration voice.
-- Last checkpoint: 2026-11-24 ~01:50 JST, repo scaffolded.
+- Last checkpoint: 2026-11-24 night run complete; video v2 + docs done; waiting on the morning checklist (docs/MORNING.md).
 
 ## Task board
 
@@ -28,7 +28,7 @@ Spec: `docs/SPEC.md` · Demo/pitch: `docs/DEMO.md` · Acceptance rows: SPEC §13
 | W10 | README, SUBMISSION.md, FEATURE_REQUESTS.md | DeepSeek | done (draft) | final pass after video/live numbers |
 | W11 | Glasses polish + run against real server | DeepSeek | done | focus cursor, counters; real mic via T3 179 ms |
 | W12 | Scene recordings + live proof run | DeepSeek | done | open→send 20.4 s, 2 notes, agent replied 7.3 s; T3 screenshot needs pairing (morning) |
-| W13 | Final docs pass, real numbers, cleanup sandbox threads, make public (user OK) | — | queued (after W8b + morning items) | |
+| W13 | Final docs + runbook (W13a done); publish + Telegram real run + final render + cleanup sandbox threads (needs user, see docs/MORNING.md) | — | waiting on user | |
 | W14 | Hardening + `npm run demo` + `npm run check` | DeepSeek | done | 155 server + 19 glasses tests |
 
 ## Morning checklist for the user (big or account-bound decisions)
