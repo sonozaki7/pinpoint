@@ -1,6 +1,6 @@
 import { serve } from '@hono/node-server';
 import { DeckStore } from './core/decks.js';
-import { loadDemoData } from './core/demo.js';
+import { loadDemoData, loadDeckFixture } from './core/demo.js';
 import { readEnv, assertLivePrivacy } from './core/env.js';
 import { FakeT3Client } from './core/fakes.js';
 import { loadTelegramNotifier, loadT3Client } from './core/loaders.js';
@@ -16,6 +16,8 @@ async function main(): Promise<void> {
   // Privacy gate: a live server without an allowlist must not start (SPEC §6).
   assertLivePrivacy(env);
   const demo = env.mode === 'demo' ? loadDemoData(env.fixturesDir) : undefined;
+  const deckFixture = env.deckFixture ? loadDeckFixture(env.deckFixture) : undefined;
+  if (deckFixture) console.info(`[pinpoint] deck fixture for ${[...deckFixture.keys()].join(', ')}`);
 
   let t3;
   let t3Live = false;
@@ -62,7 +64,7 @@ async function main(): Promise<void> {
     decks,
     reviews,
     voice,
-    precomputed: demo?.precomputed,
+    precomputed: demo?.precomputed ?? deckFixture,
   });
 
   await service.start();

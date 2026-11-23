@@ -3,15 +3,21 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Env } from '../core/env.js';
 import { resolveWhisperModel } from './model.js';
+import { createScriptedVoice } from './scripted.js';
 import { isWav, pcm16ToFloat32, pcmToWav, wavToPcm } from './wav.js';
 
 export interface VoiceResult {
   text: string;
-  via: 't3' | 'whisper';
+  via: 't3' | 'whisper' | 'scripted';
+}
+
+export interface VoiceHint {
+  threadId?: string;
+  pointId?: string;
 }
 
 export interface VoiceTranscriber {
-  transcribe(audio: Buffer): Promise<VoiceResult>;
+  transcribe(audio: Buffer, hint?: VoiceHint): Promise<VoiceResult>;
 }
 
 const T3_TIMEOUT_MS = 60_000;
@@ -125,6 +131,10 @@ async function transcribeWithWhisper(env: Env, wav: Buffer): Promise<string> {
  * The glasses post raw PCM; a WAV fixture is also accepted.
  */
 export function createVoiceService(env: Env): VoiceTranscriber {
+  if (env.scriptedTranscripts) {
+    // Recording helper: deterministic notes with a realistic latency, no model.
+    return createScriptedVoice(env.scriptedTranscripts);
+  }
   return {
     async transcribe(audio: Buffer): Promise<VoiceResult> {
       if (audio.length < 100) throw new Error('No audio captured');

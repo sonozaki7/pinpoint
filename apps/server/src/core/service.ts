@@ -14,7 +14,7 @@ import { emptyDraft, mergeDraft, normalizeDraft } from './reviews.js';
 import type { ReviewStore } from './reviews.js';
 import type { Splitter } from './splitter/types.js';
 import type { AttentionThread, TelegramNotifier, T3Client } from './types.js';
-import type { VoiceTranscriber } from '../voice/service.js';
+import type { VoiceHint, VoiceTranscriber } from '../voice/service.js';
 import { verdictForTranscript } from '../voice/verdict.js';
 
 export interface ServiceDeps {
@@ -334,9 +334,9 @@ export class PinpointService {
     console.info(`[service] agree-all from phone for ${thread.title}`);
   }
 
-  async transcribe(audio: Buffer): Promise<{ text: string; verdict: 'object' | 'note' }> {
+  async transcribe(audio: Buffer, hint?: VoiceHint): Promise<{ text: string; verdict: 'object' | 'note' }> {
     try {
-      const result = await this.voice.transcribe(audio);
+      const result = await this.voice.transcribe(audio, hint);
       return { text: result.text, verdict: verdictForTranscript(result.text) };
     } catch (error) {
       throw new HttpError(502, errorMessage(error), 'voice_error');

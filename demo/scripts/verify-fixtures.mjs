@@ -63,6 +63,7 @@ function checkOptions(where, options) {
 
 const files = readdirSync(dir)
   .filter((name) => name.endsWith(".json"))
+  .filter((name) => name !== "transcripts.json") // scripted voice notes, not a thread fixture
   .sort()
   .map((name) => join(dir, name))
   .filter((path) => statSync(path).isFile());

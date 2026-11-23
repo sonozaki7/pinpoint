@@ -34,7 +34,7 @@ export function createApp(deps: AppDeps): Hono {
     cors({
       origin: '*',
       allowMethods: ['GET', 'POST', 'PUT', 'OPTIONS'],
-      allowHeaders: ['Content-Type', 'Authorization'],
+      allowHeaders: ['Content-Type', 'Authorization', 'X-Point-Id', 'X-Thread-Id'],
       maxAge: 86_400,
     }),
   );
@@ -101,7 +101,12 @@ export function createApp(deps: AppDeps): Hono {
     if (bytes.length > MAX_PCM_BYTES) {
       throw new HttpError(413, 'Audio exceeds 25 seconds', 'too_large');
     }
-    return c.json(await service.transcribe(bytes));
+    return c.json(
+      await service.transcribe(bytes, {
+        threadId: c.req.header('x-thread-id') || undefined,
+        pointId: c.req.header('x-point-id') || undefined,
+      }),
+    );
   });
 
   app.post('/api/phone/:threadId/:pointId', async (c) => {

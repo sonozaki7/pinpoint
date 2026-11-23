@@ -22,10 +22,17 @@ export interface Env {
   telegramToken: string;
   telegramChatId: string;
   whisperModel: string;
+  /**
+   * Demo recording helper: a JSON file of canned voice notes. When set, /api/voice
+   * skips T3/whisper and returns the next note with a realistic delay.
+   */
+  scriptedTranscripts: string;
   /** apps/server */
   serverRoot: string;
   /** repo root (pinpoint/) */
   repoRoot: string;
+  /** optional deck pin for a live recording (see loadDeckFixture) */
+  deckFixture: string;
   /** apps/server/.data (or PINPOINT_DATA_DIR) */
   dataDir: string;
   /** demo/fixtures */
@@ -78,8 +85,10 @@ export function readEnv(source: NodeJS.ProcessEnv = process.env): Env {
     telegramToken: str(source, 'TELEGRAM_BOT_TOKEN'),
     telegramChatId: str(source, 'TELEGRAM_CHAT_ID'),
     whisperModel: str(source, 'WHISPER_MODEL'),
+    scriptedTranscripts: str(source, 'PINPOINT_SCRIPTED_TRANSCRIPTS'),
     serverRoot: SERVER_ROOT,
     repoRoot: REPO_ROOT,
+    deckFixture: str(source, 'PINPOINT_DECK_FIXTURE'),
     dataDir,
     fixturesDir: path.join(REPO_ROOT, 'demo', 'fixtures'),
   };

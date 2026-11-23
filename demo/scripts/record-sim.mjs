@@ -26,13 +26,16 @@
 //   node demo/scripts/record-sim.mjs --mock --out demo/shots/tmp/mock
 //   node demo/scripts/record-sim.mjs --dry-run --list
 
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 import { deflateSync } from "node:zlib";
+
+const execFileP = promisify(execFile);
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = resolve(here, "../..");
@@ -65,11 +68,16 @@ const options = {
   url: value("--url", process.env.PINPOINT_GLASSES_URL ?? "http://127.0.0.1:5173"),
   launch: has("--launch"),
   simBin: value("--sim-bin", join(repo, "apps/glasses/node_modules/@evenrealities/evenhub-simulator/bin/index.js")),
-  scenes: value("--scenes", "inbox,auth,deps,inbox-morning").split(",").map((scene) => scene.trim()).filter(Boolean),
+  scenes: value("--scenes", "inbox,auth,inbox-after,deps,inbox-morning").split(",").map((scene) => scene.trim()).filter(Boolean),
   out: resolve(repo, value("--out", "demo/shots/tmp")),
+  recordings: resolve(repo, value("--recordings", "demo/recordings")),
+  recordName: value("--record-name", ""),
+  encode: !has("--no-encode"),
+  sheet: !has("--no-sheet"),
   captureMs: numeric("--capture-ms", 100),
   stepMs: numeric("--step-ms", 700),
   voiceMs: numeric("--voice-ms", 2600),
+  voiceStopMs: numeric("--voice-stop-ms", 2000),
   readyMs: numeric("--ready-ms", 15000),
   readyPattern: value("--ready-pattern", "pinpoint|ready"),
   dryRun: has("--dry-run"),
@@ -86,14 +94,21 @@ const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 // ------------------------------------------------------------------- scenes
 
 // Hero sequence from docs/DEMO.md:
-//   inbox -> auth-refresh-fix (notes on 4 and 6) -> preview -> send
-//   -> deps-upgrade (one tap on an option) -> inbox-morning (one correction).
+//   inbox (before) -> auth-refresh-fix (notes on 4 and 6, preview, send)
+//   -> inbox (after, thread gone) -> deps-upgrade (one tap on an option)
+//   -> inbox-morning (one correction on the Tuesday draft).
 // Assumes the visible order of SPEC §5 (question, plan, failed, report): inbox
-// row 1 is deps-upgrade, row 2 auth-refresh-fix, row 4 inbox-morning.
+// row 1 is deps-upgrade, row 2 auth-refresh-fix, row 4 inbox-morning before the
+// send; after the send auth is hidden, so inbox-morning is row 3 (row 1 deps,
+// row 2 flaky-e2e).
+const NOTE_POINT4 = "No. Don't log everyone out. Migrate the existing sessions instead.";
+const NOTE_POINT6 = "Use a request queue. A mutex deadlocks with the retry path.";
+const NOTE_MORNING = "Make it Thursday, not Tuesday.";
+
 const SCENES = [
   {
     id: "inbox",
-    title: "Inbox at a glance",
+    title: "Inbox before the review",
     steps: [
       { wait: 600, label: "settle after boot" },
       { mark: "inbox:first-frame" },
@@ -108,32 +123,42 @@ const SCENES = [
     steps: [
       { action: "click", label: "open auth-refresh-fix", hold: 1400 },
       { mark: "auth:deck" },
-      { wait: 600, label: "read point 1" },
-      { action: "down", label: "point 2" },
-      { action: "down", label: "point 3" },
-      { action: "down", label: "point 4, high risk", hold: 1300 },
+      { wait: 700, label: "read point 1" },
+      { action: "down", label: "point 2", hold: 900 },
+      { action: "down", label: "point 3", hold: 900 },
+      // Human beat: let the risky step 4 quote sit on screen for a read.
+      { action: "down", label: "point 4, high risk", hold: 1500 },
       { mark: "auth:point4" },
-      { note: "No, don't log everyone out. Migrate existing sessions." },
+      { note: NOTE_POINT4 },
       { mark: "auth:point4-objected" },
-      { action: "down", label: "point 5" },
-      { action: "down", label: "point 6, mutex", hold: 1300 },
+      { action: "down", label: "point 5", hold: 900 },
+      { action: "down", label: "point 6, mutex", hold: 1200 },
       { mark: "auth:point6" },
-      { note: "Use a request queue, a mutex deadlocks with the retry path." },
+      { note: NOTE_POINT6 },
       { mark: "auth:point6-noted" },
-      { action: "down", label: "point 7" },
-      { action: "down", label: "Send review row", hold: 1200 },
+      { action: "down", label: "point 7", hold: 900 },
+      { action: "down", label: "Send review row", hold: 1100 },
       { mark: "auth:send-row" },
       { action: "click", label: "open preview", hold: 1600 },
       { mark: "auth:preview" },
-      { action: "click", label: "send to agent", hold: 2600 },
+      { action: "click", label: "send to agent", hold: 1600 },
       { mark: "auth:sent" },
+      { wait: 900, label: "Sent to agent toast, then back to inbox" },
+    ],
+  },
+  {
+    id: "inbox-after",
+    title: "Inbox after the send: the thread is gone",
+    steps: [
+      { mark: "inbox-after:first-frame" },
+      { wait: 2000, label: "hold the three-thread inbox" },
     ],
   },
   {
     id: "deps",
     title: "deps-upgrade: answer a question with one tap",
     steps: [
-      { wait: 800, label: "back at inbox" },
+      { wait: 700, label: "back at inbox" },
       { mark: "deps:inbox" },
       { action: "click", label: "open deps-upgrade", hold: 1400 },
       { mark: "deps:question" },
@@ -150,23 +175,22 @@ const SCENES = [
     id: "inbox-morning",
     title: "inbox-morning: 4 drafted replies",
     steps: [
-      { wait: 800, label: "back at inbox" },
+      { wait: 700, label: "back at inbox" },
       { mark: "morning:inbox" },
-      { action: "down", label: "row 2" },
-      { action: "down", label: "row 3" },
-      { action: "down", label: "row 4 inbox-morning", hold: 900 },
+      { action: "down", label: "row 2", hold: 900 },
+      { action: "down", label: "row 3 inbox-morning", hold: 900 },
       { action: "click", label: "open inbox-morning", hold: 1400 },
       { mark: "morning:deck" },
-      { wait: 600, label: "read the summary" },
-      { action: "down", label: "draft 1, Priya" },
+      { wait: 700, label: "read the summary" },
+      { action: "down", label: "draft 1, Priya", hold: 900 },
       { action: "down", label: "draft 2, Tomas", hold: 1200 },
       { mark: "morning:tomas-draft" },
-      { note: "Thursday, not Tuesday." },
+      { note: NOTE_MORNING },
       { mark: "morning:corrected" },
-      { action: "down", label: "draft 3, Cassie" },
-      { action: "down", label: "draft 4, Airbnb" },
-      { action: "down", label: "last point" },
-      { action: "down", label: "Send review row", hold: 1200 },
+      { action: "down", label: "draft 3, Cassie", hold: 900 },
+      { action: "down", label: "draft 4, Airbnb", hold: 900 },
+      { action: "down", label: "last point", hold: 900 },
+      { action: "down", label: "Send review row", hold: 1100 },
       { mark: "morning:send-row" },
       { action: "double_click", label: "back to inbox", hold: 1000 },
     ],
@@ -183,9 +207,14 @@ if (options.help) {
   --launch              start an own simulator on --port unless one already answers
   --scenes <list>       comma list of: ${SCENES_HINT}
   --out <dir>           output root (default demo/shots/tmp)
+  --recordings <dir>    mp4 + timeline + contact sheet folder (default demo/recordings)
+  --record-name <name>  output name for a single-scene run (e.g. live-hero)
+  --no-encode           keep frames + timelines, skip mp4 and contact sheets
+  --no-sheet            skip the contact sheet PNG
   --capture-ms <n>      frame cadence (default 100)
   --step-ms <n>         hold after each input (default 700)
   --voice-ms <n>        simulated voice-note length (default 2600)
+  --voice-stop-ms <n>   wait after stopping the mic for the transcript to land (default 2000)
   --ready-ms <n>        how long to wait for the app-ready log line (default 15000)
   --ready-pattern <re>  regex for the ready log line (default "pinpoint|ready")
   --no-capture          send inputs, skip frames
@@ -197,13 +226,15 @@ if (options.help) {
   process.exit(0);
 }
 
-function expand(steps, { voiceMs, stepMs }) {
+function expand(steps, { voiceMs, voiceStopMs, stepMs }) {
   const expanded = [];
   for (const step of steps) {
     if (step.note) {
       expanded.push({ type: "input", action: "click", label: `tap to record: ${step.note}`, hold: 0 });
       expanded.push({ type: "wait", ms: voiceMs, label: "speaking" });
-      expanded.push({ type: "input", action: "click", label: "tap to stop", hold: 1000 });
+      // The transcript arrives after the server's delay; wait for it before the
+      // next swipe, or the note lands on the point the user has swiped to.
+      expanded.push({ type: "input", action: "click", label: "tap to stop", hold: voiceStopMs });
       expanded.push({ type: "transcript", label: step.note });
     } else if (step.action) {
       expanded.push({ type: "input", action: step.action, label: step.label ?? step.action, hold: step.hold ?? stepMs });
@@ -228,7 +259,12 @@ const selected = options.scenes.map((id) => {
   return scene;
 });
 
-const pacing = { voiceMs: options.voiceMs, stepMs: options.stepMs };
+if (options.recordName && selected.length !== 1) {
+  console.error(`--record-name needs exactly one scene, got ${selected.length}`);
+  process.exit(2);
+}
+
+const pacing = { voiceMs: options.voiceMs, voiceStopMs: options.voiceStopMs, stepMs: options.stepMs };
 
 if (options.list) {
   for (const scene of selected) {
@@ -264,7 +300,7 @@ async function ping(timeout = 1000) {
 }
 
 async function screenshot() {
-  const response = await request("/api/screenshot/glasses", { timeout: 4000 });
+  const response = await request("/api/screenshot/glasses", { timeout: 6000 });
   const bytes = Buffer.from(await response.arrayBuffer());
   if (bytes.length < 8 || bytes.subarray(0, 8).toString("hex") !== "89504e470d0a1a0a") {
     throw new Error("screenshot is not a PNG");
@@ -445,7 +481,7 @@ async function tick(ms) {
 }
 
 async function send(action) {
-  const response = await request("/api/input", { method: "POST", body: { action }, timeout: 4000 });
+  const response = await request("/api/input", { method: "POST", body: { action }, timeout: 8000 });
   return response.json().catch(() => ({}));
 }
 
@@ -596,9 +632,177 @@ function writeArtifacts() {
   }
 }
 
+// --------------------------------------------------------------- clip output
+
+function fractionToNumber(value) {
+  if (typeof value !== "string" || value.length === 0) return null;
+  const [num, den] = value.split("/").map(Number);
+  if (!Number.isFinite(num)) return null;
+  if (!Number.isFinite(den) || den === 0) return num;
+  return Number((num / den).toFixed(3));
+}
+
+async function probeMp4(file) {
+  const { stdout } = await execFileP("ffprobe", [
+    "-v", "error",
+    "-select_streams", "v:0",
+    "-show_entries", "stream=width,height,avg_frame_rate,r_frame_rate,duration",
+    "-show_entries", "format=duration",
+    "-of", "json",
+    file,
+  ], { maxBuffer: 1 << 20 });
+  const parsed = JSON.parse(stdout);
+  const stream = parsed.streams?.[0] ?? {};
+  const durationSec = Number(parsed.format?.duration ?? stream.duration ?? 0);
+  return {
+    width: stream.width ?? null,
+    height: stream.height ?? null,
+    fps: fractionToNumber(stream.avg_frame_rate ?? stream.r_frame_rate),
+    durationSec: Number.isFinite(durationSec) ? Number(durationSec.toFixed(3)) : null,
+  };
+}
+
+async function encodeScene(scene, name) {
+  const sceneMp4 = join(options.recordings, `${scene.id}.mp4`);
+  const mp4 = join(options.recordings, `${name}.mp4`);
+  await execFileP("bash", [
+    join(here, "frames-to-mp4.sh"),
+    "--root", options.out,
+    "--out", options.recordings,
+    "--scene", scene.id,
+  ], { maxBuffer: 8 << 20 });
+  if (mp4 !== sceneMp4) renameSync(sceneMp4, mp4);
+  const video = await probeMp4(mp4);
+  return { mp4, video };
+}
+
+/** One green-on-black 4x3 contact sheet, twelve frames spread across the scene. */
+async function contactSheet(scene, name) {
+  const file = join(options.recordings, `${name}-sheet.png`);
+  const rate = scene.fps || 10;
+  const step = Math.max(1, Math.round((scene.frames || 1) / 12));
+  await execFileP("ffmpeg", [
+    "-hide_banner", "-loglevel", "error", "-y",
+    "-framerate", String(rate), "-start_number", "1", "-i", join(options.out, scene.id, "%05d.png"),
+    "-f", "lavfi", "-i", `color=c=black:s=576x288:r=${rate}`,
+    "-filter_complex",
+    `[0:v]format=rgba[fg];[1:v][fg]overlay=shortest=1:format=auto,select='not(mod(n\\,${step}))',scale=288:144:flags=neighbor,tile=4x3:padding=4:color=black[out]`,
+    "-map", "[out]", "-frames:v", "1", file,
+  ], { maxBuffer: 4 << 20 });
+  return file;
+}
+
+function sceneTimeline(scene, extra = {}, name = scene.id) {
+  const sceneEvents = events.filter((event) => event.scene === scene.id);
+  const inputs = sceneEvents
+    .filter((event) => event.type === "input")
+    .map((event) => ({
+      t: event.t,
+      sceneMs: event.sceneMs,
+      action: event.action,
+      label: event.label,
+      frameBefore: event.frameBefore,
+      frameAfter: event.frameAfter,
+      ...(event.response ? { response: event.response } : {}),
+    }));
+  return {
+    scene: name,
+    ...(name !== scene.id ? { sourceScene: scene.id } : {}),
+    title: scene.title,
+    source: "evenhub-simulator automation API",
+    viewport: { width: 576, height: 288, format: "RGBA PNG, green text on transparent" },
+    captureMs: options.captureMs,
+    pacing,
+    durationMs: scene.durationMs,
+    frames: scene.frames,
+    fps: scene.fps,
+    recordedAt: new Date(startedAt).toISOString(),
+    markers: markers.filter((marker) => marker.scene === scene.id),
+    inputs,
+    transcripts: sceneEvents.filter((event) => event.type === "transcript").map((event) => ({
+      t: event.t,
+      sceneMs: event.sceneMs,
+      text: event.label,
+    })),
+    events: sceneEvents,
+    ...extra,
+  };
+}
+
+/** Encode, probe and sheet every captured scene; writes <scene>.timeline.json. */
+async function produceRecordings() {
+  mkdirSync(options.recordings, { recursive: true });
+  const outputs = [];
+  const manifest = [];
+  for (const scene of sceneSummaries) {
+    const name = options.recordName || scene.id;
+    let video = null;
+    let mp4 = null;
+    let sheet = null;
+    if (options.encode) {
+      try {
+        ({ mp4, video } = await encodeScene(scene, name));
+        log(`  clip ${name}.mp4  ${video.width}x${video.height} ${video.fps} fps ${video.durationSec}s`);
+      } catch (error) {
+        log(`  !! could not encode ${name}: ${error.message}`);
+      }
+      if (options.sheet && mp4) {
+        try {
+          sheet = await contactSheet(scene, name);
+          log(`  sheet ${name}-sheet.png`);
+        } catch (error) {
+          log(`  !! could not build the ${name} contact sheet: ${error.message}`);
+        }
+      }
+    }
+    const timelineFile = join(options.recordings, `${name}.timeline.json`);
+    const timeline = sceneTimeline(scene, {
+      ...(mp4 ? { video: { file: mp4, ...video } } : {}),
+      ...(sheet ? { sheet } : {}),
+    }, name);
+    writeFileSync(timelineFile, JSON.stringify(timeline, null, 2) + "\n");
+    outputs.push({ ...scene, name, mp4, sheet, timeline: timelineFile, video });
+    manifest.push({
+      id: name,
+      ...(name !== scene.id ? { sourceScene: scene.id } : {}),
+      title: scene.title,
+      durationMs: scene.durationMs,
+      frames: scene.frames,
+      fps: scene.fps,
+      mp4,
+      sheet,
+      video,
+    });
+  }
+  writeFileSync(join(options.recordings, "scenes.json"), JSON.stringify({
+    recordedAt: new Date(startedAt).toISOString(),
+    mode: "simulator",
+    recordings: mergeManifest(manifest),
+  }, null, 2) + "\n");
+  return outputs;
+}
+
+/** Keep earlier clips in scenes.json when a later run records only one scene. */
+function mergeManifest(fresh) {
+  const file = join(options.recordings, "scenes.json");
+  const earlier = [];
+  try {
+    const parsed = JSON.parse(readFileSync(file, "utf8"));
+    if (Array.isArray(parsed.recordings)) earlier.push(...parsed.recordings);
+  } catch {
+    // first run in this folder
+  }
+  const freshIds = new Set(fresh.map((entry) => entry.id));
+  const merged = new Map(earlier.filter((entry) => entry?.id && !freshIds.has(entry.id)).map((entry) => [entry.id, entry]));
+  for (const entry of fresh) merged.set(entry.id, entry);
+  return [...merged.values()];
+}
+
+
 function printPlan() {
   log(`mode: ${options.dryRun ? "dry-run" : options.mock ? "mock" : `simulator on 127.0.0.1:${options.port}`}`);
   log(`out:  ${options.out}`);
+  if (!options.dryRun && !options.mock) log(`clips: ${options.recordings}`);
   log(`capture: ${options.capture ? `every ${options.captureMs} ms` : "off"}   step: ${options.stepMs} ms   voice: ${options.voiceMs} ms\n`);
   for (const scene of selected) {
     const steps = expand(scene.steps, pacing);
@@ -660,6 +864,16 @@ async function main() {
     if (mock) mock.server.close();
   }
 
+  let outputs = [];
+  const canProduce = !options.dryRun && !options.mock && options.capture;
+  if (canProduce) {
+    try {
+      outputs = await produceRecordings();
+    } catch (error) {
+      log(`\n!! recording output failed: ${error.message}`);
+    }
+  }
+
   const total = sceneSummaries.reduce((sum, scene) => sum + scene.durationMs, 0);
   const totalFrames = sceneSummaries.reduce((sum, scene) => sum + scene.frames, 0);
   log(`\nrecorded ${selected.length} scenes, ${(total / 1000).toFixed(1)} s, ${totalFrames} frames`);
@@ -668,7 +882,14 @@ async function main() {
   for (const scene of sceneSummaries) {
     log(`  ${join(options.out, scene.id)}  ${scene.frames} frames @ ${scene.fps} fps`);
   }
-  if (!options.dryRun && !options.mock && options.capture) {
+  if (canProduce && outputs.length > 0) {
+    log(`\nclips for the editor (${options.recordings}):`);
+    for (const output of outputs) {
+      log(`  ${output.name}.mp4${output.video ? `  ${output.video.width}x${output.video.height} ${output.video.fps} fps ${output.video.durationSec}s` : ""}`);
+      log(`  ${output.name}.timeline.json${output.sheet ? ` + ${output.name}-sheet.png` : ""}`);
+    }
+  }
+  if (canProduce && !options.encode) {
     log(`\nnext: demo/scripts/frames-to-mp4.sh --root ${options.out} --all`);
   }
   if (options.mock) {
