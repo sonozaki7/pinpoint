@@ -8,6 +8,11 @@ export interface Env {
   port: number;
   t3Url: string;
   t3Token: string;
+  /**
+   * Privacy allowlist: T3 project ids or exact titles Pinpoint may read.
+   * Live mode refuses to start when this is empty (see assertLivePrivacy).
+   */
+  t3Projects: string[];
   splitterProvider: SplitterProviderName;
   splitterModel: string;
   anthropicKey: string;
@@ -47,6 +52,13 @@ function provider(source: NodeJS.ProcessEnv, mode: 'demo' | 'live'): SplitterPro
   return mode === 'demo' ? 'fixture' : 'opencode';
 }
 
+function list(source: NodeJS.ProcessEnv, key: string): string[] {
+  return str(source, key)
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+}
+
 export function readEnv(source: NodeJS.ProcessEnv = process.env): Env {
   const mode = str(source, 'PINPOINT_MODE').toLowerCase() === 'live' ? 'live' : 'demo';
   const port = Number.parseInt(str(source, 'PINPOINT_PORT', '8787'), 10);
@@ -56,6 +68,7 @@ export function readEnv(source: NodeJS.ProcessEnv = process.env): Env {
     port: Number.isFinite(port) && port > 0 && port < 65536 ? port : 8787,
     t3Url: str(source, 'T3_URL', 'http://127.0.0.1:3773').replace(/\/+$/, ''),
     t3Token: str(source, 'T3_TOKEN'),
+    t3Projects: list(source, 'T3_PROJECTS'),
     splitterProvider: provider(source, mode),
     splitterModel: str(source, 'SPLITTER_MODEL', 'opencode-go/deepseek-v4.1-flash'),
     anthropicKey: str(source, 'ANTHROPIC_API_KEY'),
@@ -70,4 +83,20 @@ export function readEnv(source: NodeJS.ProcessEnv = process.env): Env {
     dataDir,
     fixturesDir: path.join(REPO_ROOT, 'demo', 'fixtures'),
   };
+}
+
+/**
+ * Privacy gate for live mode (SPEC §6 / live-run hardening).
+ *
+ * The owner's T3 Code holds private business threads. Pinpoint may only read
+ * the projects named in T3_PROJECTS, so a live server started without that
+ * allowlist must fail instead of listing everything.
+ */
+export function assertLivePrivacy(env: Env): void {
+  if (env.mode !== 'live' || env.t3Projects.length > 0) return;
+  throw new Error(
+    'Refusing to start in live mode: T3_PROJECTS is empty. ' +
+      'Set T3_PROJECTS to a comma-separated list of T3 project ids or exact project titles ' +
+      '(for example T3_PROJECTS=pinpoint) so Pinpoint only reads the projects you allow.',
+  );
 }

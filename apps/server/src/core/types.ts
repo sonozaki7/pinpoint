@@ -20,11 +20,17 @@ export interface AttentionThread {
   updatedAt: string;
 }
 
+/** Extra delivery options for a message sent to T3 (plan approval, SPEC §6). */
+export interface SendOptions {
+  /** T3 plan id the message reviews; T3 records it as the run's source plan. */
+  sourcePlanId?: string;
+}
+
 /** SPEC §6. Implemented in src/t3, loaded dynamically by src/core/loaders.ts. */
 export interface T3Client {
   listAttention(): Promise<AttentionThread[]>;
   getSource(threadId: string): Promise<AttentionSource>;
-  sendMessage(threadId: string, text: string): Promise<void>;
+  sendMessage(threadId: string, text: string, options?: SendOptions): Promise<void>;
   answerQuestion(threadId: string, requestId: string, answers: Record<string, string>): Promise<void>;
 }
 

@@ -1,7 +1,7 @@
 import { serve } from '@hono/node-server';
 import { DeckStore } from './core/decks.js';
 import { loadDemoData } from './core/demo.js';
-import { readEnv } from './core/env.js';
+import { readEnv, assertLivePrivacy } from './core/env.js';
 import { FakeT3Client } from './core/fakes.js';
 import { loadTelegramNotifier, loadT3Client } from './core/loaders.js';
 import { ReviewStore } from './core/reviews.js';
@@ -13,6 +13,8 @@ import type { AttentionThread } from './core/types.js';
 
 async function main(): Promise<void> {
   const env = readEnv();
+  // Privacy gate: a live server without an allowlist must not start (SPEC §6).
+  assertLivePrivacy(env);
   const demo = env.mode === 'demo' ? loadDemoData(env.fixturesDir) : undefined;
 
   let t3;

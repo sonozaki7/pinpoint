@@ -37,6 +37,9 @@ interface DraftInput {
 
 const PHONE_AGREE_MESSAGE = '✓ Reviewed on phone: all points agreed. Continue.';
 
+/** The T3 web app's plan-implementation prefix (see docs/t3-api-notes.md §4). */
+const PLAN_IMPLEMENT_PREFIX = 'PLEASE IMPLEMENT THIS PLAN:\n';
+
 export class PinpointService {
   readonly env: Env;
   readonly inbox: InboxService;
@@ -265,6 +268,33 @@ export class PinpointService {
       if (hasComment) await this.t3.sendMessage(thread.threadId, message);
       return;
     }
+
+    // Plan approval (SPEC §6, docs/t3-api-notes.md §4): with no objections the
+    // user is saying "implement it", so send the plan the way the T3 web app
+    // does, with sourcePlanRef. Reviewer notes ride along in the same message.
+    if (source?.kind === 'plan') {
+      const objections = draft.notes.filter((note) => note.verdict === 'object');
+      if (objections.length === 0) {
+        const notes = draft.notes
+          .map((note) => {
+            const point = deck.points.find((candidate) => candidate.id === note.pointId);
+            if (!point) return null;
+            const text = (note.option ?? note.text ?? '').trim();
+            return `● ${point.index}. "${point.quote.slice(0, 140)}" → ${text || 'Note.'}`;
+          })
+          .filter((line): line is string => line !== null);
+        const extra =
+          notes.length > 0 ? `\n\nReviewer notes from Pinpoint:\n${notes.join('\n')}` : '';
+        await this.t3.sendMessage(
+          thread.threadId,
+          `${PLAN_IMPLEMENT_PREFIX}${source.text.trim()}${extra}`,
+          { sourcePlanId: source.sourceMessageId },
+        );
+        console.info(`[service] approved plan for ${thread.title} (no objections)`);
+        return;
+      }
+    }
+
     await this.t3.sendMessage(thread.threadId, message);
   }
 

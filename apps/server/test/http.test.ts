@@ -164,19 +164,48 @@ describe('HTTP API (demo mode)', () => {
     ]);
   });
 
-  it('POST send delivers to T3, posts the review, and clears the draft', async () => {
+  it('POST send approves a plan with no objections the T3 way, and clears the draft', async () => {
+    await app.request('/api/review/auth-refresh-fix', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ notes: [] }),
+    });
+    const sentBefore = context.t3.sent.length;
     const response = await app.request('/api/review/auth-refresh-fix/send', { method: 'POST' });
     expect(response.status).toBe(200);
     const result = await json<{ ok: boolean; delivered: string }>(response);
     expect(result).toMatchObject({ ok: true, delivered: 'demo-log' });
-    expect(context.t3.sent).toHaveLength(1);
-    expect(context.t3.sent[0].text).toContain('Force-logout every user');
-    expect(context.telegram.reviewCalls).toHaveLength(1);
+    expect(context.t3.sent).toHaveLength(sentBefore + 1);
+    const approval = context.t3.sent.at(-1)!;
+    expect(approval).toMatchObject({
+      threadId: 'auth-refresh-fix',
+      sourcePlanId: 'msg-auth-refresh-1',
+    });
+    expect(approval.text.startsWith('PLEASE IMPLEMENT THIS PLAN:\n')).toBe(true);
+    expect(approval.text).toContain('Force-logout every user');
 
     const draft = await json<{ notes: unknown[] }>(
       await app.request('/api/review/auth-refresh-fix'),
     );
     expect(draft.notes).toHaveLength(0);
+  });
+
+  it('POST send of a plan with an objection sends the cited review instead of approving', async () => {
+    await app.request('/api/review/auth-refresh-fix', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        notes: [{ pointId: 'p4', verdict: 'object', text: 'No, migrate sessions instead' }],
+      }),
+    });
+    const sentBefore = context.t3.sent.length;
+    const response = await app.request('/api/review/auth-refresh-fix/send', { method: 'POST' });
+    expect(response.status).toBe(200);
+    expect(context.t3.sent).toHaveLength(sentBefore + 1);
+    const review = context.t3.sent.at(-1)!;
+    expect(review.text.startsWith('Review from G2 (Pinpoint)')).toBe(true);
+    expect(review.text).toContain('✗ 4.');
+    expect(review.sourcePlanId).toBeUndefined();
   });
 
   it('POST send answers a pending question through answerQuestion', async () => {
@@ -195,6 +224,7 @@ describe('HTTP API (demo mode)', () => {
     expect(preview.counts.answers).toBe(1);
 
     const sentBefore = context.t3.sent.length;
+    const reviewsBefore = context.telegram.reviewCalls.length;
     const response = await app.request('/api/review/deps-upgrade/send', { method: 'POST' });
     expect(response.status).toBe(200);
     expect(context.t3.answered).toHaveLength(1);
@@ -204,7 +234,7 @@ describe('HTTP API (demo mode)', () => {
       answers: { 'q-vite-7': 'Stay on 6 for now' },
     });
     expect(context.t3.sent).toHaveLength(sentBefore);
-    expect(context.telegram.reviewCalls).toHaveLength(2);
+    expect(context.telegram.reviewCalls).toHaveLength(reviewsBefore + 1);
   });
 
   it('POST /api/voice returns the transcript and heuristic verdict', async () => {

@@ -48,6 +48,23 @@ describe('ReviewStore', () => {
     expect(second.seen).toContain('p1');
   });
 
+  it('replaces the note list when a full draft is saved, so notes can be cleared', () => {
+    const first = mergeDraft(null, 'thread', {
+      notes: [
+        { pointId: 'p1', verdict: 'note', text: 'First' },
+        { pointId: 'p2', verdict: 'object', text: 'Second' },
+      ],
+    });
+    const cleared = mergeDraft(first, 'thread', { notes: [] });
+    expect(cleared.notes).toEqual([]);
+    const partial = mergeDraft(cleared, 'thread', {});
+    expect(partial.notes).toEqual([]);
+    const kept = mergeDraft(cleared, 'thread', {
+      notes: [{ pointId: 'p3', verdict: 'note', text: 'Only this one' }],
+    });
+    expect(kept.notes.map((note) => note.pointId)).toEqual(['p3']);
+  });
+
   it('clears a draft after sending', async () => {
     await store.put(
       mergeDraft(null, 'thread', {

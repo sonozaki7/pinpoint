@@ -97,12 +97,18 @@ export function mergeDraft(
   },
 ): ReviewDraft {
   const base = existing ?? emptyDraft(threadId, input.sourceMessageId ?? '');
+  // PUT carries the whole draft from the glasses, so a provided note list
+  // replaces the stored one (that is how "Clear notes" works). Omitting
+  // `notes` keeps what is saved.
   const byPoint = new Map<string, Note>();
-  for (const note of base.notes) byPoint.set(note.pointId, note);
-  for (const note of input.notes ?? []) {
-    const parsed = noteSchema.safeParse(note);
-    if (!parsed.success) continue;
-    byPoint.set(parsed.data.pointId, parsed.data as Note);
+  if (input.notes === undefined) {
+    for (const note of base.notes) byPoint.set(note.pointId, note);
+  } else {
+    for (const note of input.notes) {
+      const parsed = noteSchema.safeParse(note);
+      if (!parsed.success) continue;
+      byPoint.set(parsed.data.pointId, parsed.data as Note);
+    }
   }
   const seen = new Set<string>(base.seen);
   for (const pointId of input.seen ?? []) if (typeof pointId === 'string') seen.add(pointId);

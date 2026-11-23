@@ -85,7 +85,7 @@ describe('composeReview (SPEC §8)', () => {
       updatedAt: '2026-11-24T00:00:00.000Z',
     });
     expect(result.message.split('\n').at(-1)).toBe(
-      '✓ Reviewed on G2: all 7 points agreed. Continue.',
+      '✓ Reviewed on G2: all 7 points agreed. Go ahead with the rest of the plan.',
     );
     expect(result.preview[0]).toBe('all 7 points agreed');
     expect(result.counts).toEqual({ objections: 0, answers: 0, notes: 0, agreed: 7 });

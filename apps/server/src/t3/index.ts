@@ -19,7 +19,7 @@ import {join} from 'node:path';
 // --- Contract (SPEC §6; owned by src/core/types.ts) -----------------------
 
 import type {ThreadAttention} from '../../../../shared/contract.js';
-import type {AttentionSource, AttentionThread, T3Client} from '../core/types.js';
+import type {AttentionSource, AttentionThread, SendOptions, T3Client} from '../core/types.js';
 
 export type {AttentionSource, AttentionThread, ThreadAttention, T3Client};
 
@@ -426,6 +426,11 @@ export interface T3ClientConfig {
   cliPath?: string;
   /** Set false in tests to keep sends from spawning a process. */
   cliFallback?: boolean;
+  /**
+   * Privacy allowlist (project ids or exact titles). Defaults to T3_PROJECTS /
+   * env.t3Projects. Required: the client refuses to exist without it.
+   */
+  projects?: string[];
   fetchImpl?: typeof fetch;
   now?: () => number;
 }
@@ -443,6 +448,53 @@ function firstEnv(env: Record<string, unknown>, ...keys: string[]): string | und
   }
   return undefined;
 }
+
+/** Read a project allowlist from either a comma-separated string or a string array. */
+function firstProjectList(env: Record<string, unknown>, ...keys: string[]): string[] {
+  for (const key of keys) {
+    const value = env[key];
+    const entries = Array.isArray(value)
+      ? value.filter((entry): entry is string => typeof entry === 'string')
+      : typeof value === 'string'
+        ? value.split(',')
+        : [];
+    const cleaned = entries.map((entry) => entry.trim()).filter((entry) => entry.length > 0);
+    if (cleaned.length > 0) return cleaned;
+  }
+  return [];
+}
+
+interface ResolvedProjects {
+  /** Project ids the allowlist names, matched by id or exact title. */
+  ids: Set<string>;
+  /** Allowlist entries that matched no project in the snapshot. */
+  unmatched: string[];
+}
+
+/** Match allowlist entries (project ids or exact titles, case-insensitive for titles). */
+export function resolveProjectAllowlist(
+  snapshot: Pick<ShellSnapshot, 'projects'>,
+  allowed: readonly string[],
+): ResolvedProjects {
+  const ids = new Set<string>();
+  const unmatched: string[] = [];
+  const projects = snapshot.projects ?? [];
+  for (const entry of allowed) {
+    const wanted = entry.trim();
+    if (wanted.length === 0) continue;
+    const lower = wanted.toLocaleLowerCase();
+    const matches = projects.filter(
+      (project) => project.id === wanted || project.title?.trim().toLocaleLowerCase() === lower,
+    );
+    if (matches.length === 0) {
+      unmatched.push(wanted);
+      continue;
+    }
+    for (const project of matches) ids.add(project.id);
+  }
+  return {ids, unmatched};
+}
+
 
 /**
  * Create a client from environment variables.
@@ -466,6 +518,13 @@ export function createT3Client(
   if (token === undefined) {
     throw new T3ClientError('unauthorized', 'T3_TOKEN is not set. Mint one with `t3 auth session issue`.');
   }
+  const projectAllowlist = config.projects ?? firstProjectList(env, 'T3_PROJECTS', 't3Projects');
+  if (projectAllowlist.length === 0) {
+    throw new T3ClientError(
+      'unauthorized',
+      'T3_PROJECTS is empty. Refusing to read T3 threads without a project allowlist.',
+    );
+  }
 
   const configuredTimeout = Number(firstEnv(env, 'T3_TIMEOUT_MS'));
   const timeoutMs =
@@ -481,6 +540,7 @@ export function createT3Client(
   let shellCache: {at: number; snapshot: ShellSnapshot} | null = null;
   let shellPending: Promise<ShellSnapshot> | null = null;
   const transcriptCache = new Map<string, CachedTranscript>();
+  const warnedUnmatched = new Set<string>();
 
   const readOnlyHeaders = {
     Accept: 'application/json',
@@ -542,6 +602,8 @@ export function createT3Client(
   }
 
   async function getThread(threadId: string): Promise<ThreadProjection> {
+    // Every projection read passes the allowlist gate first.
+    await assertAllowedThread(threadId);
     const detail = await requestJson<{projection?: ThreadProjection} | ThreadProjection>(
       `/api/orchestration/threads/${encodeURIComponent(threadId)}`,
     );
@@ -572,9 +634,44 @@ export function createT3Client(
     }
   }
 
+  /**
+   * Project ids named by T3_PROJECTS. Resolved against the shell's project list
+   * so ids and exact titles both work. An entry that matches nothing is logged
+   * once (it is a config mistake, not thread content).
+   */
+  async function allowedProjectIds(snapshot: ShellSnapshot): Promise<Set<string>> {
+    const {ids, unmatched} = resolveProjectAllowlist(snapshot, projectAllowlist);
+    for (const entry of unmatched) {
+      if (warnedUnmatched.has(entry)) continue;
+      warnedUnmatched.add(entry);
+      console.warn(`[t3] T3_PROJECTS entry "${entry}" matched no T3 project; nothing from it is read`);
+    }
+    return ids;
+  }
+
+  /** Privacy gate for single-thread reads (deck, preview, send, phone). */
+  async function assertAllowedThread(threadId: string): Promise<void> {
+    const snapshot = await getShell();
+    const ids = await allowedProjectIds(snapshot);
+    const thread = (snapshot.threads ?? []).find((candidate) => candidate.id === threadId);
+    if (thread === undefined || !ids.has(thread.projectId)) {
+      throw new T3ClientError(
+        'not_found',
+        'That thread is not visible in an allowed T3_PROJECTS project, so Pinpoint will not read it.',
+      );
+    }
+  }
+
   async function listAttention(): Promise<AttentionThread[]> {
     const snapshot = await getShell();
-    const {rows, needsTranscript} = attentionFromSnapshot(snapshot, new Map(), now());
+    const allowedIds = await allowedProjectIds(snapshot);
+    // Privacy allowlist applies before attention rules, transcript reads and
+    // deck builds, so a thread from another project never leaves this function.
+    const scoped: ShellSnapshot = {
+      ...snapshot,
+      threads: (snapshot.threads ?? []).filter((thread) => allowedIds.has(thread.projectId)),
+    };
+    const {rows, needsTranscript} = attentionFromSnapshot(scoped, new Map(), now());
 
     // Resolve only threads that could still turn out to be plain replies.
     const resolved = new Map<string, ShellLatestVisibleMessage | null>();
@@ -585,20 +682,22 @@ export function createT3Client(
       batch.forEach((thread, offset) => resolved.set(thread.id, results[offset] ?? null));
     }
 
-    const retried = attentionFromSnapshot(snapshot, resolved, now());
+    const retried = attentionFromSnapshot(scoped, resolved, now());
     const merged = new Map<string, AttentionThread>();
     for (const row of [...rows, ...retried.rows]) merged.set(row.threadId, row);
     return sortAttention([...merged.values()]);
   }
 
   async function getSource(threadId: string): Promise<T3Source> {
+    await assertAllowedThread(threadId);
     return sourceFromProjection(await getThread(threadId));
   }
 
-  async function sendMessage(threadId: string, text: string): Promise<void> {
+  async function sendMessage(threadId: string, text: string, options?: SendOptions): Promise<void> {
     if (typeof text !== 'string' || text.trim().length === 0) {
       throw new T3ClientError('send_failed', 'Refusing to send an empty message.');
     }
+    await assertAllowedThread(threadId);
     try {
       await dispatchCommand({
         type: 'message.dispatch',
@@ -611,6 +710,9 @@ export function createT3Client(
         creationSource: 'web',
         dispatchMode: {type: 'start_immediately'},
         deliveryIntent: 'auto',
+        ...(options?.sourcePlanId === undefined
+          ? {}
+          : {sourcePlanRef: {threadId, planId: options.sourcePlanId}}),
       });
       return;
     } catch (error) {

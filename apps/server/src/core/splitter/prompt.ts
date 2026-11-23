@@ -39,7 +39,7 @@ ${questionBlock}
 
 Thread: ${thread.title}
 Attention kind: ${thread.attention}
-Source kind: ${thread.attention === 'question' ? 'question' : 'reply'}
+Source kind: ${source.kind}
 
 Source message:
 <<<SOURCE

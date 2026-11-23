@@ -39,7 +39,9 @@ export function composeReview(deck: Deck, draft: ReviewDraft): PreviewResult {
   const agreedPoints = deck.points.filter((point) => !noted.has(point.id));
   const closing = deck.attention === 'plan' ? 'Go ahead with the rest of the plan.' : 'Continue.';
 
-  const lines: string[] = [`Review from G2 (Pinpoint) — ${deck.points.length} points`];
+  const lines: string[] = [
+    `Review from G2 (Pinpoint) — ${deck.points.length} point${deck.points.length === 1 ? '' : 's'}`,
+  ];
 
   for (const note of objections) {
     const point = points.get(note.pointId)!;
@@ -55,7 +57,7 @@ export function composeReview(deck: Deck, draft: ReviewDraft): PreviewResult {
   }
 
   if (notes.length === 0) {
-    lines.push(`✓ Reviewed on G2: all ${deck.points.length} points agreed. Continue.`);
+    lines.push(`✓ Reviewed on G2: all ${deck.points.length} points agreed. ${closing}`);
   } else if (agreedPoints.length > 0) {
     lines.push(`✓ Agreed: ${agreedPoints.map((point) => point.index).join(', ')}. ${closing}`);
   } else {

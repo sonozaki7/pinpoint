@@ -192,7 +192,7 @@ describe('createT3Client.listAttention', () => {
   it('reads transcripts only for threads that could still be plain replies', async () => {
     const asked: string[] = [];
     const client = createT3Client(
-      {T3_URL: 'http://127.0.0.1:3773', T3_TOKEN: 'test-token'},
+      {T3_URL: 'http://127.0.0.1:3773', T3_TOKEN: 'test-token', T3_PROJECTS: 'alpha,beta'},
       {
         cliFallback: false,
         now: () => NOW,
@@ -248,7 +248,12 @@ describe('createT3Client.listAttention', () => {
 
   it("accepts the core's camelCase env (t3Url / t3Token)", async () => {
     const client = createT3Client(
-      {mode: 'live', t3Url: 'http://127.0.0.1:3773', t3Token: 'test-token'},
+      {
+        mode: 'live',
+        t3Url: 'http://127.0.0.1:3773',
+        t3Token: 'test-token',
+        t3Projects: ['alpha', 'beta'],
+      },
       {
         cliFallback: false,
         now: () => NOW,

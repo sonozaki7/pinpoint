@@ -4,13 +4,14 @@ import { cloneFixtures } from './builtinFixtures.js';
 import type {
   AttentionSource,
   AttentionThread,
+  SendOptions,
   TelegramNotifier,
   T3Client,
 } from './types.js';
 
 /** In-memory T3 stand-in used in demo mode and whenever src/t3 is unavailable. */
 export class FakeT3Client implements T3Client {
-  readonly sent: { threadId: string; text: string }[] = [];
+  readonly sent: { threadId: string; text: string; sourcePlanId?: string }[] = [];
   readonly answered: { threadId: string; requestId: string; answers: Record<string, string> }[] = [];
   private readonly fixtures: Fixture[];
 
@@ -32,8 +33,12 @@ export class FakeT3Client implements T3Client {
     return { ...this.sourceFor(threadId) };
   }
 
-  async sendMessage(threadId: string, text: string): Promise<void> {
-    this.sent.push({ threadId, text });
+  async sendMessage(threadId: string, text: string, options?: SendOptions): Promise<void> {
+    this.sent.push({
+      threadId,
+      text,
+      ...(options?.sourcePlanId === undefined ? {} : { sourcePlanId: options.sourcePlanId }),
+    });
     console.info(`[t3 demo] message to ${threadId} (${text.length} chars)`);
   }
 
