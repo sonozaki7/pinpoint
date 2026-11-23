@@ -16,16 +16,20 @@ Spec: `docs/SPEC.md` · Demo/pitch: `docs/DEMO.md` · Acceptance rows: SPEC §13
 
 | ID | Task | Owner (delegate) | Status | Result |
 |---|---|---|---|---|
-| W1 | Glasses app per SPEC §10 (demo + live via server API), simulator screenshots | DeepSeek | running | |
-| W2 | Server core: HTTP API, decks, splitter + quote verification, composer, voice, demo mode, tests | DeepSeek | running | |
-| W3 | T3 client + `docs/t3-api-notes.md`, live attention + send to a sandbox thread | DeepSeek | running | |
-| W4 | Telegram module (dry-run + real mode), tests | DeepSeek | running | |
-| W5 | Recon: user's domains + fastest static hosting, `docs/hosting-options.md` (read-only) | DeepSeek | running | |
-| W6 | Demo fixtures (4 threads + decks) + simulator recording script | DeepSeek | running | |
-| W7 | Landing site (after W5) | — | queued | |
-| W8 | Video edit in Remotion (after W1+W6) | — | queued | |
-| W9 | Integration test: glasses ⇄ server ⇄ T3 live | — | queued | |
-| W10 | README, SUBMISSION.md, FEATURE_REQUESTS.md, .ehpk | — | queued | |
+| W1 | Glasses app per SPEC §10, simulator screenshots | DeepSeek | done | 13 sim screenshots, .ehpk 47 KB, tests green |
+| W2 | Server core | DeepSeek | done | 125 tests; T3 voice 189 ms; opencode split 20 s, 8/8 quotes valid |
+| W3 | T3 client + `docs/t3-api-notes.md` | DeepSeek | done | live: report/plan/question verified on T3 0.1.11; 3 sandbox threads to clean up later |
+| W4 | Telegram module | DeepSeek | done | 32 tests, dry-run flow; needs real bot to verify |
+| W5 | Hosting recon | DeepSeek | done | GitHub Pages in sonozaki7/pinpoint once public |
+| W6 | Demo fixtures + sim recorder | DeepSeek | done | 4 fixtures, 25 points verified |
+| W7 | Landing site | DeepSeek | done | apps/site; hero stats are placeholders → replace with real run numbers |
+| W8 | Video pipeline + draft render (Remotion) | DeepSeek | done | 2:45 draft; W8b = v2 with real footage + Kokoro voice (running) |
+| W9a | Server live mode vs T3 (project allowlist) | DeepSeek | done | privacy gate; report/question/plan live-verified |
+| W10 | README, SUBMISSION.md, FEATURE_REQUESTS.md | DeepSeek | done (draft) | final pass after video/live numbers |
+| W11 | Glasses polish + run against real server | DeepSeek | done | focus cursor, counters; real mic via T3 179 ms |
+| W12 | Scene recordings + live proof run | DeepSeek | done | open→send 20.4 s, 2 notes, agent replied 7.3 s; T3 screenshot needs pairing (morning) |
+| W13 | Final docs pass, real numbers, cleanup sandbox threads, make public (user OK) | — | queued (after W8b + morning items) | |
+| W14 | Hardening + `npm run demo` + `npm run check` | DeepSeek | done | 155 server + 19 glasses tests |
 
 ## Morning checklist for the user (big or account-bound decisions)
 
