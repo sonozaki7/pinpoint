@@ -1,0 +1,428 @@
+{
+  "schemaVersion": 2,
+  "snapshotSequence": 1000,
+  "note": "Trimmed, redacted recording of GET /api/orchestration/shell (T3 Code 0.1.11, orchestration protocol 2). Thread titles, ids, project names and message text are placeholders. One row per attention rule and exclusion rule.",
+  "threads": [
+    {
+      "id": "thread-question",
+      "projectId": "project-alpha",
+      "title": "Fixture: pending question",
+      "status": "running",
+      "createdAt": "2026-11-24T00:00:00.000Z",
+      "updatedAt": "2026-11-24T00:05:00.000Z",
+      "archivedAt": null,
+      "deletedAt": null,
+      "settledAt": null,
+      "snoozedUntil": null,
+      "pendingRuntimeRequest": {
+        "id": "request-question-1",
+        "kind": "user_input",
+        "createdAt": "2026-11-24T00:05:00.000Z",
+        "blocking": true
+      },
+      "hasActionableProposedPlan": false,
+      "latestVisibleMessage": null,
+      "latestUserAuthoredMessageAt": "2026-11-24T00:01:00.000Z",
+      "lineage": {
+        "parentThreadId": null,
+        "relationshipToParent": null,
+        "rootThreadId": "thread-question"
+      }
+    },
+    {
+      "id": "thread-plan",
+      "projectId": "project-alpha",
+      "title": "Fixture: proposed plan",
+      "status": "completed",
+      "createdAt": "2026-11-24T00:00:00.000Z",
+      "updatedAt": "2026-11-24T00:10:00.000Z",
+      "archivedAt": null,
+      "deletedAt": null,
+      "settledAt": null,
+      "snoozedUntil": null,
+      "pendingRuntimeRequest": null,
+      "hasActionableProposedPlan": true,
+      "latestVisibleMessage": null,
+      "latestUserAuthoredMessageAt": "2026-11-24T00:01:00.000Z",
+      "lineage": {
+        "parentThreadId": null,
+        "relationshipToParent": null,
+        "rootThreadId": "thread-plan"
+      }
+    },
+    {
+      "id": "thread-failed",
+      "projectId": "project-beta",
+      "title": "Fixture: failed run",
+      "status": "failed",
+      "lastError": "Provider exited",
+      "createdAt": "2026-11-24T00:00:00.000Z",
+      "updatedAt": "2026-11-24T00:15:00.000Z",
+      "archivedAt": null,
+      "deletedAt": null,
+      "settledAt": null,
+      "snoozedUntil": null,
+      "pendingRuntimeRequest": null,
+      "hasActionableProposedPlan": false,
+      "latestVisibleMessage": null,
+      "latestUserAuthoredMessageAt": "2026-11-24T00:02:00.000Z",
+      "lineage": {
+        "parentThreadId": null,
+        "relationshipToParent": null,
+        "rootThreadId": "thread-failed"
+      }
+    },
+    {
+      "id": "thread-report-transcript",
+      "projectId": "project-beta",
+      "title": "Fixture: reply, shell hides the message",
+      "status": "completed",
+      "createdAt": "2026-11-24T00:00:00.000Z",
+      "updatedAt": "2026-11-24T00:20:00.000Z",
+      "archivedAt": null,
+      "deletedAt": null,
+      "settledAt": null,
+      "snoozedUntil": null,
+      "pendingRuntimeRequest": null,
+      "hasActionableProposedPlan": false,
+      "latestVisibleMessage": null,
+      "latestUserAuthoredMessageAt": "2026-11-24T00:03:00.000Z",
+      "lineage": {
+        "parentThreadId": null,
+        "relationshipToParent": null,
+        "rootThreadId": "thread-report-transcript"
+      }
+    },
+    {
+      "id": "thread-report-inline",
+      "projectId": "project-alpha",
+      "title": "Fixture: reply, shell carries the message",
+      "status": "idle",
+      "createdAt": "2026-11-24T00:00:00.000Z",
+      "updatedAt": "2026-11-24T00:25:00.000Z",
+      "archivedAt": null,
+      "deletedAt": null,
+      "settledAt": null,
+      "snoozedUntil": null,
+      "pendingRuntimeRequest": null,
+      "hasActionableProposedPlan": false,
+      "latestVisibleMessage": {
+        "id": "message-inline-1",
+        "role": "assistant",
+        "text": "Placeholder assistant reply.",
+        "updatedAt": "2026-11-24T00:25:00.000Z"
+      },
+      "latestUserAuthoredMessageAt": "2026-11-24T00:04:00.000Z",
+      "lineage": {
+        "parentThreadId": null,
+        "relationshipToParent": null,
+        "rootThreadId": "thread-report-inline"
+      }
+    },
+    {
+      "id": "thread-unsettled-override",
+      "projectId": "project-alpha",
+      "title": "Fixture: settled time but kept active",
+      "status": "completed",
+      "createdAt": "2026-11-24T00:00:00.000Z",
+      "updatedAt": "2026-11-24T00:30:00.000Z",
+      "archivedAt": null,
+      "deletedAt": null,
+      "settledAt": "2026-11-24T00:29:00.000Z",
+      "settledOverride": "active",
+      "snoozedUntil": null,
+      "pendingRuntimeRequest": null,
+      "hasActionableProposedPlan": false,
+      "latestVisibleMessage": {
+        "id": "message-inline-2",
+        "role": "assistant",
+        "text": "Placeholder assistant reply.",
+        "updatedAt": "2026-11-24T00:30:00.000Z"
+      },
+      "latestUserAuthoredMessageAt": "2026-11-24T00:04:00.000Z",
+      "lineage": {
+        "parentThreadId": null,
+        "relationshipToParent": null,
+        "rootThreadId": "thread-unsettled-override"
+      }
+    },
+    {
+      "id": "thread-snoozed-past",
+      "projectId": "project-beta",
+      "title": "Fixture: snooze expired",
+      "status": "completed",
+      "createdAt": "2026-11-24T00:00:00.000Z",
+      "updatedAt": "2026-11-24T00:35:00.000Z",
+      "archivedAt": null,
+      "deletedAt": null,
+      "settledAt": null,
+      "snoozedUntil": "2026-11-24T00:34:00.000Z",
+      "pendingRuntimeRequest": null,
+      "hasActionableProposedPlan": false,
+      "latestVisibleMessage": null,
+      "latestUserAuthoredMessageAt": "2026-11-24T00:04:00.000Z",
+      "lineage": {
+        "parentThreadId": null,
+        "relationshipToParent": null,
+        "rootThreadId": "thread-snoozed-past"
+      }
+    },
+    {
+      "id": "thread-user-latest",
+      "projectId": "project-alpha",
+      "title": "Fixture: last message is the user's",
+      "status": "completed",
+      "createdAt": "2026-11-24T00:00:00.000Z",
+      "updatedAt": "2026-11-24T00:40:00.000Z",
+      "archivedAt": null,
+      "deletedAt": null,
+      "settledAt": null,
+      "snoozedUntil": null,
+      "pendingRuntimeRequest": null,
+      "hasActionableProposedPlan": false,
+      "latestVisibleMessage": {
+        "id": "message-inline-3",
+        "role": "user",
+        "text": "Placeholder user message.",
+        "updatedAt": "2026-11-24T00:40:00.000Z"
+      },
+      "latestUserAuthoredMessageAt": "2026-11-24T00:40:00.000Z",
+      "lineage": {
+        "parentThreadId": null,
+        "relationshipToParent": null,
+        "rootThreadId": "thread-user-latest"
+      }
+    },
+    {
+      "id": "thread-archived",
+      "projectId": "project-alpha",
+      "title": "Fixture: archived",
+      "status": "completed",
+      "createdAt": "2026-11-24T00:00:00.000Z",
+      "updatedAt": "2026-11-24T00:45:00.000Z",
+      "archivedAt": "2026-11-24T00:45:00.000Z",
+      "deletedAt": null,
+      "settledAt": null,
+      "snoozedUntil": null,
+      "pendingRuntimeRequest": null,
+      "hasActionableProposedPlan": false,
+      "latestVisibleMessage": {
+        "id": "message-inline-4",
+        "role": "assistant",
+        "text": "Placeholder assistant reply.",
+        "updatedAt": "2026-11-24T00:45:00.000Z"
+      },
+      "latestUserAuthoredMessageAt": "2026-11-24T00:04:00.000Z",
+      "lineage": {
+        "parentThreadId": null,
+        "relationshipToParent": null,
+        "rootThreadId": "thread-archived"
+      }
+    },
+    {
+      "id": "thread-deleted",
+      "projectId": "project-alpha",
+      "title": "Fixture: deleted",
+      "status": "completed",
+      "createdAt": "2026-11-24T00:00:00.000Z",
+      "updatedAt": "2026-11-24T00:46:00.000Z",
+      "archivedAt": null,
+      "deletedAt": "2026-11-24T00:46:00.000Z",
+      "settledAt": null,
+      "snoozedUntil": null,
+      "pendingRuntimeRequest": null,
+      "hasActionableProposedPlan": false,
+      "latestVisibleMessage": {
+        "id": "message-inline-5",
+        "role": "assistant",
+        "text": "Placeholder assistant reply.",
+        "updatedAt": "2026-11-24T00:46:00.000Z"
+      },
+      "latestUserAuthoredMessageAt": "2026-11-24T00:04:00.000Z",
+      "lineage": {
+        "parentThreadId": null,
+        "relationshipToParent": null,
+        "rootThreadId": "thread-deleted"
+      }
+    },
+    {
+      "id": "thread-settled",
+      "projectId": "project-alpha",
+      "title": "Fixture: settled",
+      "status": "completed",
+      "createdAt": "2026-11-24T00:00:00.000Z",
+      "updatedAt": "2026-11-24T00:47:00.000Z",
+      "archivedAt": null,
+      "deletedAt": null,
+      "settledAt": "2026-11-24T00:47:00.000Z",
+      "snoozedUntil": null,
+      "pendingRuntimeRequest": null,
+      "hasActionableProposedPlan": true,
+      "latestVisibleMessage": {
+        "id": "message-inline-6",
+        "role": "assistant",
+        "text": "Placeholder assistant reply.",
+        "updatedAt": "2026-11-24T00:47:00.000Z"
+      },
+      "latestUserAuthoredMessageAt": "2026-11-24T00:04:00.000Z",
+      "lineage": {
+        "parentThreadId": null,
+        "relationshipToParent": null,
+        "rootThreadId": "thread-settled"
+      }
+    },
+    {
+      "id": "thread-snoozed",
+      "projectId": "project-alpha",
+      "title": "Fixture: snoozed until later",
+      "status": "completed",
+      "createdAt": "2026-11-24T00:00:00.000Z",
+      "updatedAt": "2026-11-24T00:48:00.000Z",
+      "archivedAt": null,
+      "deletedAt": null,
+      "settledAt": null,
+      "snoozedUntil": "2026-11-25T00:00:00.000Z",
+      "pendingRuntimeRequest": null,
+      "hasActionableProposedPlan": false,
+      "latestVisibleMessage": {
+        "id": "message-inline-7",
+        "role": "assistant",
+        "text": "Placeholder assistant reply.",
+        "updatedAt": "2026-11-24T00:48:00.000Z"
+      },
+      "latestUserAuthoredMessageAt": "2026-11-24T00:04:00.000Z",
+      "lineage": {
+        "parentThreadId": null,
+        "relationshipToParent": null,
+        "rootThreadId": "thread-snoozed"
+      }
+    },
+    {
+      "id": "thread-subagent-child",
+      "projectId": "project-alpha",
+      "title": "Fixture: subagent child",
+      "status": "completed",
+      "createdAt": "2026-11-24T00:00:00.000Z",
+      "updatedAt": "2026-11-24T00:49:00.000Z",
+      "archivedAt": null,
+      "deletedAt": null,
+      "settledAt": null,
+      "snoozedUntil": null,
+      "pendingRuntimeRequest": null,
+      "hasActionableProposedPlan": false,
+      "latestVisibleMessage": {
+        "id": "message-inline-8",
+        "role": "assistant",
+        "text": "Placeholder assistant reply.",
+        "updatedAt": "2026-11-24T00:49:00.000Z"
+      },
+      "latestUserAuthoredMessageAt": "2026-11-24T00:04:00.000Z",
+      "lineage": {
+        "parentThreadId": "thread-plan",
+        "relationshipToParent": "subagent",
+        "rootThreadId": "thread-plan"
+      }
+    },
+    {
+      "id": "thread-side-chat",
+      "projectId": "project-alpha",
+      "title": "Fixture: side chat",
+      "status": "completed",
+      "createdAt": "2026-11-24T00:00:00.000Z",
+      "updatedAt": "2026-11-24T00:50:00.000Z",
+      "archivedAt": null,
+      "deletedAt": null,
+      "settledAt": null,
+      "snoozedUntil": null,
+      "pendingRuntimeRequest": null,
+      "hasActionableProposedPlan": false,
+      "latestVisibleMessage": {
+        "id": "message-inline-9",
+        "role": "assistant",
+        "text": "Placeholder assistant reply.",
+        "updatedAt": "2026-11-24T00:50:00.000Z"
+      },
+      "latestUserAuthoredMessageAt": "2026-11-24T00:04:00.000Z",
+      "lineage": {
+        "parentThreadId": "thread-plan",
+        "relationshipToParent": null,
+        "rootThreadId": "thread-plan",
+        "sideChat": true
+      }
+    },
+    {
+      "id": "thread-running",
+      "projectId": "project-alpha",
+      "title": "Fixture: still running",
+      "status": "running",
+      "createdAt": "2026-11-24T00:00:00.000Z",
+      "updatedAt": "2026-11-24T00:51:00.000Z",
+      "archivedAt": null,
+      "deletedAt": null,
+      "settledAt": null,
+      "snoozedUntil": null,
+      "pendingRuntimeRequest": null,
+      "hasActionableProposedPlan": false,
+      "latestVisibleMessage": {
+        "id": "message-inline-10",
+        "role": "assistant",
+        "text": "Placeholder assistant reply.",
+        "updatedAt": "2026-11-24T00:51:00.000Z"
+      },
+      "latestUserAuthoredMessageAt": "2026-11-24T00:04:00.000Z",
+      "lineage": {
+        "parentThreadId": null,
+        "relationshipToParent": null,
+        "rootThreadId": "thread-running"
+      }
+    },
+    {
+      "id": "thread-question-answered",
+      "projectId": "project-beta",
+      "title": "Fixture: question already resolved",
+      "status": "completed",
+      "createdAt": "2026-11-24T00:00:00.000Z",
+      "updatedAt": "2026-11-24T00:52:00.000Z",
+      "archivedAt": null,
+      "deletedAt": null,
+      "settledAt": null,
+      "snoozedUntil": null,
+      "pendingRuntimeRequest": {
+        "id": "request-question-2",
+        "kind": "command",
+        "createdAt": "2026-11-24T00:51:00.000Z",
+        "blocking": false
+      },
+      "hasActionableProposedPlan": false,
+      "latestVisibleMessage": {
+        "id": "message-inline-11",
+        "role": "assistant",
+        "text": "Placeholder assistant reply.",
+        "updatedAt": "2026-11-24T00:52:00.000Z"
+      },
+      "latestUserAuthoredMessageAt": "2026-11-24T00:04:00.000Z",
+      "lineage": {
+        "parentThreadId": null,
+        "relationshipToParent": null,
+        "rootThreadId": "thread-question-answered"
+      }
+    }
+  ],
+  "archivedThreads": [],
+  "projects": [
+    {
+      "id": "project-alpha",
+      "title": "alpha",
+      "workspaceRoot": "/fixtures/alpha",
+      "createdAt": "2026-11-01T00:00:00.000Z",
+      "updatedAt": "2026-11-01T00:00:00.000Z"
+    },
+    {
+      "id": "project-beta",
+      "title": "beta",
+      "workspaceRoot": "/fixtures/beta",
+      "createdAt": "2026-11-01T00:00:00.000Z",
+      "updatedAt": "2026-11-01T00:00:00.000Z"
+    }
+  ]
+}
