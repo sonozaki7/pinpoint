@@ -49,8 +49,8 @@ function paeth(a, b, c) {
   return pb <= pc ? b : c;
 }
 
-/** Decode the simulator's RGBA PNG, then bake brightness into green on a black background. */
-export function compositeGlassesPng(buffer, tint = [140, 255, 120]) {
+/** Decode the simulator's RGBA PNG into straight pixels. */
+export function decodeGlassesPng(buffer) {
   const chunks = readChunks(buffer);
   const ihdr = chunks.find((entry) => entry.type === "IHDR");
   if (!ihdr) throw new Error("PNG has no IHDR");
@@ -88,6 +88,29 @@ export function compositeGlassesPng(buffer, tint = [140, 255, 120]) {
       pixels[target + x] = out & 0xff;
     }
   }
+  return { width, height, pixels };
+}
+
+/** Highest alpha in a rectangle; the simulator stores text brightness there. */
+export function maxAlphaIn(buffer, box) {
+  const { width, height, pixels } = decodeGlassesPng(buffer);
+  const x0 = Math.max(0, Math.floor(box.x));
+  const y0 = Math.max(0, Math.floor(box.y));
+  const x1 = Math.min(width, Math.ceil(box.x + box.width));
+  const y1 = Math.min(height, Math.ceil(box.y + box.height));
+  let max = 0;
+  for (let y = y0; y < y1; y++) {
+    for (let x = x0; x < x1; x++) {
+      const alpha = pixels[(y * width + x) * 4 + 3];
+      if (alpha > max) max = alpha;
+    }
+  }
+  return max;
+}
+
+/** Decode the simulator's RGBA PNG, then bake brightness into green on a black background. */
+export function compositeGlassesPng(buffer, tint = [140, 255, 120]) {
+  const { width, height, pixels } = decodeGlassesPng(buffer);
 
   const out = Buffer.alloc(width * height * 3);
   for (let y = 0; y < height; y++) {

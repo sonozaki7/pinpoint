@@ -1,5 +1,4 @@
 import type { Deck, InboxItem, Note, Point, PreviewResult, ReviewDraft } from "../../../shared/contract";
-
 export type ScreenName = "inbox" | "review" | "options" | "preview";
 
 export interface Flash {
@@ -26,6 +25,8 @@ export interface State {
   notes: Note[];
   seen: string[];
   drafts: Record<string, SavedDraft>;
+  /** Threads handled on this device; the demo server keeps returning them, so hide them here. */
+  resolved: string[];
   recordingStartedAt: number | null;
   optionsFocus: number;
   preview: PreviewResult | null;
@@ -69,6 +70,7 @@ export function initialState(options: { demo: boolean; loading: boolean }): Stat
     notes: [],
     seen: [],
     drafts: {},
+    resolved: [],
     recordingStartedAt: null,
     optionsFocus: 0,
     preview: null,
@@ -101,10 +103,6 @@ export function countNotes(notes: readonly Note[]) {
   };
 }
 
-export function needCount(items: readonly InboxItem[]): number {
-  return items.filter((item) => item.attention !== "report").length;
-}
-
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
@@ -131,7 +129,8 @@ export function adoptInbox(
   items: readonly InboxItem[],
   options: { demo: boolean; offline: boolean },
 ): State {
-  const capped = items.slice(0, 20);
+  const visible = items.filter((item) => !state.resolved.includes(item.threadId));
+  const capped = visible.slice(0, 20);
   const existing = capped.some((item) => item.threadId === state.inbox[state.inboxFocus]?.threadId);
   return {
     ...state,
@@ -361,6 +360,9 @@ export function finishSend(state: State): State {
   const threadId = state.deck?.threadId;
   const drafts = { ...state.drafts };
   if (threadId) delete drafts[threadId];
+  const resolved = threadId && !state.resolved.includes(threadId)
+    ? [...state.resolved, threadId]
+    : state.resolved;
   return {
     ...state,
     screen: "inbox",
@@ -371,6 +373,7 @@ export function finishSend(state: State): State {
     notes: [],
     seen: [],
     drafts,
+    resolved,
     focus: 0,
     optionsFocus: 0,
     preview: null,

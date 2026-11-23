@@ -9,7 +9,7 @@
     {
       "name": "network",
       "desc": "Loads agent threads and sends your review to the Pinpoint server on your computer.",
-      "whitelist": ["http://127.0.0.1:8787"]
+      "whitelist": ["http://127.0.0.1:8787", "http://127.0.0.1:8788"]
     },
     {
       "name": "g2-microphone",

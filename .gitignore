@@ -11,3 +11,4 @@ demo/shots/tmp/
 .DS_Store
 *.log
 apps/site/review/
+demo/recordings/

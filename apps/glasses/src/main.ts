@@ -280,10 +280,13 @@ async function loadInbox(silent: boolean) {
   render();
   if (state.screen === "inbox") {
     console.info(`[pinpoint] screen=inbox items=${state.inbox.length}${state.demo ? " demo" : ""}`);
+    console.info(`[pinpoint] inbox-ids=${state.inbox.map((item) => item.threadId).join(",")}`);
+    console.info(`[pinpoint] inbox-header="${pageFor(state, Date.now()).title}"`);
   }
 }
 
 async function boot() {
+  console.info(`[pinpoint] server=${forceMock ? "mock" : serverUrl}`);
   if (!forceMock) {
     const live = new HttpPinpointApi(serverUrl);
     try {
@@ -302,6 +305,8 @@ async function boot() {
   }
   render();
   console.info(`[pinpoint] mode=${state.demo ? "demo" : "live"} screen=inbox items=${state.inbox.length}`);
+  console.info(`[pinpoint] inbox-ids=${state.inbox.map((item) => item.threadId).join(",")}`);
+  console.info(`[pinpoint] inbox-header="${pageFor(state, Date.now()).title}"`);
 }
 
 async function openThread(index: number) {
@@ -323,6 +328,7 @@ async function openThread(index: number) {
       maybePersist(before, state);
       render();
       console.info(`[pinpoint] screen=review thread=${result.threadId} focus=${state.focus + 1} points=${result.points.length}`);
+      console.info(`[pinpoint] review-header="${pageFor(state, Date.now()).title}"`);
       return;
     } catch (error) {
       console.warn("[pinpoint] deck", error);
@@ -371,6 +377,7 @@ async function stopRecording() {
     const point = focusedPoint(state);
     const note = point ? noteFor(state, point.id) : undefined;
     console.info(`[pinpoint] note=${point?.id ?? "none"} verdict=${note?.verdict ?? "none"} text="${text}"`);
+    console.info(`[pinpoint] review-header="${pageFor(state, Date.now()).title}"`);
   } catch (error) {
     console.warn("[pinpoint] voice", error);
     state = setFlash(state, "Voice failed. Try again.", Date.now());

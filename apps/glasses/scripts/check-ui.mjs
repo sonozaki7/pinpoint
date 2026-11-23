@@ -30,7 +30,7 @@ try {
       assert.equal(clipped, false, `${selector} clipped at ${width}px`);
     }
   }
-  assert.match(await phone.locator("#glasses-head").innerText(), /PINPOINT \| 3 need you[\s\S]*demo data/);
+  assert.match(await phone.locator("#glasses-head").innerText(), /PINPOINT \| 4 need you[\s\S]*demo data/);
   await phone.close();
 
   // Mock only the Flutter host transport and drive the real pinned SDK.
@@ -53,7 +53,7 @@ try {
   await page.waitForFunction(() => document.querySelector("#glasses-list")?.children.length === 4);
   await page.waitForFunction(() => window.__bridgeCalls.some((call) =>
     call.method === "rebuildPageContainer" && (call.data.listObject?.length ?? 0) > 0));
-  assert.match(await page.locator("#glasses-head").innerText(), /PINPOINT \| 3 need you/);
+  assert.match(await page.locator("#glasses-head").innerText(), /PINPOINT \| 4 need you/);
 
   const emit = (type, jsonData) => page.evaluate(({ type, jsonData }) => window._listenEvenAppMessage({
     type: "listen_even_app_data", method: "evenHubEvent", data: { type, jsonData },
@@ -79,11 +79,21 @@ try {
   await waitText("#glasses-head", "auth-refresh-fix");
   await waitText("#glasses-rows", "Force-logout all users");
   assert.equal(await page.locator("#glasses-rows .row").count(), 4);
+  assert.match(await page.locator("#glasses-head").innerText(), /auth-refresh-fix \| 1\/7/);
+  assert.doesNotMatch(await page.locator("#glasses-head").innerText(), /x0|\*0/);
 
   const review = (await calls()).filter(({ method }) => method === "rebuildPageContainer").at(-1);
   assert.equal(review.data.containerTotalNum, 8);
   assert.equal(review.data.menuObject.menuItems.length, 4);
   assert.equal(review.data.menuObject.menuItems[0].itemName, "Send review");
+  const reviewRows = review.data.textObject.filter((box) => box.containerName.startsWith("row"));
+  assert.equal(reviewRows.length, 4);
+  assert.equal(reviewRows[0].textColor, 4, "focused row is brightest");
+  assert.match(reviewRows[0].content, /^> \+ 1 /);
+  for (const row of reviewRows.slice(1)) {
+    assert.equal(row.textColor, 2, `${row.containerName} stays dim`);
+    assert.match(row.content, /^ {2}/, `${row.containerName} has no cursor`);
+  }
 
   for (let i = 0; i < 3; i++) {
     await emit("sysEvent", { eventType: 2, eventSource: 1 });
@@ -91,13 +101,21 @@ try {
   }
   await waitText("#glasses-head", "4/7");
   assert.match(await page.locator("#glasses-rows .row").nth(3).innerText(), /Force-logout all users/);
+  const upgrades = (await calls()).filter(({ method }) => method === "textContainerUpgrade");
+  const focusedRow = upgrades.filter(({ data }) => data.containerName === "row4").at(-1);
+  assert.equal(focusedRow?.data.textColor, 4, "row 4 is bright after focus moves");
+  assert.match(focusedRow?.data.content ?? "", /^> !\+ 4 /);
+  const dimRow = upgrades.filter(({ data }) => data.containerName === "row1").at(-1);
+  assert.equal(dimRow?.data.textColor, 2, "row 1 dims after focus moves");
+  assert.doesNotMatch(dimRow?.data.content ?? "", /^>/);
 
   await emit("sysEvent", { eventSource: 1 });
   await waitText("#glasses-pane", "REC");
   await delay(900);
   await emit("sysEvent", { eventSource: 1 });
   await waitText("#glasses-pane", "Heard: No, keep the existing sessions");
-  assert.match(await page.locator("#glasses-rows .row").nth(3).innerText(), /^!x 4 /);
+  assert.match(await page.locator("#glasses-rows .row").nth(3).innerText(), /^> !x 4 /);
+  assert.match(await page.locator("#glasses-head").innerText(), /auth-refresh-fix \| 4\/7 \| 1 objection/);
   const audio = (await calls()).filter(({ method }) => method === "audioControl");
   assert.equal(audio.at(-2)?.data.isOpen, true);
   assert.equal(audio.at(-2)?.data.source, "glasses");
@@ -114,7 +132,7 @@ try {
   await waitText("#glasses-pane", "Sent to agent");
   await delay(1_800);
   await page.waitForFunction(() => document.querySelector("#glasses-list")?.children.length === 3);
-  assert.match(await page.locator("#glasses-head").innerText(), /2 need you/);
+  assert.match(await page.locator("#glasses-head").innerText(), /3 need you/);
 
   // Root double-tap must ask the host for the system exit dialog, mode 1.
   await emit("sysEvent", { eventType: 3, eventSource: 1 });

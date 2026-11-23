@@ -3,10 +3,10 @@ import { test } from "node:test";
 import { validateEvenHubPageContainer } from "@evenrealities/even_hub_sdk";
 import { createAuthDeck, createDemoInbox, createDepsDeck, MockPinpointApi } from "../src/mock";
 import {
-  adoptInbox, applyVoice, chooseOption, clearNotes, initialState, moveFocus, openDeck, press,
-  setPreview, startReview, type State,
+  adoptInbox, applyVoice, chooseOption, clearNotes, finishSend, initialState, moveFocus, openDeck,
+  press, setPreview, startReview, type State,
 } from "../src/model";
-import { asciiTruncate, markerFor, pageFor, toAscii } from "../src/display";
+import { asciiTruncate, markerFor, pageFor, reviewHeader, toAscii } from "../src/display";
 import { createLayout } from "../src/even";
 import { decodeInput } from "../src/events";
 import { Text_ItemEvent, Sys_ItemEvent, OsEventTypeList, MenuItemClickEvent, List_ItemEvent } from "@evenrealities/even_hub_sdk";
@@ -43,15 +43,70 @@ test("the four-row window scrolls only after the fourth row", () => {
     state = { ...state, focus };
     return pageFor(state, 1_000).rows.map((row) => row.text);
   };
-  assert.deepEqual(at(0).map((row) => row.slice(0, 1)), ["+", "o", "o", "!"]);
+  assert.deepEqual(at(0).map((row) => row.slice(0, 3)), ["> +", "  o", "  o", "  !"]);
   assert.match(at(0)[3] ?? "", /Force-logout all users/);
   assert.match(at(3)[3] ?? "", /Force-logout all users/, "focus 4 keeps the first window");
+  assert.match(at(3)[3] ?? "", /^> !o 4 /, "the focused row carries the brightness cursor");
   assert.match(at(4)[0] ?? "", /Move signing/, "focus 5 scrolls one row");
   assert.match(at(4)[3] ?? "", /Backfill sessions/, "four visible rows end at point 5");
   assert.match(at(6)[0] ?? "", /Force-logout all users/);
   assert.match(at(6)[3] ?? "", /concurrent refresh/);
-  assert.deepEqual(at(7).map((row) => row.slice(0, 1)), ["o", "o", "o", ">"]);
-  assert.match(at(7)[3] ?? "", /Send review \(0 notes\)/);
+  assert.deepEqual(
+    at(7).slice(0, 3).map((row) => row.slice(0, 3)),
+    ["  o", "  o", "  o"],
+    "only the focused row carries the cursor",
+  );
+  assert.match(at(7)[3] ?? "", /^> Send review \(0 notes\)/);
+});
+
+test("the inbox header counts every listed thread and review counters read as words", () => {
+  const inbox = inboxState();
+  assert.equal(pageFor(inbox, 1_000).title, "PINPOINT | 4 need you");
+  let review = reviewState();
+  assert.equal(reviewHeader(review), "auth-refresh-fix | 1/7");
+  review = { ...review, focus: 3, notes: [{ pointId: "p4", verdict: "object", text: "No" }] };
+  assert.equal(reviewHeader(review), "auth-refresh-fix | 4/7 | 1 objection");
+  review = {
+    ...review,
+    notes: [...review.notes, { pointId: "p6", verdict: "note", text: "Queue it" }],
+  };
+  const header = reviewHeader(review);
+  assert.ok(header.length <= 44, header);
+  assert.match(header, /^auth-refresh-fix \| 4\/7 \| 1 objection, 1 note$/);
+  const longTitle = {
+    ...review,
+    deck: { ...review.deck!, title: "a-very-long-thread-title-that-does-not-fit" },
+  };
+  const fitted = reviewHeader(longTitle);
+  assert.ok(fitted.length <= 44, fitted);
+  assert.match(fitted, /\.\.\. \| 4\/7 \| 1 objection, 1 note$/);
+});
+
+test("the focused row is brighter and carries the only cursor", () => {
+  const state = { ...reviewState(), focus: 2 };
+  const page = pageFor(state, 1_000);
+  const focused = page.rows.filter((row) => row.text.startsWith("> "));
+  assert.equal(focused.length, 1);
+  assert.equal(focused[0]?.brightness, 4);
+  for (const row of page.rows.filter((entry) => entry !== focused[0])) {
+    assert.equal(row.brightness, 2, row.text);
+    assert.match(row.text, /^ {2}/, row.text);
+  }
+});
+
+test("a sent thread stays gone when the demo server still lists it", async () => {
+  const api = new MockPinpointApi();
+  let state = inboxState();
+  const item = state.inbox.find((entry) => entry.threadId === "auth-refresh-fix");
+  assert.ok(item);
+  state = openDeck(startReview(state, item), createAuthDeck());
+  state = finishSend({ ...state, focus: 7 });
+  assert.equal(state.inbox.some((entry) => entry.threadId === "auth-refresh-fix"), false);
+  assert.equal(pageFor(state, 1_000).title, "PINPOINT | 3 need you");
+  const { items } = await api.inbox();
+  state = adoptInbox(state, items, { demo: false, offline: false });
+  assert.equal(state.inbox.length, 3);
+  assert.equal(state.inbox.some((entry) => entry.threadId === "auth-refresh-fix"), false);
 });
 
 test("markers cover unseen, seen, objection, note, question, answer and high risk", () => {
@@ -64,10 +119,10 @@ test("markers cover unseen, seen, objection, note, question, answer and high ris
   assert.equal(markerFor(p4, { ...state, seen: [] }), "o");
   assert.equal(markerFor(p4, { ...state, seen: ["p4"] }), "+");
   assert.equal(markerFor(p4, state), "o");
-  assert.match(pageFor(state, 1_000).rows[3]?.text ?? "", /^!o 4 /, "high-risk marker comes first");
+  assert.match(pageFor(state, 1_000).rows[3]?.text ?? "", /^  !o 4 /, "high-risk marker comes first");
   state = { ...state, notes: [{ pointId: "p4", verdict: "object", text: "No" }] };
   assert.equal(markerFor(p4, state), "x");
-  assert.match(pageFor(state, 1_000).rows[3]?.text ?? "", /^!x 4 /);
+  assert.match(pageFor(state, 1_000).rows[3]?.text ?? "", /^  !x 4 /);
   state = { ...state, notes: [{ pointId: "p6", verdict: "note", text: "Queue it" }] };
   assert.equal(markerFor(p6, state), "*");
   const question = reviewState("deps-upgrade");

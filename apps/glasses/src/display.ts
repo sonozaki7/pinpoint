@@ -1,6 +1,6 @@
 import type { InboxItem, Point } from "../../../shared/contract";
 import {
-  countNotes, focusedPoint, needCount, noteFor, REVIEW_ROWS, type State,
+  countNotes, focusedPoint, noteFor, REVIEW_ROWS, type State,
 } from "./model";
 
 export const DOT = " | ";
@@ -103,9 +103,15 @@ export function markerFor(point: Point, state: State): string {
   return state.seen.includes(point.id) ? "+" : "o";
 }
 
-export function pointRow(point: Point, state: State): string {
+/** Prefix a row with the cursor, keeping the indent out of the ASCII trim. */
+function cursorRow(text: string, focused: boolean, max = ROW_WIDTH): string {
+  return `${focused ? "> " : "  "}${asciiTruncate(text, max - 2)}`;
+}
+
+/** A ">" cursor leads the focused row; every other row keeps the same two-character indent. */
+export function pointRow(point: Point, state: State, focused = false): string {
   const risk = point.risk === "high" ? "!" : "";
-  return asciiTruncate(`${risk}${markerFor(point, state)} ${point.index} ${point.glance}`, ROW_WIDTH);
+  return cursorRow(`${risk}${markerFor(point, state)} ${point.index} ${point.glance}`, focused);
 }
 
 export interface RowSlot {
@@ -152,16 +158,42 @@ export function inboxRow(item: InboxItem): string {
   return asciiTruncate(`${inboxSymbol(item)} ${item.title}${DOT}${item.summary}`, LIST_WIDTH);
 }
 
-function reviewTitle(state: State): string {
+function noteParts(state: State): string[] {
+  const counts = countNotes(state.notes);
+  const parts: string[] = [];
+  if (counts.objections > 0) {
+    parts.push(`${counts.objections} objection${counts.objections === 1 ? "" : "s"}`);
+  }
+  if (counts.answers > 0) {
+    parts.push(`${counts.answers} answer${counts.answers === 1 ? "" : "s"}`);
+  }
+  if (counts.notes > 0) {
+    parts.push(`${counts.notes} note${counts.notes === 1 ? "" : "s"}`);
+  }
+  return parts;
+}
+
+/** Fit a title plus suffix into 44 characters, shortening the title first. */
+export function fitTitle(title: string, suffix: string, max = ROW_WIDTH): string {
+  const room = max - suffix.length;
+  if (room >= 4) return `${asciiTruncate(title, room)}${suffix}`;
+  return asciiTruncate(`${title}${suffix}`, max);
+}
+
+/** `auth-refresh-fix | 4/7 | 1 objection` — words, no cryptic counters. */
+export function reviewHeader(state: State): string {
   const deck = state.deck;
   if (!deck) return asciiTruncate(state.reviewTitle || "Review", ROW_WIDTH);
-  const counts = countNotes(state.notes);
-  const points = deck.points.length;
-  const position = Math.min(state.focus + 1, points);
-  return asciiTruncate(
-    `${deck.title}${DOT}${position}/${points}${DOT}x${counts.objections} *${counts.notes}`,
-    ROW_WIDTH + 8,
-  );
+  const position = Math.min(state.focus + 1, deck.points.length);
+  const meta = `${position}/${deck.points.length}`;
+  const parts = noteParts(state);
+  // Keep the most important counts first; drop later ones only if the title cannot shrink enough.
+  for (let count = parts.length; count > 0; count--) {
+    const summary = parts.slice(0, count).join(", ");
+    const full = fitTitle(deck.title, `${DOT}${meta}${DOT}${summary}`);
+    if (full.endsWith(summary)) return full;
+  }
+  return fitTitle(deck.title, `${DOT}${meta}`);
 }
 
 function optionLines(point: Point): string {
@@ -208,9 +240,7 @@ export function pageFor(state: State, now: number): PageModel {
       ? "PINPOINT"
       : state.inbox.length === 0
         ? "PINPOINT"
-        : needCount(state.inbox) > 0
-          ? `PINPOINT${DOT}${needCount(state.inbox)} need you`
-          : `PINPOINT${DOT}all clear`;
+        : `PINPOINT${DOT}${state.inbox.length} ${state.inbox.length === 1 ? "needs" : "need"} you`;
     const subtitle = state.demo ? "demo data" : state.offline ? "offline" : undefined;
     const base: PageModel = {
       kind: "inbox",
@@ -241,14 +271,17 @@ export function pageFor(state: State, now: number): PageModel {
     const slots = reviewSlots(state);
     return {
       kind: "review",
-      title: reviewTitle(state),
+      title: reviewHeader(state),
       rows: slots.map((slot) => slot.kind === "send"
         ? {
-          text: asciiTruncate(`> Send review (${slot.count} note${slot.count === 1 ? "" : "s"})`, ROW_WIDTH),
+          text: cursorRow(
+            `Send review (${slot.count} note${slot.count === 1 ? "" : "s"})`,
+            slot.focused,
+          ),
           brightness: slot.focused ? 4 : 2,
         }
         : {
-          text: pointRow(slot.point, state),
+          text: pointRow(slot.point, state, slot.focused),
           brightness: slot.focused ? 4 : 2,
         }),
       pane: reviewPane(state, now),
@@ -261,16 +294,16 @@ export function pageFor(state: State, now: number): PageModel {
     const point = focusedPoint(state);
     const options = point?.options ?? [];
     const rows: PageRow[] = options.map((option, index) => ({
-      text: asciiTruncate(`${index + 1} ${option}`, ROW_WIDTH),
+      text: cursorRow(`${index + 1} ${option}`, index === state.optionsFocus),
       brightness: index === state.optionsFocus ? 4 : 2,
     }));
     rows.push({
-      text: asciiTruncate("> Say something else", ROW_WIDTH),
+      text: cursorRow("Say something else", state.optionsFocus === options.length),
       brightness: state.optionsFocus === options.length ? 4 : 2,
     });
     return {
       kind: "options",
-      title: asciiTruncate(`${state.deck?.title ?? "Question"}${DOT}answer`, ROW_WIDTH + 8),
+      title: fitTitle(state.deck?.title ?? "Question", `${DOT}answer`),
       rows,
       footer: `tap: choose${DOT}2x: back`,
       menu: REVIEW_MENU,
