@@ -1,11 +1,12 @@
 import "./style.css";
+import type { InboxItem } from "../../../shared/contract";
 import { DEFAULT_SERVER, HttpPinpointApi, type PinpointApi } from "./api";
 import { MockPinpointApi } from "./mock";
 import {
   adoptInbox, applyVoice, clearFlash, clearNotes, deckFailed, doubleTap, draftFor, endRecording,
-  finishSend, focusedPoint, goPreview, initialState, markLoading, markOffline, markSent, mergeDeck,
+  finishSend, focusedPoint, goPreview, initialState, markLoading, markOffline, markSending, markSent, mergeDeck,
   moveFocus, noteFor, openDeck, press, previewFailed, sendFailed, setFlash, setInboxFocus, setPreview,
-  startReview, VOICE_MAX_MS, SENT_HOLD_MS, type Effect, type State,
+  shouldAcceptSwipe, startReview, VOICE_MAX_MS, SENT_HOLD_MS, type Effect, type State,
 } from "./model";
 import { pageFor, type PageModel } from "./display";
 import { connectEven } from "./even";
@@ -26,7 +27,12 @@ let tapTimer: ReturnType<typeof setTimeout> | undefined;
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 let lastMenuAt = 0;
 let lastDoubleAt = 0;
+let lastSwipeAt = Number.NEGATIVE_INFINITY;
 let sendInFlight = false;
+let previewInFlight = false;
+let inboxInFlight = false;
+/** A cold live deck can take ~45 s; give it a minute before offering retry. */
+const DECK_WAIT_MS = 60_000;
 
 const el = {
   head: document.getElementById("glasses-head")!,
@@ -105,9 +111,11 @@ function updateButtons() {
       ? "Choose"
       : state.screen === "preview"
         ? "Send"
-        : record
-          ? "Stop"
-          : sendRow ? "Preview" : focusedPoint(state)?.kind === "question" ? "Options" : "Talk");
+        : state.screen === "review" && state.deck === null
+          ? "Retry"
+          : record
+            ? "Stop"
+            : sendRow ? "Preview" : focusedPoint(state)?.kind === "question" ? "Options" : "Talk");
   setText(el.double, state.screen === "inbox" ? "Exit" : "Back");
   setText(el.menuButton, "Hold menu");
   el.up.disabled = ifInboxEmpty();
@@ -182,6 +190,9 @@ function handleInput(input: Input) {
     return;
   }
   if (input.kind === "up" || input.kind === "down") {
+    const now = performance.now();
+    if (!shouldAcceptSwipe(now, lastSwipeAt)) return;
+    lastSwipeAt = now;
     clearTimeout(tapTimer);
     tapTimer = undefined;
     const before = state;
@@ -262,22 +273,31 @@ async function runEffect(effect: Effect) {
     case "retry":
       await loadInbox(false);
       break;
+    case "retry-deck":
+      await retryDeck();
+      break;
   }
 }
 
 async function loadInbox(silent: boolean) {
-  if (!silent) {
-    state = markLoading(state);
-    render();
-  }
+  if (inboxInFlight) return;
+  inboxInFlight = true;
   try {
-    const result = await api.inbox();
-    state = adoptInbox(state, result.items, { demo: api.mode === "demo", offline: false });
-  } catch (error) {
-    console.warn("[pinpoint] inbox", error);
-    if (!silent) state = markOffline(state);
+    if (!silent) {
+      state = markLoading(state);
+      render();
+    }
+    try {
+      const result = await api.inbox();
+      state = adoptInbox(state, result.items, { demo: api.mode === "demo", offline: false });
+    } catch (error) {
+      console.warn("[pinpoint] inbox", error);
+      if (!silent) state = markOffline(state);
+    }
+    render();
+  } finally {
+    inboxInFlight = false;
   }
-  render();
   if (state.screen === "inbox") {
     console.info(`[pinpoint] screen=inbox items=${state.inbox.length}${state.demo ? " demo" : ""}`);
     console.info(`[pinpoint] inbox-ids=${state.inbox.map((item) => item.threadId).join(",")}`);
@@ -289,15 +309,15 @@ async function boot() {
   console.info(`[pinpoint] server=${forceMock ? "mock" : serverUrl}`);
   if (!forceMock) {
     const live = new HttpPinpointApi(serverUrl);
+    api = live;
     try {
       const result = await live.inbox();
-      api = live;
       state = adoptInbox(state, result.items, { demo: false, offline: false });
     } catch (error) {
-      console.info("[pinpoint] live server unavailable, using demo data", error);
-      api = new MockPinpointApi();
-      const result = await api.inbox();
-      state = adoptInbox(state, result.items, { demo: true, offline: false });
+      // Do not silently substitute sample data for the user's agents. The
+      // offline screen says the server is unreachable and offers a tap-retry.
+      console.info("[pinpoint] live server unavailable", error);
+      state = markOffline(state);
     }
   } else {
     const result = await api.inbox();
@@ -312,10 +332,32 @@ async function boot() {
 async function openThread(index: number) {
   const item = state.inbox[index];
   if (!item) return;
+  await openThreadItem(item);
+}
+
+async function retryDeck() {
+  const threadId = state.reviewThreadId;
+  if (!threadId) return;
+  const item = state.inbox.find((entry) => entry.threadId === threadId) ?? {
+    threadId,
+    title: state.reviewTitle || threadId,
+    project: "",
+    attention: "report",
+    summary: "",
+    updatedAt: new Date().toISOString(),
+    deckReady: false,
+    pointCount: 0,
+    draftNotes: 0,
+  } satisfies InboxItem;
+  await openThreadItem(item);
+}
+
+async function openThreadItem(item: InboxItem) {
   state = startReview(state, item);
   render();
   console.info(`[pinpoint] opening=${item.threadId}`);
-  for (let attempt = 0; attempt < 40; attempt++) {
+  const deadline = Date.now() + DECK_WAIT_MS;
+  while (Date.now() < deadline) {
     try {
       const result = await api.deck(item.threadId);
       if (state.loadingThreadId !== item.threadId) return;
@@ -333,13 +375,13 @@ async function openThread(index: number) {
     } catch (error) {
       console.warn("[pinpoint] deck", error);
       if (state.loadingThreadId !== item.threadId) return;
-      state = deckFailed(state, "Could not load points", Date.now());
+      state = deckFailed(state, "Could not load points. Tap to retry.", Date.now());
       render();
       return;
     }
   }
   if (state.loadingThreadId === item.threadId) {
-    state = deckFailed(state, "Deck is still building", Date.now());
+    state = deckFailed(state, "Still building. Tap to retry.", Date.now());
     render();
   }
 }
@@ -386,34 +428,46 @@ async function stopRecording() {
 }
 
 async function openPreview() {
+  if (previewInFlight) return;
+  previewInFlight = true;
   const before = state;
-  state = goPreview(state);
-  render();
-  const deck = state.deck;
-  const draft = draftFor(state, Date.now());
-  if (!deck || !draft) {
-    state = previewFailed(state, "No draft to preview", Date.now());
-    render();
-    return;
-  }
   try {
-    await api.putReview(draft);
-    const preview = await api.preview(deck.threadId, draft);
-    if (state.screen !== "preview") return;
-    state = setPreview(state, preview);
-    console.info(`[pinpoint] preview objections=${preview.counts.objections} answers=${preview.counts.answers} notes=${preview.counts.notes} agreed=${preview.counts.agreed}`);
-  } catch (error) {
-    console.warn("[pinpoint] preview", error);
-    if (state.screen !== "preview") return;
-    state = previewFailed(state, "Preview failed. Tap to retry.", Date.now());
+    state = goPreview(state);
+    render();
+    const deck = state.deck;
+    const draft = draftFor(state, Date.now());
+    if (!deck || !draft) {
+      state = previewFailed(state, "No draft to preview", Date.now());
+      render();
+      return;
+    }
+    try {
+      await api.putReview(draft);
+      const preview = await api.preview(deck.threadId, draft);
+      if (state.screen !== "preview") return;
+      state = setPreview(state, preview);
+      console.info(`[pinpoint] preview objections=${preview.counts.objections} answers=${preview.counts.answers} notes=${preview.counts.notes} agreed=${preview.counts.agreed}`);
+    } catch (error) {
+      console.warn("[pinpoint] preview", error);
+      if (state.screen !== "preview") return;
+      state = previewFailed(state, "Preview failed. Tap to retry.", Date.now());
+    }
+    maybePersist(before, state);
+    render();
+  } finally {
+    previewInFlight = false;
   }
-  maybePersist(before, state);
-  render();
 }
 
 async function sendReview() {
   const deck = state.deck;
-  if (!deck || sendInFlight || state.sent) return;
+  if (!deck || sendInFlight || state.sent || !state.preview || state.previewLoading) return;
+  // A debounced autosave must not land after send clears the draft and
+  // recreate it with the notes that were just delivered.
+  clearTimeout(saveTimer);
+  saveTimer = undefined;
+  state = markSending(state);
+  render();
   sendInFlight = true;
   try {
     const draft = draftFor(state, Date.now());
@@ -438,6 +492,8 @@ async function sendReview() {
 
 function finishSent() {
   if (state.screen !== "preview" || !state.sent) return;
+  clearTimeout(saveTimer);
+  saveTimer = undefined;
   state = finishSend(state);
   render();
   console.info(`[pinpoint] screen=inbox items=${state.inbox.length}`);
@@ -451,7 +507,7 @@ async function refreshCurrent() {
   }
   const deck = state.deck;
   if (!deck) {
-    await loadInbox(false);
+    await retryDeck();
     return;
   }
   try {
@@ -495,7 +551,7 @@ async function handleMenu(id: number) {
   }
   switch (id) {
     case 1:
-      if (state.screen === "preview") await sendReview();
+      if (state.screen === "preview" && state.preview) await sendReview();
       else await openPreview();
       break;
     case 2:

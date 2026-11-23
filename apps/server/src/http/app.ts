@@ -5,18 +5,40 @@ import { HttpError, errorMessage } from '../core/errors.js';
 import { draftInputSchema } from '../core/schemas.js';
 import type { PinpointService } from '../core/service.js';
 import { MAX_PCM_BYTES } from '../voice/wav.js';
+import { MAX_JSON_BYTES, readBodyCapped } from './body.js';
 
 export interface AppDeps {
   service: PinpointService;
 }
 
+/**
+ * The Even Hub app runs inside the Even phone app's WebView. Hosted builds
+ * are served from an evenrealities.com subdomain, covered by the pattern
+ * below. Local simulator previews use 127.0.0.1 and must be listed in
+ * PINPOINT_ALLOWED_ORIGINS. If your WebView reports an opaque "null" origin,
+ * list `null` there as well.
+ */
+const EVEN_WEBVIEW_ORIGIN = /^https:\/\/(?:[a-z0-9-]+\.)*evenrealities\.com$/i;
+
+function isAllowedLiveOrigin(origin: string, configured: readonly string[]): boolean {
+  if (origin.length === 0) return false;
+  if (configured.some((entry) => entry === origin)) return true;
+  return EVEN_WEBVIEW_ORIGIN.test(origin);
+}
+
 async function readJson(request: Request): Promise<unknown> {
-  let text: string;
+  let bytes: Buffer;
   try {
-    text = await request.text();
-  } catch {
+    bytes = await readBodyCapped(
+      request,
+      MAX_JSON_BYTES,
+      'JSON body exceeds 256 KB',
+    );
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
     throw new HttpError(400, 'Could not read request body', 'bad_request');
   }
+  const text = bytes.toString('utf8');
   if (text.trim().length === 0) return {};
   try {
     return JSON.parse(text);
@@ -32,7 +54,13 @@ export function createApp(deps: AppDeps): Hono {
   app.use(
     '*',
     cors({
-      origin: '*',
+      // Demo is a local, single-user showcase: every origin may call it.
+      // Live never reflects an arbitrary origin; it echoes only the configured
+      // glasses origins and Even's hosted WebView subdomains.
+      origin: (origin) => {
+        if (service.env.mode === 'demo') return '*';
+        return isAllowedLiveOrigin(origin, service.env.allowedOrigins) ? origin : undefined;
+      },
       allowMethods: ['GET', 'POST', 'PUT', 'OPTIONS'],
       allowHeaders: ['Content-Type', 'Authorization', 'X-Point-Id', 'X-Thread-Id'],
       maxAge: 86_400,
@@ -92,15 +120,18 @@ export function createApp(deps: AppDeps): Hono {
   });
 
   app.post('/api/voice', async (c) => {
-    const declared = Number.parseInt(c.req.header('content-length') ?? '', 10);
-    if (Number.isFinite(declared) && declared > MAX_PCM_BYTES) {
-      throw new HttpError(413, 'Audio exceeds 25 seconds', 'too_large');
+    let bytes: Buffer;
+    try {
+      bytes = await readBodyCapped(
+        c.req.raw,
+        MAX_PCM_BYTES,
+        'Audio exceeds 25 seconds',
+      );
+    } catch (error) {
+      if (error instanceof HttpError) throw error;
+      throw new HttpError(400, 'Could not read audio body', 'bad_request');
     }
-    const bytes = Buffer.from(await c.req.arrayBuffer());
     if (bytes.length === 0) throw new HttpError(400, 'Empty audio body', 'bad_request');
-    if (bytes.length > MAX_PCM_BYTES) {
-      throw new HttpError(413, 'Audio exceeds 25 seconds', 'too_large');
-    }
     return c.json(
       await service.transcribe(bytes, {
         threadId: c.req.header('x-thread-id') || undefined,

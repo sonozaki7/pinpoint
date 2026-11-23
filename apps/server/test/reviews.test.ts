@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ReviewStore, mergeDraft } from '../src/core/reviews.js';
 
 let dir: string;
@@ -75,6 +75,26 @@ describe('ReviewStore', () => {
     await store.clear('thread');
     expect(await store.get('thread')).toBeNull();
     expect(await store.noteCount('thread')).toBe(0);
+  });
+
+  it('does not lose a save when two autosaves land in the same millisecond', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const date = vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
+    try {
+      const first = mergeDraft(null, 'thread', {
+        notes: [{ pointId: 'p1', verdict: 'note', text: 'First' }],
+      });
+      const second = mergeDraft(null, 'thread', {
+        notes: [{ pointId: 'p2', verdict: 'note', text: 'Second' }],
+      });
+      await Promise.all([store.put(first), store.put(second)]);
+      expect(warn).not.toHaveBeenCalledWith(expect.stringContaining('could not save draft'));
+      const reopened = new ReviewStore(dir);
+      expect((await reopened.get('thread'))?.notes).toHaveLength(1);
+    } finally {
+      date.mockRestore();
+      warn.mockRestore();
+    }
   });
 
   it('ignores malformed notes', async () => {

@@ -20,7 +20,9 @@ export interface State {
   inboxFocus: number;
   deck: Deck | null;
   loadingThreadId: string | null;
+  reviewThreadId: string | null;
   reviewTitle: string;
+  deckError: string | null;
   focus: number;
   notes: Note[];
   seen: string[];
@@ -49,11 +51,14 @@ export type Effect =
   | { type: "send" }
   | { type: "record-start" }
   | { type: "record-stop" }
-  | { type: "retry" };
+  | { type: "retry" }
+  | { type: "retry-deck" };
 
 export const REVIEW_ROWS = 4;
 export const VOICE_MAX_MS = 20_000;
 export const SENT_HOLD_MS = 1_500;
+/** One swipe per 250 ms: the ring and touch surfaces both repeat fast. */
+export const SWIPE_DEBOUNCE_MS = 250;
 
 export function initialState(options: { demo: boolean; loading: boolean }): State {
   return {
@@ -65,7 +70,9 @@ export function initialState(options: { demo: boolean; loading: boolean }): Stat
     inboxFocus: 0,
     deck: null,
     loadingThreadId: null,
+    reviewThreadId: null,
     reviewTitle: "",
+    deckError: null,
     focus: 0,
     notes: [],
     seen: [],
@@ -95,6 +102,17 @@ export function noteFor(state: State, pointId: string): Note | undefined {
   return state.notes.find((note) => note.pointId === pointId);
 }
 
+/** A send needs a loaded preview; the hold menu must not bypass it. */
+export function canSend(state: State): boolean {
+  return (
+    state.screen === "preview" &&
+    state.preview !== null &&
+    !state.previewLoading &&
+    !state.sending &&
+    !state.sent
+  );
+}
+
 export function countNotes(notes: readonly Note[]) {
   return {
     objections: notes.filter((note) => note.verdict === "object").length,
@@ -105,6 +123,15 @@ export function countNotes(notes: readonly Note[]) {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+/** Debounce repeated scroll events; `lastSwipeAt` starts at -Infinity. */
+export function shouldAcceptSwipe(
+  now: number,
+  lastSwipeAt: number,
+  windowMs = SWIPE_DEBOUNCE_MS,
+): boolean {
+  return now - lastSwipeAt >= windowMs;
 }
 
 function remember(state: State): State {
@@ -181,7 +208,9 @@ export function startReview(state: State, item: InboxItem): State {
     screen: "review",
     deck: null,
     loadingThreadId: item.threadId,
+    reviewThreadId: item.threadId,
     reviewTitle: item.title,
+    deckError: null,
     focus: 0,
     notes: saved?.notes ?? [],
     seen: saved?.seen ?? [],
@@ -206,7 +235,9 @@ export function openDeck(state: State, deck: Deck): State {
     screen: "review",
     deck,
     loadingThreadId: null,
+    reviewThreadId: deck.threadId,
     reviewTitle: deck.title,
+    deckError: null,
     focus: 0,
     notes: notes.filter((note) => deck.points.some((point) => point.id === note.pointId)),
     seen: seen.filter((id) => deck.points.some((point) => point.id === id)),
@@ -230,6 +261,7 @@ export function mergeDeck(state: State, deck: Deck): State {
   return remember({
     ...state,
     deck,
+    deckError: null,
     focus: clamp(state.focus, 0, deck.points.length),
     notes,
     seen,
@@ -241,6 +273,7 @@ export function deckFailed(state: State, message: string, now: number): State {
   return {
     ...state,
     loadingThreadId: null,
+    deckError: message,
     flash: { text: message, until: now + 5_000 },
   };
 }
@@ -255,6 +288,8 @@ export function backToInbox(state: State): State {
     screen: "inbox",
     deck: null,
     loadingThreadId: null,
+    reviewThreadId: null,
+    deckError: null,
     inbox: items,
     inboxFocus: 0,
     focus: 0,
@@ -370,6 +405,8 @@ export function finishSend(state: State): State {
     inboxFocus: 0,
     deck: null,
     loadingThreadId: null,
+    reviewThreadId: null,
+    deckError: null,
     notes: [],
     seen: [],
     drafts,
@@ -409,7 +446,13 @@ export function press(state: State, now: number): PressResult {
       return { state, effect: { type: "record-stop" } };
     }
     const deck = state.deck;
-    if (!deck) return { state };
+    if (!deck) {
+      // A 202 that outlived the wait, or a failed request: let a tap retry the
+      // deck instead of leaving the review screen inert.
+      return state.loadingThreadId !== null
+        ? { state }
+        : { state, effect: { type: "retry-deck" } };
+    }
     const point = deck.points[state.focus];
     if (!point) {
       return { state: goPreview(state), effect: { type: "preview" } };
@@ -429,9 +472,10 @@ export function press(state: State, now: number): PressResult {
   }
   if (state.screen === "preview") {
     if (!state.preview) {
+      if (state.previewLoading) return { state };
       return { state: { ...state, previewLoading: true }, effect: { type: "preview" } };
     }
-    if (state.sending || state.sent) return { state };
+    if (!canSend(state)) return { state };
     return { state: markSending(state), effect: { type: "send" } };
   }
   return { state };

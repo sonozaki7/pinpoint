@@ -3,6 +3,7 @@ import path from 'node:path';
 import type { Deck } from '../../../../shared/contract.js';
 import { BUILTIN_FIXTURES, cloneFixtures, type Fixture } from './builtinFixtures.js';
 import type { Env } from './env.js';
+import { errorMessage } from './errors.js';
 import { attentionSourceSchema, attentionThreadSchema, asDeck } from './schemas.js';
 import type { AttentionSource, AttentionThread } from './types.js';
 
@@ -67,12 +68,12 @@ export function loadDemoData(fixturesDir: string): DemoData {
           }
           fixtures.push(fixture);
         } catch (error) {
-          console.warn(`[demo] skipped fixture ${name}: ${(error as Error).message}`);
+          console.warn(`[demo] skipped fixture ${name}: ${errorMessage(error)}`);
         }
       }
     }
   } catch (error) {
-    console.warn(`[demo] could not read fixtures folder: ${(error as Error).message}`);
+    console.warn(`[demo] could not read fixtures folder: ${errorMessage(error)}`);
   }
 
   if (fixtures.length === 0) {

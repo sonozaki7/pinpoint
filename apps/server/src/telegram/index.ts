@@ -10,6 +10,7 @@
 import { fileURLToPath } from 'node:url';
 import { Bot } from 'grammy';
 import type { Deck, Point, ReviewDraft, Note } from '../../../../shared/contract.js';
+import { errorMessage } from '../core/errors.js';
 import { AGREE_PREFIX, handleCallbackQuery } from './callbacks.js';
 import { headerText, messageLink, pointReplyText, reviewLine, topicName } from './format.js';
 import { renderParts, splitPlainText } from './markdown.js';
@@ -399,16 +400,14 @@ export function createTelegramNotifier(env: TelegramEnv, opts: NotifierOptions):
       );
     });
     instance.catch((error) => {
-      console.error(
-        `[telegram] update handler failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      console.error(`[telegram] update handler failed: ${errorMessage(error)}`);
     });
     // Validate the token before reporting live, so /api/health can show a real error
     // instead of `ok` while polling silently fails in the background.
     await instance.init();
     bot = instance;
     polling = instance.start({ allowed_updates: ['callback_query'] }).catch((error: unknown) => {
-      console.error(`[telegram] long polling stopped: ${(error as Error).message}`);
+      console.error(`[telegram] long polling stopped: ${errorMessage(error)}`);
     });
   }
 

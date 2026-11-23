@@ -5,6 +5,7 @@ import type { AttentionSource, AttentionThread, TelegramNotifier, T3Client } fro
 import type { Env } from './env.js';
 import type { DeckStore } from './decks.js';
 import { buildDeck, deckFromPrecomputed } from './decks.js';
+import { errorMessage } from './errors.js';
 import type { ReviewStore } from './reviews.js';
 import { makeGlance, toAscii } from './text.js';
 import type { Splitter } from './splitter/types.js';
@@ -93,7 +94,7 @@ export class InboxService {
     if (this.env.mode === 'live' && !this.timer) {
       this.timer = setInterval(() => {
         void this.listInbox().catch((error: unknown) => {
-          console.warn(`[inbox] background refresh failed: ${(error as Error).message}`);
+          console.warn(`[inbox] background refresh failed: ${errorMessage(error)}`);
         });
       }, LIVE_REFRESH_MS);
       this.timer.unref();
@@ -109,7 +110,7 @@ export class InboxService {
   /** Warm decks and deliver any Telegram alerts that are still due. */
   async preload(): Promise<void> {
     await this.listInbox().catch((error: unknown) => {
-      console.warn(`[inbox] preload failed: ${(error as Error).message}`);
+      console.warn(`[inbox] preload failed: ${errorMessage(error)}`);
     });
     await this.flush();
   }
@@ -163,7 +164,7 @@ export class InboxService {
       .catch((error: unknown) => {
         if (cached) {
           console.warn(
-            `[inbox] source refresh failed for ${thread.title}, using cached source: ${(error as Error).message}`,
+            `[inbox] source refresh failed for ${thread.title}, using cached source: ${errorMessage(error)}`,
           );
           return cached.source;
         }
@@ -220,8 +221,19 @@ export class InboxService {
     return undefined;
   }
 
+  /**
+   * One in-flight build per (thread, source message). Keying by thread alone
+   * would hand a caller a build for an older reply while the thread moved on;
+   * keying by source alone would mix two threads' titles. Concurrent callers
+   * asking for the same source share this promise.
+   */
+  private buildKey(threadId: string, sourceMessageId: string): string {
+    return `${threadId}\u0000${sourceMessageId}`;
+  }
+
   private ensureBuild(thread: AttentionThread, source: AttentionSource): Promise<Deck> {
-    const existing = this.builds.get(thread.threadId);
+    const key = this.buildKey(thread.threadId, source.sourceMessageId);
+    const existing = this.builds.get(key);
     if (existing) return existing;
 
     const run = this.queue.then(async () => {
@@ -242,16 +254,17 @@ export class InboxService {
       () => undefined,
       () => undefined,
     );
-    this.builds.set(thread.threadId, run);
+    this.builds.set(key, run);
     const cleanup = () => {
-      if (this.builds.get(thread.threadId) === run) this.builds.delete(thread.threadId);
+      if (this.builds.get(key) === run) this.builds.delete(key);
     };
     void run.then(cleanup, cleanup);
     return run;
   }
 
   isBuilding(threadId: string): boolean {
-    return this.builds.has(threadId);
+    const prefix = `${threadId}\u0000`;
+    return [...this.builds.keys()].some((key) => key.startsWith(prefix));
   }
 
   /**
@@ -276,17 +289,15 @@ export class InboxService {
       return { status: 'ready', deck: cached };
     }
 
+    const key = this.buildKey(thread.threadId, source.sourceMessageId);
     if (wait) {
-      let deck = await (this.builds.get(threadId) ?? this.ensureBuild(thread, source));
-      if (deck.sourceMessageId !== source.sourceMessageId) {
-        deck = await this.ensureBuild(thread, source);
-      }
+      const deck = await (this.builds.get(key) ?? this.ensureBuild(thread, source));
       return { status: 'ready', deck };
     }
 
-    if (!this.builds.has(threadId)) {
+    if (!this.builds.has(key)) {
       void this.ensureBuild(thread, source).catch((error: unknown) => {
-        console.warn(`[inbox] deck build failed for ${thread.title}: ${(error as Error).message}`);
+        console.warn(`[inbox] deck build failed for ${thread.title}: ${errorMessage(error)}`);
       });
     }
     return { status: 'pending' };
@@ -314,13 +325,13 @@ export class InboxService {
               ),
             )
             .catch((error: unknown) => {
-              console.warn(`[inbox] could not persist notifications: ${(error as Error).message}`);
+              console.warn(`[inbox] could not persist notifications: ${errorMessage(error)}`);
             });
         }
       } catch (error) {
         this.notifyFailures.set(failureKey, Date.now());
         console.warn(
-          `[inbox] telegram onAttention failed for ${thread.title}: ${(error as Error).message}`,
+          `[inbox] telegram onAttention failed for ${thread.title}: ${errorMessage(error)}`,
         );
       }
     })();
@@ -358,7 +369,7 @@ export class InboxService {
           return [thread.threadId, await this.fetchSource(thread)] as const;
         } catch (error) {
           console.warn(
-            `[inbox] no source for ${thread.title}: ${(error as Error).message}`,
+            `[inbox] no source for ${thread.title}: ${errorMessage(error)}`,
           );
           return [thread.threadId, undefined] as const;
         }
@@ -373,7 +384,7 @@ export class InboxService {
         const deck = source ? this.validDeck(thread, source) : undefined;
         if (source && !deck) {
           void this.ensureBuild(thread, source).catch((error: unknown) => {
-            console.warn(`[inbox] deck build failed for ${thread.title}: ${(error as Error).message}`);
+            console.warn(`[inbox] deck build failed for ${thread.title}: ${errorMessage(error)}`);
           });
         }
         if (source && deck) void this.maybeNotify(thread, source, deck);

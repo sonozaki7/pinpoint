@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Env } from '../core/env.js';
+import { errorMessage } from '../core/errors.js';
 import { resolveWhisperModel } from './model.js';
 import { createScriptedVoice } from './scripted.js';
 import { isWav, pcm16ToFloat32, pcmToWav, wavToPcm } from './wav.js';
@@ -149,8 +150,8 @@ export function createVoiceService(env: Env): VoiceTranscriber {
           console.info(`[voice] transcribed via T3 in ${Date.now() - started}ms`);
           return { text, via: 't3' };
         } catch (error) {
-          failures.push(`T3: ${(error as Error).message}`);
-          console.warn(`[voice] T3 transcription failed, trying whisper-cli: ${(error as Error).message}`);
+          failures.push(`T3: ${errorMessage(error)}`);
+          console.warn(`[voice] T3 transcription failed, trying whisper-cli: ${errorMessage(error)}`);
         }
       }
 
@@ -160,7 +161,7 @@ export function createVoiceService(env: Env): VoiceTranscriber {
         console.info(`[voice] transcribed via whisper-cli in ${Date.now() - started}ms`);
         return { text, via: 'whisper' };
       } catch (error) {
-        failures.push(`whisper: ${(error as Error).message}`);
+        failures.push(`whisper: ${errorMessage(error)}`);
       }
 
       throw new Error(`Transcription failed. ${failures.join(' | ')}`);

@@ -1,5 +1,6 @@
 // Inline button callbacks. The only button Pinpoint posts is "Agree all & continue" on a
 // thread header; tapping it approves the whole plan from the phone.
+import { errorMessage } from '../core/errors.js';
 import { headerText } from './format.js';
 import type { JsonStateStore, TopicRecord } from './store.js';
 import type { TelegramTransport } from './transport.js';
@@ -33,7 +34,7 @@ export async function handleCallbackQuery(deps: CallbackDeps, query: CallbackQue
   try {
     await deps.onAgreeAll(threadId);
   } catch (error) {
-    console.error(`[telegram] onAgreeAll failed: ${(error as Error).message}`);
+    console.error(`[telegram] onAgreeAll failed: ${errorMessage(error)}`);
     await deps.transport
       .call('answerCallbackQuery', {
         callback_query_id: query.id,

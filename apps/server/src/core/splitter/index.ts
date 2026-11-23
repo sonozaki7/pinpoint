@@ -1,4 +1,5 @@
 import type { Env } from '../env.js';
+import { errorMessage } from '../errors.js';
 import { findSplitPayload } from './json.js';
 import { naiveSplit } from './naive.js';
 import { buildSplitPrompt, normalizeHeadline } from './prompt.js';
@@ -42,7 +43,9 @@ export function createSplitter(env: Env): Splitter {
     label,
     async split(input: SplitInput): Promise<RawSplit> {
       const fallback = (reason?: string): RawSplit => {
-        if (reason) console.warn(`[splitter] ${provider} failed, using naive split: ${reason}`);
+        if (reason) {
+          console.warn(`[splitter] ${provider} failed, using naive split: ${errorMessage(reason)}`);
+        }
         const naive = naiveSplit(input);
         return {
           headline: naive.headline,
@@ -64,7 +67,7 @@ export function createSplitter(env: Env): Splitter {
           text = await splitWithOpenRouter(input, env.openrouterKey, model);
         }
       } catch (error) {
-        return fallback((error as Error).message);
+        return fallback(errorMessage(error));
       }
 
       const payload = fromModelText(text);

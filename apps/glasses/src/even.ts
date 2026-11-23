@@ -216,6 +216,25 @@ function signature(box: TextBox): string {
   return `${box.brightness}\u0000${box.content}`;
 }
 
+/**
+ * One bridge write at a time. The SDK transport is asynchronous and the page
+ * can change while a rebuild is in flight, so overlapping calls can interleave
+ * with containers being replaced. A failed write must not stall the writes
+ * behind it.
+ */
+export class SerialWrites {
+  private tail: Promise<unknown> = Promise.resolve();
+
+  run<T>(task: () => Promise<T>): Promise<T> {
+    const result = this.tail.then(task, task);
+    this.tail = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
+  }
+}
+
 export async function connectEven(
   getPage: () => PageModel,
   onInput: (input: Input) => void,
@@ -240,7 +259,7 @@ export async function connectEven(
   setHostStatus(connected);
   console.info("[pinpoint] ready");
 
-  let queue: Promise<void> = Promise.resolve();
+  const writes = new SerialWrites();
 
   async function apply(page: PageModel) {
     const nextFull = fullSignature(page);
@@ -272,18 +291,19 @@ export async function connectEven(
 
   return {
     render(page: PageModel) {
-      queue = queue.then(() => apply(page)).catch((error) => {
+      return writes.run(() => apply(page)).catch((error) => {
         console.error("[pinpoint] display", error);
         setHostStatus("Even Hub display update failed");
       });
-      return queue;
     },
     async exit() {
-      try {
-        if (!await bridge.shutDownPageContainer(1)) setHostStatus("Even Hub exit could not open");
-      } catch {
-        setHostStatus("Even Hub exit could not open");
-      }
+      await writes.run(async () => {
+        try {
+          if (!await bridge.shutDownPageContainer(1)) setHostStatus("Even Hub exit could not open");
+        } catch {
+          setHostStatus("Even Hub exit could not open");
+        }
+      });
     },
     async mic(on: boolean) {
       try {

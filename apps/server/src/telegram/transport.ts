@@ -5,6 +5,8 @@
 // The bot token only ever appears in the request URL; it is never logged or put in an error.
 import { appendFile, mkdir } from 'node:fs/promises';
 import { dirname } from 'node:path';
+import { errorMessage } from '../core/errors.js';
+import { redactSecrets } from '../core/redact.js';
 
 export interface TelegramMessage {
   message_id: number;
@@ -39,7 +41,8 @@ export class TelegramApiError extends Error {
     readonly description: string,
     readonly retryAfter?: number,
   ) {
-    super(`${method} failed (${code || 'network'}): ${description}`);
+    super(redactSecrets(`${method} failed (${code || 'network'}): ${description}`));
+    this.description = redactSecrets(description);
     this.name = 'TelegramApiError';
   }
 }
@@ -95,7 +98,7 @@ export class TelegramTransport {
           body: JSON.stringify(params),
         });
       } catch (error) {
-        throw new TelegramApiError(method, 0, `network error: ${(error as Error).message}`);
+        throw new TelegramApiError(method, 0, `network error: ${errorMessage(error)}`);
       }
 
       const body = (await response.json().catch(() => undefined)) as TelegramResponse | undefined;
@@ -144,7 +147,7 @@ export class TelegramTransport {
         await appendFile(this.config.logPath, `${JSON.stringify(entry)}\n`, 'utf8');
       })
       .catch((error: unknown) => {
-        console.error(`[telegram] dry-run log write failed: ${(error as Error).message}`);
+        console.error(`[telegram] dry-run log write failed: ${errorMessage(error)}`);
       });
     return this.logQueue;
   }

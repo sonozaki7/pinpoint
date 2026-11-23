@@ -33,6 +33,15 @@ try {
   assert.match(await phone.locator("#glasses-head").innerText(), /PINPOINT \| 4 need you[\s\S]*demo data/);
   await phone.close();
 
+  // No server must show the offline screen, never silently substitute demo data.
+  const offline = await browser.newPage({ viewport: { width: 390, height: 900 } });
+  await offline.route("http://127.0.0.1:8787/**", (route) => route.abort());
+  await offline.goto(base);
+  await offline.waitForFunction(() =>
+    document.querySelector("#glasses-pane")?.textContent?.includes("Server unreachable"));
+  assert.match(await offline.locator("#glasses-pane").innerText(), /Server unreachable/);
+  await offline.close();
+
   // Mock only the Flutter host transport and drive the real pinned SDK.
   const page = await browser.newPage({ viewport: { width: 390, height: 900 } });
   page.setDefaultTimeout(10_000);
@@ -97,7 +106,7 @@ try {
 
   for (let i = 0; i < 3; i++) {
     await emit("sysEvent", { eventType: 2, eventSource: 1 });
-    await delay(120);
+    await delay(280); // swipes are debounced to one per 250 ms
   }
   await waitText("#glasses-head", "4/7");
   assert.match(await page.locator("#glasses-rows .row").nth(3).innerText(), /Force-logout all users/);
@@ -123,7 +132,7 @@ try {
 
   for (let i = 0; i < 4; i++) {
     await emit("sysEvent", { eventType: 2, eventSource: 1 });
-    await delay(120);
+    await delay(280); // swipes are debounced to one per 250 ms
   }
   await waitText("#glasses-rows", "Send review (1 note)");
   await emit("sysEvent", { eventSource: 1 });

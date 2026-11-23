@@ -729,6 +729,9 @@ export function createT3Client(
     if (typeof requestId !== 'string' || requestId.length === 0 || Object.keys(answers ?? {}).length === 0) {
       throw new T3ClientError('send_failed', 'Refusing to answer with no request id or answers.');
     }
+    // Gate before the read that may fail: the answer write must never reach a
+    // thread outside T3_PROJECTS just because the projection read failed.
+    await assertAllowedThread(threadId);
     let questions: RawQuestion[] = [];
     try {
       questions = questionsForRequest(await getThread(threadId), requestId);

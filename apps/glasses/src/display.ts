@@ -209,7 +209,11 @@ function reviewPane(state: State, now: number): string {
   }
   if (state.flash && state.flash.until > now) return wrapAscii(state.flash.text);
   const deck = state.deck;
-  if (!deck) return "Building points...";
+  if (!deck) {
+    return state.deckError
+      ? wrapAscii(`${state.deckError}\nTap to retry.`)
+      : "Building points...";
+  }
   const point = deck.points[state.focus];
   if (!point) return wrapAscii(`Send ${state.notes.length} note${state.notes.length === 1 ? "" : "s"} to ${deck.title}.`);
   if (point.kind === "question") return optionLines(point);
@@ -218,7 +222,7 @@ function reviewPane(state: State, now: number): string {
 
 function reviewFooter(state: State): string {
   if (state.recordingStartedAt !== null) return `tap: stop${DOT}2x: back`;
-  if (!state.deck) return "2x: back";
+  if (!state.deck) return state.deckError ? `tap: retry${DOT}2x: back` : "2x: back";
   const point = state.deck.points[state.focus];
   if (!point) return `tap: preview${DOT}2x: back`;
   if (point.kind === "question") return `tap: options${DOT}2x: back`;
@@ -267,7 +271,6 @@ export function pageFor(state: State, now: number): PageModel {
   }
 
   if (state.screen === "review") {
-    const deck = state.deck;
     const slots = reviewSlots(state);
     return {
       kind: "review",
@@ -285,7 +288,7 @@ export function pageFor(state: State, now: number): PageModel {
           brightness: slot.focused ? 4 : 2,
         }),
       pane: reviewPane(state, now),
-      footer: deck ? reviewFooter(state) : "2x: back",
+      footer: reviewFooter(state),
       menu: REVIEW_MENU,
     };
   }
@@ -327,7 +330,13 @@ export function pageFor(state: State, now: number): PageModel {
     title: "Send review",
     rows: [],
     pane,
-    footer: state.sent ? "Returning to inbox..." : state.sending ? "Sending..." : `tap: send${DOT}2x: back`,
+    footer: state.sent
+      ? "Returning to inbox..."
+      : state.sending
+        ? "Sending..."
+        : state.previewLoading
+          ? "Building preview..."
+          : `tap: send${DOT}2x: back`,
     menu: REVIEW_MENU,
   };
 }

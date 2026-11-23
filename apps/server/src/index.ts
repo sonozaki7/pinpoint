@@ -5,6 +5,7 @@ import { readEnv, assertLivePrivacy } from './core/env.js';
 import { FakeT3Client } from './core/fakes.js';
 import { loadTelegramNotifier, loadT3Client } from './core/loaders.js';
 import { ReviewStore } from './core/reviews.js';
+import { redactSecrets } from './core/redact.js';
 import { PinpointService } from './core/service.js';
 import { createSplitter } from './core/splitter/index.js';
 import { createApp } from './http/app.js';
@@ -29,7 +30,7 @@ async function main(): Promise<void> {
     t3Live = loaded.live;
     if (!loaded.live) {
       console.warn(
-        `[pinpoint] T3 client unavailable (${loaded.reason ?? 'unknown reason'}); waiting in live mode with no threads`,
+        `[pinpoint] T3 client unavailable (${redactSecrets(loaded.reason ?? 'unknown reason')}); waiting in live mode with no threads`,
       );
     }
   }
@@ -47,7 +48,7 @@ async function main(): Promise<void> {
     },
   });
   if (!telegramLoaded.live && telegramLoaded.reason) {
-    console.warn(`[pinpoint] Telegram notifier unavailable: ${telegramLoaded.reason}`);
+    console.warn(`[pinpoint] Telegram notifier unavailable: ${redactSecrets(telegramLoaded.reason)}`);
   }
 
   const splitter = createSplitter(env);
@@ -87,7 +88,7 @@ async function main(): Promise<void> {
     try {
       await service?.stop();
     } catch (error) {
-      console.warn(`[pinpoint] shutdown error: ${(error as Error).message}`);
+      console.warn(`[pinpoint] shutdown error: ${redactSecrets((error as Error).message)}`);
     }
     server.close(() => process.exit(0));
   };
@@ -96,6 +97,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  console.error(`[pinpoint] failed to start: ${(error as Error).message}`);
+  console.error(`[pinpoint] failed to start: ${redactSecrets((error as Error).message)}`);
   process.exit(1);
 });

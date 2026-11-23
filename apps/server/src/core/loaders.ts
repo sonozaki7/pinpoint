@@ -1,5 +1,6 @@
 import type { Env } from './env.js';
 import { FakeTelegramNotifier, FakeT3Client } from './fakes.js';
+import { redactSecrets } from './redact.js';
 import type { AgreeAllHook, TelegramNotifier, T3Client } from './types.js';
 
 async function importModule(url: string): Promise<Record<string, unknown> | null> {
@@ -8,7 +9,7 @@ async function importModule(url: string): Promise<Record<string, unknown> | null
     return module;
   } catch (error) {
     const message = (error as Error).message.split('\n')[0];
-    console.warn(`[loaders] could not import ${url}: ${message}`);
+    console.warn(`[loaders] could not import ${url}: ${redactSecrets(message)}`);
     return null;
   }
 }

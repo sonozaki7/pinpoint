@@ -52,6 +52,8 @@ export class PinpointService {
   private readonly voice: VoiceTranscriber;
   private t3Probe: { at: number; value: Health['t3'] } | null = null;
   private telegramStarted = false;
+  /** Thread ids with a send in flight, so a double tap cannot post twice. */
+  private readonly sends = new Set<string>();
 
   constructor(deps: ServiceDeps) {
     this.env = deps.env;
@@ -178,7 +180,20 @@ export class PinpointService {
   }
 
   async getDraft(threadId: string): Promise<ReviewDraft> {
-    return (await this.reviews.get(threadId)) ?? emptyDraft(threadId);
+    const existing = await this.reviews.get(threadId);
+    if (existing) return existing;
+    const deck = this.decks.getForThread(threadId);
+    if (deck) return emptyDraft(threadId, deck.sourceMessageId);
+    // Same privacy gate as PUT: a guessed thread id outside T3_PROJECTS is a
+    // 404, not an empty draft that confirms the id exists.
+    let known = false;
+    try {
+      known = Boolean(await this.inbox.lookupThread(threadId));
+    } catch {
+      known = false;
+    }
+    if (!known) throw new HttpError(404, `Unknown thread ${threadId}`, 'not_found');
+    return emptyDraft(threadId);
   }
 
   async putDraft(threadId: string, input: DraftInput): Promise<ReviewDraft> {
@@ -206,6 +221,20 @@ export class PinpointService {
   }
 
   async send(threadId: string): Promise<SendResult> {
+    // Register before the first await: two requests that arrive together must
+    // not both compose and deliver the same draft.
+    if (this.sends.has(threadId)) {
+      throw new HttpError(409, 'A review is already being sent for this thread', 'conflict');
+    }
+    this.sends.add(threadId);
+    try {
+      return await this.sendOnce(threadId);
+    } finally {
+      this.sends.delete(threadId);
+    }
+  }
+
+  private async sendOnce(threadId: string): Promise<SendResult> {
     const thread = await this.requireThread(threadId);
     const deck = await this.requireDeck(threadId);
     const draft = await this.draftFor(threadId, deck);

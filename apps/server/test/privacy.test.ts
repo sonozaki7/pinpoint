@@ -107,4 +107,16 @@ describe('T3_PROJECTS privacy allowlist', () => {
     await expect(client.sendMessage('thread-failed', 'hello')).rejects.toThrow(/not visible in an allowed T3_PROJECTS project/);
     expect(fetchImpl.mock.calls.some(([url]) => String(url).includes('websocket-ticket'))).toBe(false);
   });
+
+  it('refuses to answer a question outside the allowlist even if the projection read fails', async () => {
+    const fetchImpl = vi.fn(stubFetch());
+    const client = createT3Client(
+      {T3_URL: 'http://127.0.0.1:3773', T3_TOKEN: 'test-token', T3_PROJECTS: 'alpha'},
+      {cliFallback: false, now: () => NOW, fetchImpl: fetchImpl as unknown as typeof fetch},
+    );
+    await expect(
+      client.answerQuestion('thread-failed', 'runtime-request:x', {q: 'yes'}),
+    ).rejects.toThrow(/not visible in an allowed T3_PROJECTS project/);
+    expect(fetchImpl.mock.calls.some(([url]) => String(url).includes('websocket-ticket'))).toBe(false);
+  });
 });

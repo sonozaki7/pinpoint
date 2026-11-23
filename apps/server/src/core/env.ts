@@ -13,6 +13,11 @@ export interface Env {
    * Live mode refuses to start when this is empty (see assertLivePrivacy).
    */
   t3Projects: string[];
+  /**
+   * Live-mode browser origins allowed to call the API (comma-separated).
+   * Demo mode always allows every origin; live mode never uses "*".
+   */
+  allowedOrigins: string[];
   splitterProvider: SplitterProviderName;
   splitterModel: string;
   anthropicKey: string;
@@ -76,6 +81,7 @@ export function readEnv(source: NodeJS.ProcessEnv = process.env): Env {
     t3Url: str(source, 'T3_URL', 'http://127.0.0.1:3773').replace(/\/+$/, ''),
     t3Token: str(source, 'T3_TOKEN'),
     t3Projects: list(source, 'T3_PROJECTS'),
+    allowedOrigins: list(source, 'PINPOINT_ALLOWED_ORIGINS'),
     splitterProvider: provider(source, mode),
     splitterModel: str(source, 'SPLITTER_MODEL', 'opencode-go/deepseek-v4.1-flash'),
     anthropicKey: str(source, 'ANTHROPIC_API_KEY'),

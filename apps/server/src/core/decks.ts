@@ -7,6 +7,7 @@ import type {
   PointKind,
   ThreadAttention,
 } from '../../../../shared/contract.js';
+import { errorMessage } from './errors.js';
 import { asDeck } from './schemas.js';
 import { isHighRiskText, makeGlance, safeFileName } from './text.js';
 import { naiveSplit } from './splitter/naive.js';
@@ -226,7 +227,7 @@ export async function buildDeck(
       split.splitter,
     );
   } catch (error) {
-    console.warn(`[deck] splitter threw, using naive split: ${(error as Error).message}`);
+    console.warn(`[deck] splitter threw, using naive split: ${errorMessage(error)}`);
     const naive = naiveSplit({ thread, source });
     return makeDeck(thread, source, naive.points, naive.headline, 'fallback:naive');
   }
@@ -291,7 +292,7 @@ export class DeckStore {
         }
       }
     } catch (error) {
-      console.warn(`[deck] cache folder unavailable: ${(error as Error).message}`);
+      console.warn(`[deck] cache folder unavailable: ${errorMessage(error)}`);
     }
   }
 
@@ -319,7 +320,7 @@ export class DeckStore {
       fs.writeFileSync(tmp, JSON.stringify(deck, null, 2), 'utf8');
       fs.renameSync(tmp, target);
     } catch (error) {
-      console.warn(`[deck] could not cache deck: ${(error as Error).message}`);
+      console.warn(`[deck] could not cache deck: ${errorMessage(error)}`);
     }
   }
 

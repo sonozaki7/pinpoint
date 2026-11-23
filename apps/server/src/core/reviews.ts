@@ -1,7 +1,8 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Note, ReviewDraft } from '../../../../shared/contract.js';
+import { errorMessage } from './errors.js';
 import { asReviewDraft, noteSchema } from './schemas.js';
 import { safeFileName } from './text.js';
 
@@ -24,7 +25,7 @@ export class ReviewStore {
     try {
       fs.mkdirSync(this.dir, { recursive: true });
     } catch (error) {
-      console.warn(`[reviews] data folder unavailable: ${(error as Error).message}`);
+      console.warn(`[reviews] data folder unavailable: ${errorMessage(error)}`);
     }
   }
 
@@ -52,11 +53,11 @@ export class ReviewStore {
     try {
       fs.mkdirSync(this.dir, { recursive: true });
       const target = this.file(clean.threadId);
-      const tmp = `${target}.${process.pid}.${Date.now()}.tmp`;
+      const tmp = `${target}.${process.pid}.${randomUUID()}.tmp`;
       await fs.promises.writeFile(tmp, JSON.stringify(clean, null, 2), 'utf8');
       await fs.promises.rename(tmp, target);
     } catch (error) {
-      console.warn(`[reviews] could not save draft: ${(error as Error).message}`);
+      console.warn(`[reviews] could not save draft: ${errorMessage(error)}`);
     }
     return clean;
   }
@@ -66,7 +67,7 @@ export class ReviewStore {
     try {
       await fs.promises.rm(this.file(threadId), { force: true });
     } catch (error) {
-      console.warn(`[reviews] could not clear draft: ${(error as Error).message}`);
+      console.warn(`[reviews] could not clear draft: ${errorMessage(error)}`);
     }
   }
 

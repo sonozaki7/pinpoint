@@ -1,0 +1,13 @@
+{
+  "name": "pinpoint-workspace",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pinpoint: review AI agents' replies point by point on Even G2.",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "demo": "bash scripts/demo.sh",
+    "check": "npm --prefix apps/server test && npm --prefix apps/server run typecheck && npm --prefix apps/glasses test && npm --prefix apps/glasses run build && npm --prefix apps/glasses run test:ui && node demo/scripts/verify-fixtures.mjs"
+  }
+}

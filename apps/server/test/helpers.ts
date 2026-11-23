@@ -8,6 +8,7 @@ import { FakeTelegramNotifier, FakeT3Client } from '../src/core/fakes.js';
 import { ReviewStore } from '../src/core/reviews.js';
 import { PinpointService } from '../src/core/service.js';
 import { createNaiveSplitter } from '../src/core/splitter/index.js';
+import type { Splitter } from '../src/core/splitter/types.js';
 import type { VoiceTranscriber } from '../src/voice/service.js';
 
 export const stubVoice: VoiceTranscriber = {
@@ -27,12 +28,16 @@ export async function makeTestContext(options?: {
   preload?: boolean;
   voice?: VoiceTranscriber;
   precomputed?: boolean;
+  splitter?: Splitter;
+  env?: Record<string, string>;
 }): Promise<TestContext> {
   const dir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'pinpoint-test-'));
   const env = readEnv({
     PINPOINT_MODE: 'demo',
-    PINPOINT_DATA_DIR: dir,
     SPLITTER_PROVIDER: 'fixture',
+    ...options?.env,
+    // Always isolate test data, even when a test overrides other settings.
+    PINPOINT_DATA_DIR: dir,
   });
   const demo = loadDemoData(path.join(dir, 'missing-fixtures'));
   const t3 = new FakeT3Client(demo.fixtures);
@@ -42,7 +47,7 @@ export async function makeTestContext(options?: {
     t3,
     t3Live: false,
     telegram,
-    splitter: createNaiveSplitter(),
+    splitter: options?.splitter ?? createNaiveSplitter(),
     decks: new DeckStore(dir),
     reviews: new ReviewStore(dir),
     voice: options?.voice ?? stubVoice,
