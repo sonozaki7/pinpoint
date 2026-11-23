@@ -1,104 +1,295 @@
 import {
+  AudioInputSource,
   CreateStartUpPageContainer,
+  ListContainerProperty,
+  ListItemContainerProperty,
+  MenuContainerProperty,
+  MenuItemProperty,
+  RebuildPageContainer,
   StartUpPageCreateResult,
   TextContainerProperty,
   TextContainerUpgrade,
   waitForEvenAppBridge,
 } from "@evenrealities/even_hub_sdk";
-import { decodeInput, isOverlayChange } from "./events";
-import type { Input } from "./model";
-import type { Screen } from "./display";
+import type { PageModel } from "./display";
+import { decodeInput, type Input } from "./events";
 
-const boxes = [
-  { key: "heading", id: 1, y: 12, height: 42, brightness: 3 },
-  { key: "kicker", id: 2, y: 55, height: 42, brightness: 3 },
-  { key: "body", id: 3, y: 99, height: 105, brightness: 4 },
-  { key: "controls", id: 4, y: 216, height: 67, brightness: 3 },
-] as const;
+export interface TextBox {
+  name: string;
+  id: number;
+  content: string;
+  brightness: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  capture?: boolean;
+  border?: boolean;
+  padding?: number;
+}
 
-export function nativeLayout(screen: Screen): CreateStartUpPageContainer {
-  return new CreateStartUpPageContainer({
-    containerTotalNum: boxes.length,
-    textObject: boxes.map(({ key, id, y, height, brightness }) =>
-      new TextContainerProperty({
-        xPosition: key === "body" ? 20 : 25, yPosition: y, width: key === "body" ? 536 : 526, height,
-        containerID: id, containerName: key, content: screen[key],
-        isEventCapture: key === "body" ? 1 : 0,
-        borderWidth: key === "body" ? 2 : 0,
-        borderColor: 5, paddingLength: key === "body" ? 5 : 0,
-        textColor: brightness,
-      })),
+export interface PageLayout {
+  text: TextBox[];
+  list?: { items: string[] };
+}
+
+const CAPTURE: Omit<TextBox, "id"> = {
+  name: "capture", content: " ", brightness: 1, x: 0, y: 0, width: 576, height: 288, capture: true,
+};
+
+function header(page: PageModel, id: number, y = 6, height = 28): TextBox {
+  const content = page.subtitle ? `${page.title}\n${page.subtitle}` : page.title;
+  return { name: "header", id, content, brightness: 3, x: 16, y, width: 544, height };
+}
+
+export function layoutFor(page: PageModel): PageLayout {
+  if (page.kind === "inbox") {
+    if (page.list) {
+      return {
+        text: [
+          header(page, 1, 8, 56),
+          { name: "footer", id: 3, content: page.footer, brightness: 2, x: 16, y: 252, width: 544, height: 30 },
+        ],
+        list: { items: page.list },
+      };
+    }
+    return {
+      text: [
+        { ...CAPTURE, id: 1 },
+        header(page, 2, 8, 56),
+        {
+          name: "message", id: 3, content: page.message ?? "", brightness: 3,
+          x: 20, y: 96, width: 536, height: 128, border: true,
+        },
+        { name: "footer", id: 4, content: page.footer, brightness: 2, x: 16, y: 252, width: 544, height: 30 },
+      ],
+    };
+  }
+
+  if (page.kind === "review") {
+    const boxes: TextBox[] = [
+      { ...CAPTURE, id: 1 },
+      header(page, 2, 4),
+    ];
+    page.rows.forEach((row, index) => {
+      boxes.push({
+        name: `row${index + 1}`, id: 3 + index, content: row.text, brightness: row.brightness,
+        x: 18, y: 38 + index * 29, width: 540, height: 28,
+      });
+    });
+    const paneId = 3 + page.rows.length;
+    boxes.push({
+      name: "pane", id: paneId, content: page.pane ?? "", brightness: 2,
+      x: 18, y: 157, width: 540, height: 86, border: true, padding: 2,
+    });
+    boxes.push({
+      name: "footer", id: paneId + 1, content: page.footer, brightness: 2,
+      x: 18, y: 250, width: 540, height: 30,
+    });
+    return { text: boxes };
+  }
+
+  if (page.kind === "options") {
+    const boxes: TextBox[] = [
+      { ...CAPTURE, id: 1 },
+      header(page, 2, 6),
+    ];
+    page.rows.forEach((row, index) => {
+      boxes.push({
+        name: `opt${index + 1}`, id: 3 + index, content: row.text, brightness: row.brightness,
+        x: 18, y: 42 + index * 31, width: 540, height: 29,
+      });
+    });
+    boxes.push({
+      name: "footer", id: 3 + page.rows.length, content: page.footer, brightness: 2,
+      x: 18, y: 250, width: 540, height: 30,
+    });
+    return { text: boxes };
+  }
+
+  return {
+    text: [
+      { ...CAPTURE, id: 1 },
+      header(page, 2, 44),
+      {
+        name: "pane", id: 3, content: page.pane ?? "", brightness: 4,
+        x: 36, y: 88, width: 504, height: 84,
+      },
+      { name: "footer", id: 4, content: page.footer, brightness: 2, x: 16, y: 236, width: 544, height: 30 },
+    ],
+  };
+}
+
+function toTextContainers(boxes: readonly TextBox[]): TextContainerProperty[] {
+  return boxes.map((box) => new TextContainerProperty({
+    xPosition: box.x,
+    yPosition: box.y,
+    width: box.width,
+    height: box.height,
+    containerID: box.id,
+    containerName: box.name,
+    content: box.content,
+    isEventCapture: box.capture ? 1 : 0,
+    borderWidth: box.border ? 1 : 0,
+    borderColor: 4,
+    paddingLength: box.padding ?? (box.border ? 6 : 0),
+    textColor: box.brightness,
+  }));
+}
+
+function toMenu(page: PageModel): MenuContainerProperty | undefined {
+  if (page.menu.length === 0) return undefined;
+  return new MenuContainerProperty({
+    menuItems: page.menu.map((item) => new MenuItemProperty({ itemName: item.label, itemID: item.id })),
   });
 }
 
+function toList(page: PageModel): ListContainerProperty[] {
+  if (!page.list) return [];
+  return [new ListContainerProperty({
+    xPosition: 16,
+    yPosition: 70,
+    width: 544,
+    height: 174,
+    containerID: 2,
+    containerName: "list",
+    isEventCapture: 1,
+    borderWidth: 0,
+    paddingLength: 0,
+    itemContainer: new ListItemContainerProperty({
+      itemCount: page.list.length,
+      itemWidth: 500,
+      isItemSelectBorderEn: 1,
+      itemName: page.list,
+    }),
+  })];
+}
+
+export function createLayout(page: PageModel): CreateStartUpPageContainer {
+  const layout = layoutFor(page);
+  const text = toTextContainers(layout.text);
+  const list = toList(page);
+  return new CreateStartUpPageContainer({
+    containerTotalNum: text.length + list.length,
+    textObject: text,
+    listObject: list,
+    menuObject: toMenu(page),
+  });
+}
+
+export function rebuildLayout(page: PageModel): RebuildPageContainer {
+  const layout = layoutFor(page);
+  const text = toTextContainers(layout.text);
+  const list = toList(page);
+  return new RebuildPageContainer({
+    containerTotalNum: text.length + list.length,
+    textObject: text,
+    listObject: list,
+    menuObject: toMenu(page),
+  });
+}
+
+function shapeOf(page: PageModel): string {
+  const shape = page.list
+    ? `list${page.list.length}`
+    : page.message !== undefined
+      ? `message${page.message.length}`
+      : `rows${page.rows.length}`;
+  return `${page.kind}:${shape}`;
+}
+
+function fullSignature(page: PageModel): string {
+  return [
+    shapeOf(page),
+    page.title,
+    page.subtitle ?? "",
+    page.list?.join("\u0001") ?? "",
+    page.message ?? "",
+    page.rows.map((row) => `${row.brightness}:${row.text}`).join("\u0001"),
+    page.pane ?? "",
+    page.footer,
+    page.menu.map((item) => `${item.id}:${item.label}`).join("\u0001"),
+  ].join("\u0002");
+}
+
+function signature(box: TextBox): string {
+  return `${box.brightness}\u0000${box.content}`;
+}
+
 export async function connectEven(
-  getScreen: () => Screen,
+  getPage: () => PageModel,
   onInput: (input: Input) => void,
-  onOverlayChange: () => void,
   setHostStatus: (message: string) => void,
 ) {
-  // Remain usable as a standalone browser preview while waiting for an Even host.
   const bridge = await waitForEvenAppBridge();
-  const initial = getScreen();
-  const result = await bridge.createStartUpPageContainer(nativeLayout(initial));
+  const initial = getPage();
+  const result = await bridge.createStartUpPageContainer(createLayout(initial));
   if (result !== StartUpPageCreateResult.success) {
     throw new Error("Even Hub rejected the initial display");
   }
+  let shape = shapeOf(initial);
+  let full = fullSignature(initial);
+  let signatures = new Map(layoutFor(initial).text.map((box) => [box.name, signature(box)]));
+
   const unsubscribe = bridge.onEvenHubEvent((event) => {
-    if (isOverlayChange(event)) {
-      onOverlayChange();
-      return;
-    }
     const input = decodeInput(event);
     if (input) onInput(input);
   });
   window.addEventListener("pagehide", (event) => { if (!event.persisted) unsubscribe(); });
-  const connectedMessage = "Even Hub connected · Display and touch input";
-  setHostStatus(connectedMessage);
-  console.info("[agent-relay] ready");
+  const connected = "Glasses connected";
+  setHostStatus(connected);
+  console.info("[pinpoint] ready");
 
-  let last = initial;
-  let pending: Screen | undefined;
-  let rendering = false;
+  let queue: Promise<void> = Promise.resolve();
 
-  async function render(screen: Screen) {
-    pending = screen;
-    if (rendering) return;
-    rendering = true;
-    let target = screen;
-    try {
-      while (pending) {
-        const next = pending;
-        target = next;
-        pending = undefined;
-        for (const { key, id } of boxes) {
-          if (last[key] !== next[key]) {
-            const ok = await bridge.textContainerUpgrade(new TextContainerUpgrade({
-              containerID: id, containerName: key, content: next[key],
-            }));
-            if (!ok) {
-              setHostStatus("Even Hub display update failed");
-              continue;
-            }
-            last = { ...last, [key]: next[key] };
-          }
-        }
-      }
-      if (boxes.every(({ key }) => last[key] === target[key])) setHostStatus(connectedMessage);
-    } catch {
-      setHostStatus("Even Hub display update failed");
-    } finally {
-      rendering = false;
+  async function apply(page: PageModel) {
+    const nextFull = fullSignature(page);
+    if (nextFull === full) return;
+    const nextShape = shapeOf(page);
+    const layout = layoutFor(page);
+    if (nextShape !== shape || page.kind === "inbox") {
+      const ok = await bridge.rebuildPageContainer(rebuildLayout(page));
+      if (!ok) throw new Error("Even Hub rejected the page rebuild");
+      shape = nextShape;
+      full = nextFull;
+      signatures = new Map(layout.text.map((box) => [box.name, signature(box)]));
+      return;
     }
+    for (const box of layout.text) {
+      const next = signature(box);
+      if (signatures.get(box.name) === next) continue;
+      const ok = await bridge.textContainerUpgrade(new TextContainerUpgrade({
+        containerID: box.id,
+        containerName: box.name,
+        content: box.content,
+        textColor: box.brightness,
+      }));
+      if (!ok) throw new Error(`Even Hub rejected ${box.name}`);
+      signatures.set(box.name, next);
+    }
+    full = nextFull;
   }
 
   return {
-    render,
+    render(page: PageModel) {
+      queue = queue.then(() => apply(page)).catch((error) => {
+        console.error("[pinpoint] display", error);
+        setHostStatus("Even Hub display update failed");
+      });
+      return queue;
+    },
     async exit() {
       try {
         if (!await bridge.shutDownPageContainer(1)) setHostStatus("Even Hub exit could not open");
       } catch {
         setHostStatus("Even Hub exit could not open");
+      }
+    },
+    async mic(on: boolean) {
+      try {
+        return await bridge.audioControl(on, on ? AudioInputSource.Glasses : undefined);
+      } catch {
+        return false;
       }
     },
   };

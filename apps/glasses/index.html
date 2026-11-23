@@ -3,40 +3,52 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#111612" />
-    <meta name="description" content="A glanceable companion concept for T3 Code and Even G2." />
+    <meta name="theme-color" content="#0d120e" />
+    <meta name="description" content="Pinpoint: review your AI agents point by point on Even G2." />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23a9f58b' d='M12 2 22 12 12 22 2 12Z'/%3E%3C/svg%3E" />
-    <title>Agent Relay · T3 Code companion</title>
+    <title>Pinpoint · Even G2 review</title>
   </head>
   <body>
     <main class="shell">
       <header class="intro">
-        <div class="eyebrow"><span class="mark" aria-hidden="true"></span> T3 CODE COMPANION CONCEPT</div>
-        <h1>Agent Relay</h1>
-        <p>Stay with your day. See which coding thread needs you.</p>
+        <div class="eyebrow"><span class="mark" aria-hidden="true"></span> EVEN G2 · HEADS UP HACKATHON</div>
+        <h1>Pinpoint</h1>
+        <p>Review your agents point by point. Ring for where, voice for what.</p>
       </header>
+
       <section class="console" aria-labelledby="panel-title">
         <div class="console-top">
-          <h2 id="panel-title">G2 display preview</h2>
-          <span class="mode" id="mode-badge">Demo</span>
+          <h2 id="panel-title">Glasses preview</h2>
+          <span class="badge" id="mode-badge">Demo data</span>
         </div>
-        <div class="display" aria-label="Display contents" aria-live="polite" aria-atomic="true">
-          <p class="display-heading" id="display-heading"></p>
-          <p class="display-kicker" id="display-kicker"></p>
-          <p class="display-body" id="display-body"></p>
-          <p class="display-controls" id="display-controls"></p>
+
+        <div class="glasses" aria-live="polite" aria-atomic="true">
+          <div class="scr-head" id="glasses-head"></div>
+          <ol class="scr-list" id="glasses-list" hidden></ol>
+          <div class="scr-rows" id="glasses-rows"></div>
+          <div class="scr-pane" id="glasses-pane"></div>
+          <div class="scr-footer" id="glasses-footer"></div>
         </div>
-        <div class="controls" aria-label="Preview controls" role="group">
-          <button type="button" id="up">Previous</button>
-          <button type="button" id="down">Next</button>
-          <button type="button" id="press" class="primary">View thread</button>
-          <button type="button" id="back">Back</button>
+
+        <div class="controls" role="group" aria-label="Preview controls">
+          <button type="button" id="btn-up">Swipe up</button>
+          <button type="button" id="btn-down">Swipe down</button>
+          <button type="button" id="btn-tap" class="primary">Tap</button>
+          <button type="button" id="btn-double">Double tap</button>
+          <button type="button" id="btn-menu">Hold menu</button>
         </div>
-        <p class="panel-note" id="panel-note">Sample data. No commands are sent.</p>
+
+        <div class="menu-panel" id="menu-panel" hidden>
+          <p class="menu-label">Contextual menu</p>
+          <div class="menu-items" id="menu-items"></div>
+        </div>
+
+        <p class="panel-note" id="panel-note"></p>
       </section>
-      <footer>
-        <span id="host-status" role="status">Browser preview · Even Hub not connected</span>
-        <a id="mode-link" href="?source=t3" hidden>Try local read-only relay</a>
+
+      <footer class="foot">
+        <span id="host-status" role="status">Browser preview · no glasses host</span>
+        <a id="mode-link" href="?mock=1">Force demo data</a>
       </footer>
     </main>
     <script type="module" src="/src/main.ts"></script>

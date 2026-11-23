@@ -1,167 +1,446 @@
-export const statuses = ["running", "attention", "complete", "idle", "error"] as const;
-export type Status = (typeof statuses)[number];
-export type Agent = Readonly<{ id: string; title: string; provider: string; status: Status }>;
-export type Mode = "demo" | "t3";
-export type Connection = "ready" | "loading" | "offline";
-export type Input = "up" | "down" | "press" | "back";
-export type State = Readonly<{
-  mode: Mode;
-  connection: Connection;
-  agents: readonly Agent[];
-  selectedId: string | null;
-  page: "list" | "detail" | "confirm";
-  confirmUntil: number;
-  demoFinishAt: number;
-  notice: string;
-}>;
+import type { Deck, InboxItem, Note, Point, PreviewResult, ReviewDraft } from "../../../shared/contract";
 
-const demoAgents: readonly Agent[] = [
-  { id: "build", title: "Build interface", provider: "Codex", status: "running" },
-  { id: "test", title: "Run tests", provider: "Codex", status: "attention" },
-  { id: "review", title: "Review code", provider: "Claude Code", status: "running" },
-];
+export type ScreenName = "inbox" | "review" | "options" | "preview";
 
-export const statusText: Record<Status, string> = {
-  running: "Running",
-  attention: "Needs attention",
-  complete: "Complete",
-  idle: "Idle",
-  error: "Error",
-};
+export interface Flash {
+  text: string;
+  until: number;
+}
 
-export function initialState(mode: Mode): State {
-  const agents = mode === "demo" ? demoAgents : [];
+export interface SavedDraft {
+  notes: Note[];
+  seen: string[];
+}
+
+export interface State {
+  screen: ScreenName;
+  demo: boolean;
+  loading: boolean;
+  offline: boolean;
+  inbox: InboxItem[];
+  inboxFocus: number;
+  deck: Deck | null;
+  loadingThreadId: string | null;
+  reviewTitle: string;
+  focus: number;
+  notes: Note[];
+  seen: string[];
+  drafts: Record<string, SavedDraft>;
+  recordingStartedAt: number | null;
+  optionsFocus: number;
+  preview: PreviewResult | null;
+  previewLoading: boolean;
+  sending: boolean;
+  sent: boolean;
+  sentAt: number | null;
+  flash: Flash | null;
+}
+
+export interface PressResult {
+  state: State;
+  effect?: Effect;
+}
+
+export type Effect =
+  | { type: "exit" }
+  | { type: "open"; index: number }
+  | { type: "preview" }
+  | { type: "send" }
+  | { type: "record-start" }
+  | { type: "record-stop" }
+  | { type: "retry" };
+
+export const REVIEW_ROWS = 4;
+export const VOICE_MAX_MS = 20_000;
+export const SENT_HOLD_MS = 1_500;
+
+export function initialState(options: { demo: boolean; loading: boolean }): State {
   return {
-    mode, agents,
-    connection: mode === "demo" ? "ready" : "loading",
-    selectedId: agents[0]?.id ?? null,
-    page: "list",
-    confirmUntil: 0,
-    demoFinishAt: 0,
-    notice: "",
+    screen: "inbox",
+    demo: options.demo,
+    loading: options.loading,
+    offline: false,
+    inbox: [],
+    inboxFocus: 0,
+    deck: null,
+    loadingThreadId: null,
+    reviewTitle: "",
+    focus: 0,
+    notes: [],
+    seen: [],
+    drafts: {},
+    recordingStartedAt: null,
+    optionsFocus: 0,
+    preview: null,
+    previewLoading: false,
+    sending: false,
+    sent: false,
+    sentAt: null,
+    flash: null,
   };
 }
 
-export function selectedAgent(state: State): Agent | undefined {
-  return state.agents.find(({ id }) => id === state.selectedId);
+export function focusedPoint(state: State): Point | undefined {
+  return state.deck?.points[state.focus];
 }
 
-export function isSimulatedActionAvailable(state: State): boolean {
-  const agent = selectedAgent(state);
-  return state.mode === "demo" && agent?.id === "test" && agent.status === "attention";
+export function selectedPointId(state: State): string | undefined {
+  const point = focusedPoint(state);
+  return point?.id ?? state.deck?.points[state.deck.points.length - 1]?.id;
 }
 
-export function updateAgents(state: State, agents: readonly Agent[]): State {
-  const selectionExists = agents.some(({ id }) => id === state.selectedId);
+export function noteFor(state: State, pointId: string): Note | undefined {
+  return state.notes.find((note) => note.pointId === pointId);
+}
+
+export function countNotes(notes: readonly Note[]) {
   return {
-    ...state, agents,
-    connection: "ready",
-    selectedId: selectionExists ? state.selectedId : (agents[0]?.id ?? null),
-    page: selectionExists ? state.page : "list",
+    objections: notes.filter((note) => note.verdict === "object").length,
+    answers: notes.filter((note) => note.verdict === "answer").length,
+    notes: notes.filter((note) => note.verdict === "note").length,
   };
 }
 
-export function setOffline(state: State): State {
+export function needCount(items: readonly InboxItem[]): number {
+  return items.filter((item) => item.attention !== "report").length;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function remember(state: State): State {
+  const deck = state.deck;
+  if (!deck) return state;
   return {
-    ...state, connection: "offline", agents: [], selectedId: null,
-    page: "list", confirmUntil: 0, notice: "",
+    ...state,
+    drafts: {
+      ...state.drafts,
+      [deck.threadId]: { notes: state.notes, seen: state.seen },
+    },
   };
 }
 
-export function advance(state: State, now: number): State {
-  if (state.page === "confirm" && now >= state.confirmUntil) {
-    return { ...state, page: "detail", confirmUntil: 0, notice: "Confirmation expired. Try again." };
+function withSeen(state: State, point: Point | undefined): State {
+  if (!point || state.seen.includes(point.id)) return state;
+  return remember({ ...state, seen: [...state.seen, point.id] });
+}
+
+export function adoptInbox(
+  state: State,
+  items: readonly InboxItem[],
+  options: { demo: boolean; offline: boolean },
+): State {
+  const capped = items.slice(0, 20);
+  const existing = capped.some((item) => item.threadId === state.inbox[state.inboxFocus]?.threadId);
+  return {
+    ...state,
+    inbox: [...capped],
+    inboxFocus: existing ? state.inboxFocus : 0,
+    demo: options.demo,
+    offline: options.offline,
+    loading: false,
+  };
+}
+
+export function markOffline(state: State): State {
+  return { ...state, loading: false, offline: true };
+}
+
+export function markLoading(state: State): State {
+  return { ...state, loading: true, offline: false };
+}
+
+export function setInboxFocus(state: State, index: number): State {
+  const focus = clamp(index, 0, Math.max(0, state.inbox.length - 1));
+  return focus === state.inboxFocus ? state : { ...state, inboxFocus: focus };
+}
+
+export function moveFocus(state: State, delta: number): State {
+  if (state.screen === "inbox") {
+    return setInboxFocus(state, state.inboxFocus + delta);
   }
-  if (state.mode === "demo" && state.demoFinishAt > 0 && now >= state.demoFinishAt) {
-    return {
-      ...state,
-      agents: state.agents.map((agent) => agent.id === "test" ? { ...agent, status: "complete" } : agent),
-      demoFinishAt: 0,
-      notice: "Demo: final checks complete.",
-    };
+  if (state.screen === "options") {
+    const total = (state.deck?.points[state.focus]?.options?.length ?? 0) + 1;
+    const focus = clamp(state.optionsFocus + delta, 0, total - 1);
+    return focus === state.optionsFocus ? state : { ...state, optionsFocus: focus };
+  }
+  if (state.screen === "review") {
+    if (state.recordingStartedAt !== null || !state.deck) return state;
+    const max = state.deck.points.length;
+    const focus = clamp(state.focus + delta, 0, max);
+    if (focus === state.focus) return state;
+    return withSeen({ ...state, focus, flash: null }, state.deck.points[focus]);
   }
   return state;
 }
 
-// Closing the phone view or opening an OS overlay invalidates an unconfirmed choice.
-export function afterSurfaceChange(previous: State, now: number): State {
-  const state = advance(previous, now);
-  return state.page === "confirm"
-    ? { ...state, page: "detail", confirmUntil: 0, notice: "Confirmation cancelled." }
-    : state;
+export function startReview(state: State, item: InboxItem): State {
+  const saved = state.drafts[item.threadId];
+  return {
+    ...state,
+    screen: "review",
+    deck: null,
+    loadingThreadId: item.threadId,
+    reviewTitle: item.title,
+    focus: 0,
+    notes: saved?.notes ?? [],
+    seen: saved?.seen ?? [],
+    recordingStartedAt: null,
+    optionsFocus: 0,
+    preview: null,
+    previewLoading: false,
+    sending: false,
+    sent: false,
+    sentAt: null,
+    flash: null,
+  };
 }
 
-export function interact(previous: State, input: Input, now: number): { state: State; exit: boolean } {
-  const state = advance(previous, now);
-  // A press after expiry is not allowed to reopen and confirm in the same step.
-  if (input === "press" && previous.page === "confirm" && state.page !== "confirm") {
-    return { state, exit: false };
-  }
-  if (input === "back") {
-    if (state.page === "list") return { state, exit: true };
-    return {
-      state: { ...state, page: state.page === "confirm" ? "detail" : "list", confirmUntil: 0, notice: "" },
-      exit: false,
-    };
-  }
-  if (state.page === "list") {
-    if (input === "press" && selectedAgent(state)) {
-      return { state: { ...state, page: "detail", notice: "" }, exit: false };
-    }
-    if ((input === "up" || input === "down") && state.agents.length > 0) {
-      const index = state.agents.findIndex(({ id }) => id === state.selectedId);
-      const nextIndex = Math.max(0, Math.min(state.agents.length - 1, index + (input === "up" ? -1 : 1)));
-      return {
-        state: { ...state, selectedId: state.agents[nextIndex]?.id ?? null, notice: "" },
-        exit: false,
-      };
-    }
-  }
-  if (state.page === "detail" && input === "press" && isSimulatedActionAvailable(state)) {
-    return { state: { ...state, page: "confirm", confirmUntil: now + 8_000, notice: "" }, exit: false };
-  }
-  if (state.page === "confirm" && input === "press" && isSimulatedActionAvailable(state)) {
-    return {
-      state: {
-        ...state,
-        page: "detail",
-        confirmUntil: 0,
-        agents: state.agents.map((agent) => agent.id === state.selectedId ? { ...agent, status: "running" } : agent),
-        demoFinishAt: now + 4_000,
-        notice: "Demo: final checks started.",
-      },
-      exit: false,
-    };
-  }
-  return { state, exit: false };
+export function openDeck(state: State, deck: Deck): State {
+  if (state.loadingThreadId !== deck.threadId && state.deck?.threadId !== deck.threadId) return state;
+  const saved = state.drafts[deck.threadId];
+  const notes = saved?.notes ?? [];
+  const seen = saved?.seen ?? [];
+  const next: State = {
+    ...state,
+    screen: "review",
+    deck,
+    loadingThreadId: null,
+    reviewTitle: deck.title,
+    focus: 0,
+    notes: notes.filter((note) => deck.points.some((point) => point.id === note.pointId)),
+    seen: seen.filter((id) => deck.points.some((point) => point.id === id)),
+    recordingStartedAt: null,
+    optionsFocus: 0,
+    preview: null,
+    previewLoading: false,
+    sending: false,
+    sent: false,
+    sentAt: null,
+    flash: null,
+  };
+  return withSeen(next, deck.points[0]);
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function boundedLabel(value: unknown, limit: number): string | null {
-  if (typeof value !== "string") return null;
-  const cleaned = value.replace(/[\p{Cc}\p{Cf}]/gu, " ").trim();
-  return cleaned ? Array.from(cleaned).slice(0, limit).join("") : null;
-}
-
-// Copy only the allowlisted display fields; do not display tool output, paths, or messages.
-export function parseStatusPayload(value: unknown): readonly Agent[] {
-  if (!isRecord(value) || !Array.isArray(value.agents) || value.agents.length > 50) {
-    throw new Error("Invalid status response");
-  }
-  const ids = new Set<string>();
-  return value.agents.map((raw: unknown) => {
-    if (!isRecord(raw)) throw new Error("Invalid agent");
-    const id = raw.id;
-    const title = boundedLabel(raw.title, 160);
-    const provider = boundedLabel(raw.provider, 40);
-    const status = statuses.find((item) => item === raw.status);
-    if (typeof id !== "string" || !id || id.length > 200 || ids.has(id) || !title || !provider || !status) {
-      throw new Error("Invalid agent fields");
-    }
-    ids.add(id);
-    return { id, title, provider, status };
+export function mergeDeck(state: State, deck: Deck): State {
+  if (state.deck?.threadId !== deck.threadId) return state;
+  const pointIds = new Set(deck.points.map((point) => point.id));
+  const notes = state.notes.filter((note) => pointIds.has(note.pointId));
+  const seen = state.seen.filter((id) => pointIds.has(id));
+  return remember({
+    ...state,
+    deck,
+    focus: clamp(state.focus, 0, deck.points.length),
+    notes,
+    seen,
+    optionsFocus: 0,
   });
+}
+
+export function deckFailed(state: State, message: string, now: number): State {
+  return {
+    ...state,
+    loadingThreadId: null,
+    flash: { text: message, until: now + 5_000 },
+  };
+}
+
+export function backToInbox(state: State): State {
+  const threadId = state.deck?.threadId;
+  const items = threadId
+    ? state.inbox.map((item) => item.threadId === threadId ? { ...item, draftNotes: state.notes.length } : item)
+    : state.inbox;
+  return {
+    ...state,
+    screen: "inbox",
+    deck: null,
+    loadingThreadId: null,
+    inbox: items,
+    inboxFocus: 0,
+    focus: 0,
+    recordingStartedAt: null,
+    optionsFocus: 0,
+    preview: null,
+    previewLoading: false,
+    sending: false,
+    sent: false,
+    sentAt: null,
+    flash: null,
+  };
+}
+
+export function backToReview(state: State): State {
+  return {
+    ...state,
+    screen: "review",
+    optionsFocus: 0,
+    preview: null,
+    previewLoading: false,
+    sending: false,
+    sent: false,
+    sentAt: null,
+    flash: null,
+  };
+}
+
+export function beginRecording(state: State, now: number): State {
+  return { ...state, recordingStartedAt: now, flash: null };
+}
+
+export function endRecording(state: State): State {
+  return state.recordingStartedAt === null ? state : { ...state, recordingStartedAt: null };
+}
+
+export function setFlash(state: State, text: string, now: number, ms = 4_000): State {
+  return { ...state, flash: { text, until: now + ms } };
+}
+
+export function clearFlash(state: State): State {
+  return state.flash ? { ...state, flash: null } : state;
+}
+
+const OBJECTION = /^(no|not|don'?t|do not|never|stop|wrong|instead)\b/i;
+
+export function isObjection(text: string): boolean {
+  return OBJECTION.test(text.trim());
+}
+
+export function applyVoice(state: State, text: string, now: number, verdict?: "object" | "note"): State {
+  const point = focusedPoint(state);
+  if (!point) return state;
+  const decided: Note["verdict"] = point.kind === "question"
+    ? "answer"
+    : verdict === "object" || verdict === "note"
+      ? verdict
+      : isObjection(text) ? "object" : "note";
+  const note: Note = { pointId: point.id, verdict: decided, text };
+  const notes = [...state.notes.filter((item) => item.pointId !== point.id), note];
+  return remember(setFlash({ ...state, notes, recordingStartedAt: null }, `Heard: ${text}`, now, 5_000));
+}
+
+export function chooseOption(state: State, index: number, now: number): State {
+  const point = focusedPoint(state);
+  const option = point?.options?.[index];
+  if (!point || option === undefined) return state;
+  const note: Note = { pointId: point.id, verdict: "answer", option };
+  const notes = [...state.notes.filter((item) => item.pointId !== point.id), note];
+  return remember(setFlash({ ...state, screen: "review", notes, optionsFocus: 0 }, `Answer: ${option}`, now, 3_000));
+}
+
+export function clearNotes(state: State, now: number): State {
+  if (state.notes.length === 0) return setFlash(state, "No notes to clear", now);
+  return remember(setFlash({ ...state, notes: [] }, "Notes cleared", now));
+}
+
+export function goPreview(state: State): State {
+  return { ...state, screen: "preview", preview: null, previewLoading: true, sending: false, sent: false, sentAt: null, flash: null };
+}
+
+export function setPreview(state: State, preview: PreviewResult): State {
+  return { ...state, preview, previewLoading: false };
+}
+
+export function previewFailed(state: State, message: string, now: number): State {
+  return { ...state, preview: null, previewLoading: false, flash: { text: message, until: now + 5_000 } };
+}
+
+export function markSending(state: State): State {
+  return { ...state, sending: true, flash: null };
+}
+
+export function markSent(state: State, now: number): State {
+  return { ...state, sending: false, sent: true, sentAt: now, flash: null };
+}
+
+export function sendFailed(state: State, message: string, now: number): State {
+  return { ...state, sending: false, flash: { text: message, until: now + 5_000 } };
+}
+
+export function finishSend(state: State): State {
+  const threadId = state.deck?.threadId;
+  const drafts = { ...state.drafts };
+  if (threadId) delete drafts[threadId];
+  return {
+    ...state,
+    screen: "inbox",
+    inbox: threadId ? state.inbox.filter((item) => item.threadId !== threadId) : state.inbox,
+    inboxFocus: 0,
+    deck: null,
+    loadingThreadId: null,
+    notes: [],
+    seen: [],
+    drafts,
+    focus: 0,
+    optionsFocus: 0,
+    preview: null,
+    previewLoading: false,
+    sending: false,
+    sent: false,
+    sentAt: null,
+    flash: null,
+  };
+}
+
+export function draftFor(state: State, now: number): ReviewDraft | null {
+  const deck = state.deck;
+  if (!deck) return null;
+  return {
+    threadId: deck.threadId,
+    sourceMessageId: deck.sourceMessageId,
+    notes: [...state.notes],
+    seen: [...state.seen],
+    updatedAt: new Date(now).toISOString(),
+  };
+}
+
+export function press(state: State, now: number): PressResult {
+  if (state.screen === "inbox") {
+    if (state.loading || state.offline || state.inbox.length === 0) {
+      return { state, effect: { type: "retry" } };
+    }
+    return { state, effect: { type: "open", index: state.inboxFocus } };
+  }
+  if (state.screen === "review") {
+    if (state.recordingStartedAt !== null) {
+      return { state, effect: { type: "record-stop" } };
+    }
+    const deck = state.deck;
+    if (!deck) return { state };
+    const point = deck.points[state.focus];
+    if (!point) {
+      return { state: goPreview(state), effect: { type: "preview" } };
+    }
+    if (point.kind === "question") {
+      return { state: { ...state, screen: "options", optionsFocus: 0, flash: null } };
+    }
+    return { state: beginRecording(state, now), effect: { type: "record-start" } };
+  }
+  if (state.screen === "options") {
+    const point = focusedPoint(state);
+    const options = point?.options ?? [];
+    if (state.optionsFocus < options.length) {
+      return { state: chooseOption(state, state.optionsFocus, now) };
+    }
+    return { state: beginRecording({ ...state, screen: "review" }, now), effect: { type: "record-start" } };
+  }
+  if (state.screen === "preview") {
+    if (!state.preview) {
+      return { state: { ...state, previewLoading: true }, effect: { type: "preview" } };
+    }
+    if (state.sending || state.sent) return { state };
+    return { state: markSending(state), effect: { type: "send" } };
+  }
+  return { state };
+}
+
+export function doubleTap(state: State): PressResult {
+  if (state.sending) return { state };
+  if (state.screen === "inbox") {
+    return { state, effect: { type: "exit" } };
+  }
+  if (state.screen === "review") {
+    return { state: backToInbox(state) };
+  }
+  return { state: backToReview(endRecording(state)) };
 }

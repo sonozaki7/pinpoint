@@ -1,8 +1,31 @@
-# Agent Relay — Even Hub app
+# Pinpoint — Even G2 app
 
-Agent Relay is an independent companion prototype for T3 Code. It uses the official Even Hub SDK to draw a 576 × 288 text interface on the G2 and receive standard touch input. The same app has a browser preview with buttons, so no glasses or ring are required to try the workflow.
+Review your AI agents' replies and plans on Even G2, point by point. **Ring for where, voice for what.** Built for the Heads Up hackathon (Even Realities × TVM Ventures), simulator-first.
 
-## Preview without an account
+The app talks only to the Pinpoint server (`apps/server`). With no server it falls back to a deterministic in-memory demo, so the whole flow works standalone. This folder started from the MIT-licensed Agent Relay scaffold (see `PRIOR_WORK.md`); its SDK wrapper, event normalization and simulator patterns were reused.
+
+## Screens and gestures
+
+| Screen | Gesture | Result |
+| --- | --- | --- |
+| Inbox (root, native list) | Swipe up/down | Move the native list selection |
+| | Tap | Open the focused thread |
+| | Double-tap | **`shutDownPageContainer(1)`** — the required system exit dialog |
+| | Hold menu | `Refresh` |
+| Review | Swipe up/down | Move the point focus; the four-row window scrolls in place |
+| | Tap a step/claim/draft point | Start a voice note; tap again to stop |
+| | Tap a question | Open Options |
+| | Tap the `> Send review (N notes)` row | Open Preview |
+| | Double-tap | Back to Inbox (draft kept and autosaved) |
+| | Hold menu | `Send review`, `Read on phone`, `Clear notes`, `Refresh` |
+| Options | Tap | Choose an option and return to Review, or `Say something else` to record |
+| | Double-tap | Back to Review |
+| Preview | Tap | Send to the agent, then `Sent to agent` for 1.5 s and back to Inbox |
+| | Double-tap | Back to Review |
+
+Rows use ASCII markers: `o` unseen, `+` agreed (seen), `x` objection, `*` note, `?` question unanswered, `=` answered, and `!` before a high-risk point. The quote pane shows the exact quote, or the question's options, wrapped to at most three 44-character lines.
+
+## Run the browser preview
 
 Requires Node.js 22.13 or newer.
 
@@ -11,68 +34,56 @@ npm ci
 npm run dev
 ```
 
-Open the local address printed by Vite (normally `http://127.0.0.1:4173`). It starts with sample threads and does not contact T3 Code. Choose **Next → View thread → Run final checks → Confirm demo** to see the full simulated interaction. After four seconds the sample status becomes **Complete**. Cancel or let the confirmation expire without starting anything.
+Open `http://127.0.0.1:4173/?mock=1` (or just `http://127.0.0.1:4173/`; an unreachable server falls back to demo data). The page mirrors the 576 × 288 glasses canvas and has buttons for swipe, tap, double-tap and the hold menu, plus keyboard arrows, Enter, Escape and Backspace. The header shows `demo data` whenever the in-memory demo is active.
 
-### Even Hub simulator
+### Official Even Hub simulator
 
-![Agent Relay demo in the official 576 × 288 simulator](simulator.png)
-
-The screenshot is from the simulator, not physical glasses.
-
-With the development server still running, run:
+With the dev server running:
 
 ```sh
-npm run simulator -- http://127.0.0.1:4173
+npm run simulator -- "http://127.0.0.1:4173/?mock=1" --automation-port 9898
 ```
 
-| Preview button | Even Hub control | Purpose |
-| --- | --- | --- |
-| Previous / Next | Swipe up / down | Select a thread |
-| View thread | Press | Open the selected thread |
-| Run final checks | Press | Ask for a simulated confirmation |
-| Confirm demo | Press again | Advance the sample data only |
-| Back / Cancel | Double press | Back out; the root page opens Even’s exit confirmation |
-
-The ring and glasses touchpads are designed to use these gestures through the [Even Hub SDK](https://hub.evenrealities.com/docs/build/device-apis). Physical G2/R1 input, timing, and readability still need device testing. The app does not request microphone permissions, perform voice recognition, create system notifications, or operate outside the foreground experience. If the phone view is suspended or the Even menu opens while you are confirming, the pending demo confirmation is cancelled.
-
-To run the repeatable framebuffer/input check, start the simulator on a fresh demo
-with `npm run simulator -- http://127.0.0.1:4173 --automation-port 9898` and run
-`node scripts/check-simulator.mjs` in another terminal. The check exercises the
-simulator, not physical hardware.
-
-### Try the sample on physical Even G2 and R1
-
-This is a **demo-only** hardware test. It does not give the phone or glasses access to your T3 Code server.
-
-1. Pair the G2 and optional R1 in the Even Realities phone app. Update the phone app and device firmware; this package requires Even App **2.2.10 or newer**. Enable the developer preview as described in [Even’s local testing guide](https://hub.evenrealities.com/docs/test/local-testing).
-2. On a trusted Wi-Fi network, find the computer’s LAN IP (not `127.0.0.1`). From `app/`, use that IP in both terminals below. Keep the demo server running until testing is complete, then stop it.
-
-   ```sh
-   # Terminal 1 (replace the example address with your own)
-   npm run dev:device -- --host 192.168.1.100
-   # Terminal 2
-   npx --no-install evenhub qr --url http://192.168.1.100:4173
-   ```
-
-3. Scan the QR code in the Even Realities app's developer preview. Verify the three sample threads appear. With the glasses touchpad, then with the R1 separately, swipe to **Run tests**, open it, and check both outcomes: double press to cancel; reopen, deliberately confirm, and see **Complete**. Repeat once by letting the confirmation expire and ensure no checks started. Double press from the list to verify the system exit prompt.
-4. QR preview checks display and input, not installation or phone-lock behaviour. For those, use the packaged build with [Even’s Private Testing](https://hub.evenrealities.com/docs/test/private-testing) and [Beta Testing](https://hub.evenrealities.com/docs/test/beta-testing). Reopen after locking the phone and confirm that no stale approval can fire and the demo remains usable. The demo may reset if the phone recreates the page; no real task is affected.
-
-Do not make the local T3 relay reachable on this network. The demo device build ignores `?source=t3`, and the default browser/developer servers still bind to the local computer unless you supply a LAN address.
-
-### Real, read-only thread status on the local computer
-
-Build the app and follow [the local T3 relay setup](../bridge/README.md). Open the relay URL with `?source=t3`. In that view the app retrieves thread summaries from the same local server. It has no write controls and never receives the T3 Code credential. If the relay fails, the app shows **Relay offline** instead of substituting fake live status.
-
-The installable Even Hub package has no network permission and only shows sample data, even if a URL includes `?source=t3`. The local read-only preview is not a remote phone service. A private phone-to-relay setup and its permissions would need separate validation; do not expose this local relay to the internet.
-
-## Checks and packaging
+Then, in another terminal, drive the full flow and save screenshots:
 
 ```sh
-npm test
-npm run build
-npx playwright install chromium   # if using Playwright’s bundled browser
-npm run test:ui
-npm run pack
+node scripts/check-simulator.mjs 9898
 ```
 
-The UI check uses headless Google Chrome if installed on macOS, or Playwright Chromium. It checks 320, 375, 390, 768, 1024, and 1440 CSS-pixel widths, including the demo action, disconnected/empty relay, long labels, and the real SDK against a mocked native host. `npm run pack` builds the demo-only `dist-even/` and creates `agent-relay.ehpk` with the pinned SDK. `npm run build` builds the separate browser/relay preview into `dist/`. Packaging is not Even Hub publication or device verification. See [official device testing](https://hub.evenrealities.com/docs/test) and [packaging](https://hub.evenrealities.com/docs/ship/packaging).
+The script runs: inbox → open `auth-refresh-fix` → context menu → point 4 → record and stop a (scripted) voice note → Send row → Preview → Send → inbox → Options for `deps-upgrade` → choose an answer → root double-tap exit. PNGs are written to `demo/shots/glasses-01-inbox.png` … `glasses-13-exit.png`.
+
+**Simulator caveat:** version 0.9.5 accepts `shutDownPageContainer(1)` and blanks the glasses framebuffer, but does not draw the system exit dialog itself (the app logs `[pinpoint] exit-dialog`). The same call is asserted through a mocked host by `npm run test:ui`. A Vite hot reload can leave the next startup page rejected; restart the simulator after code changes.
+
+## Data and voice
+
+- `VITE_PINPOINT_SERVER` sets the server origin (default `http://127.0.0.1:8787`). `?mock=1` forces the in-memory demo.
+- Demo mode implements the SPEC §5 API in memory with the four §12 threads: `auth-refresh-fix` (plan, 7 steps, risky step 4, mutex step 6), `deps-upgrade` (question with three options), `inbox-morning` (4 drafts) and `flaky-e2e` (failed run).
+- Voice: tap starts `audioControl(true, AudioInputSource.Glasses)`, PCM frames are buffered, and a second tap (or 20 s) stops the mic and POSTs the raw s16le 16 kHz mono bytes to `/api/voice`. Demo mode returns a scripted transcript. The `no / don't / not / wrong / instead / stop / never` heuristic picks `x` versus `*`; a question answer uses `=`.
+- Every change to notes or seen points is autosaved with `PUT /api/review/:threadId`.
+
+## Permissions and packaging
+
+`app.json` requests:
+
+- **network** — whitelists the server origin (`http://127.0.0.1:8787`). For a LAN device preview, add the Mac's LAN origin and set `VITE_PINPOINT_SERVER` to it.
+- **g2-microphone** — records the short voice note about the focused point.
+
+```sh
+npm run pack   # writes pinpoint.ehpk (SDK 0.0.16)
+```
+
+## Checks
+
+```sh
+npm test          # tsx --test: focus, four-row window, markers, ASCII 44, notes, API
+npm run build     # tsc --noEmit + vite build
+npm run test:ui   # 320–1440 px preview + mocked SDK transport, exit mode 1
+```
+
+The UI check needs Google Chrome or Playwright Chromium (`npx playwright install chromium`). The simulator check needs the simulator running with `--automation-port`.
+
+## Known limits
+
+- Simulator-only: no BLE timing/flicker, no ring-vs-temple distinction, brightness levels are indicative, and the system exit dialog is not drawn (see caveat above).
+- No live server was available while building the glasses app; every flow was exercised against the in-memory demo. The HTTP client follows SPEC §5 and is ready for the server agent's implementation.
+- One fixed firmware font; strings are normalised to printable ASCII and capped before sending.

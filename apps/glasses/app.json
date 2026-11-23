@@ -1,10 +1,20 @@
 {
-  "package_id": "com.sonozaki7.agentrelay",
+  "package_id": "com.sonozaki7.pinpoint",
   "edition": "202601",
-  "name": "Agent Relay",
-  "version": "0.1.3",
+  "name": "Pinpoint",
+  "version": "0.2.0",
   "min_sdk_version": "0.0.16",
   "entrypoint": "index.html",
-  "permissions": [],
+  "permissions": [
+    {
+      "name": "network",
+      "desc": "Loads agent threads and sends your review to the Pinpoint server on your computer.",
+      "whitelist": ["http://127.0.0.1:8787"]
+    },
+    {
+      "name": "g2-microphone",
+      "desc": "Records a short voice note about the point you are looking at."
+    }
+  ],
   "supported_languages": ["en"]
 }
