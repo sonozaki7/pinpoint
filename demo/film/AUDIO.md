@@ -1,3 +1,5 @@
+> The Pinpoint demo uses a separate draft voice and ambient bed; see [PINPOINT.md](PINPOINT.md) and [../../docs/narration.md](../../docs/narration.md).
+
 # Narration, music, and captions
 
 The film uses **AI-generated American English narration**, synthesized locally

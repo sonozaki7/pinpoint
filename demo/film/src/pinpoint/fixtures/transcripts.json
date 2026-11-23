@@ -1,0 +1,20 @@
+{
+  "delayMs": 1200,
+  "notes": [
+    {
+      "threadId": "auth-refresh-fix",
+      "pointId": "p4",
+      "text": "No. Don't log everyone out. Migrate the existing sessions instead."
+    },
+    {
+      "threadId": "auth-refresh-fix",
+      "pointId": "p6",
+      "text": "Use a request queue. A mutex deadlocks with the retry path."
+    },
+    {
+      "threadId": "inbox-morning",
+      "pointId": "p3",
+      "text": "Make it Thursday, not Tuesday."
+    }
+  ]
+}

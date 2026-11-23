@@ -12,3 +12,4 @@ demo/shots/tmp/
 *.log
 apps/site/review/
 demo/recordings/
+demo/film/public/audio/*-draft.mp3

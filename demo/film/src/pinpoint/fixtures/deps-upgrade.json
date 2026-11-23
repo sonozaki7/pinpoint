@@ -1,0 +1,87 @@
+{
+  "thread": {
+    "threadId": "deps-upgrade",
+    "title": "deps-upgrade",
+    "project": "acme-web",
+    "attention": "question",
+    "updatedAt": "2026-11-24T00:41:05.000Z"
+  },
+  "source": {
+    "sourceMessageId": "01JCQ4B2N7YVK3H8RS5T6MWD9E",
+    "kind": "question",
+    "text": "## Build settled; one decision before I touch the toolchain\n\nEverything else from this morning is done: 3 dependabot PRs merged, the ESLint flat config is in, and CI is green on `main` (run 2214, 4m12s). The one item left is the Vite upgrade, and it has a real trade-off, so I stopped here instead of guessing.\n\n### Where we are\n\n- `package.json` pins `vite` 6.3.5 and `@vitejs/plugin-react` 4.4.1.\n- Vite 7.1 is out, and the security advisory CVE-2026-31177 (dev server `server.fs.allow` bypass) is fixed only in 7.0.2 and 6.3.6. So we patch either way; the question is 6.3.6 or 7.1.\n- Vite 7 requires Node 20.19 or newer. CI runs 20.11 and the deploy image is `node:20.11-slim`. That is a one-line bump, but it touches the Dockerfile and the CI matrix.\n- `vite-plugin-svgr` has no Vite 7 release yet (open issue, last comment 3 days ago). It runs with `--force` and a peer override, but the maintainer has not confirmed support.\n- `@tanstack/router-plugin` ships a Vite 7 build. `vite-plugin-checker` 0.9 needs the beta tag for Vite 7.\n\n### The other side of the ledger\n\nVite 6's dev server leaks memory. On the big app it grows about 400 MB over a working day, and two of us restart it around lunch. Cold start is 2.9 s on Vite 6 and 1.6 s on Vite 7 in the benchmark I ran in `bench/vite-cold-start.mjs` (5 runs each, same machine). HMR on the settings page is 180 ms against 90 ms.\n\nSo the upgrade buys a daily annoyance gone, at the cost of one unsupported plugin and a Node bump in two places.\n\n### Options\n\n1. **Stay on 6 for now.** Patch to 6.3.6 tonight for the CVE, revisit after the demo.\n2. **Upgrade to 7.** Node 20.19 in CI and in Docker, override the svgr peer range, drop `vite-plugin-checker` for a week if the beta bites.\n3. **Upgrade in a branch.** `chore/vite-7` with the full change, CI runs on it, merge after the demo when a rollback is not expensive.\n\n**Upgrade to Vite 7 now or stay on 6?** I recommend option 1 for this week: the CVE is patchable on 6 and the demo is Thursday. If you would rather not think about this again, say option 2 and I will do the Node bump and pin `vite-plugin-svgr` behind the override until it lands.\n",
+    "question": {
+      "requestId": "req_01JCQ4B2Q1",
+      "questions": [
+        {
+          "id": "q_vite7",
+          "question": "Upgrade to Vite 7 now or stay on 6?",
+          "options": [
+            "Stay on 6 for now",
+            "Upgrade to 7",
+            "Upgrade in a branch"
+          ]
+        }
+      ]
+    }
+  },
+  "deck": {
+    "threadId": "deps-upgrade",
+    "sourceMessageId": "01JCQ4B2N7YVK3H8RS5T6MWD9E",
+    "title": "deps-upgrade",
+    "attention": "question",
+    "headline": "Vite 7 now or stay on 6?",
+    "points": [
+      {
+        "id": "p1",
+        "index": 1,
+        "kind": "question",
+        "glance": "Upgrade to Vite 7 now or stay on 6?",
+        "quote": "Upgrade to Vite 7 now or stay on 6?",
+        "options": [
+          "Stay on 6 for now",
+          "Upgrade to 7",
+          "Upgrade in a branch"
+        ],
+        "questionId": "q_vite7"
+      },
+      {
+        "id": "p2",
+        "index": 2,
+        "kind": "claim",
+        "glance": "CVE fix lands in 6.3.6 too",
+        "quote": "fixed only in 7.0.2 and 6.3.6"
+      },
+      {
+        "id": "p3",
+        "index": 3,
+        "kind": "claim",
+        "glance": "Vite 7 needs Node 20.19, CI has 20.11",
+        "quote": "Vite 7 requires Node 20.19 or newer"
+      },
+      {
+        "id": "p4",
+        "index": 4,
+        "kind": "claim",
+        "glance": "Two plugins lag: svgr, checker",
+        "quote": "has no Vite 7 release yet"
+      },
+      {
+        "id": "p5",
+        "index": 5,
+        "kind": "claim",
+        "glance": "Vite 6 dev server leaks 400 MB a day",
+        "quote": "it grows about 400 MB over a working day"
+      },
+      {
+        "id": "p6",
+        "index": 6,
+        "kind": "step",
+        "glance": "Patch 6.3.6 tonight, Vite 7 later",
+        "quote": "Patch to 6.3.6 tonight for the CVE"
+      }
+    ],
+    "createdAt": "2026-11-24T00:41:19.000Z",
+    "splitter": "fixture"
+  }
+}

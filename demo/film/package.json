@@ -7,7 +7,11 @@
     "check": "tsc --noEmit",
     "render": "remotion render src/index.tsx Landscape ../output/even-g2-t3-concept-16x9.mp4 --codec=h264 --crf=17 --concurrency=5",
     "render:vertical": "remotion render src/index.tsx Portrait ../output/even-g2-t3-concept-9x16.mp4 --codec=h264 --crf=17 --concurrency=5",
-    "thumbnail": "remotion still src/index.tsx Cover ../output/thumbnail.png --frame=0"
+    "thumbnail": "remotion still src/index.tsx Cover ../output/thumbnail.png --frame=0",
+    "sync-shots": "node scripts/sync-shots.mjs",
+    "voice": "node scripts/build-audio.mjs",
+    "render:pinpoint": "remotion render src/index.tsx PinpointDemo ../out/pinpoint-demo-draft.mp4 --codec=h264 --crf=20 --pixel-format=yuv420p --concurrency=6 --browser-executable=\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\"",
+    "poster": "remotion still src/index.tsx PinpointDemo ../out/poster.png --frame=1425 --scale=0.6666667 --browser-executable=\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\""
   },
   "dependencies": {
     "@fontsource-variable/inter": "5.2.8",

@@ -1,0 +1,102 @@
+{
+  "_readme": [
+    "One file to swap draft visuals for real captures. No component edits needed.",
+    "",
+    "Every scene reads its screen source from here. `source: null` means the scene",
+    "uses the `stills` map (real simulator screenshots) or remains a designed board.",
+    "Hook, Problem and Close are always designed; the other six accept a source.",
+    "Replace a scene by setting its `source`:",
+    "  { \"kind\": \"clip\",   \"src\": \"clips/auth.mp4\" }",
+    "  { \"kind\": \"frames\", \"dir\": \"clips/auth\", \"fps\": 9.91, \"count\": 182 }",
+    "    optional: \"meta\": \"clips/auth/meta.json\", \"timeline\": \"clips/timeline.json\"",
+    "Files must live under demo/film/public/. Use `npm run sync-shots` after new captures.",
+    "",
+    "`inputs` are ring-gesture overlays, in seconds from the scene start. If a new",
+    "recording follows the same script, keep them; otherwise edit the `at` values.",
+    "`status` is the honesty label reported in the render summary and shown in the",
+    "top-right proof tag. Change it when a placeholder becomes a real capture.",
+    "",
+    "Scene timings live in src/pinpoint/timeline.ts (165 s total, 30 fps)."
+  ],
+  "audio": {
+    "narration": "audio/pinpoint-voice-draft.mp3",
+    "bed": "audio/pinpoint-bed-draft.mp3",
+    "bedVolume": 0.5,
+    "note": "Swap narration for the author's recording, keeping the file name, or point this at a new file. Re-run `node scripts/build-audio.mjs` after editing narration.json to refresh burned-in captions."
+  },
+  "scenes": {
+    "hook": {
+      "status": "real deck (auth-refresh-fix fixture), designed motion",
+      "note": "The wall is the fixture's real 511-word plan text; the seven lines are its real glances.",
+      "source": null
+    },
+    "problem": {
+      "status": "illustration (generic yes/no card, no brand names)",
+      "source": null
+    },
+    "alert": {
+      "status": "real simulator still + illustrative phone",
+      "note": "Glasses screen is demo/shots/glasses-01-inbox.png. The lock-screen notification is built in Remotion.",
+      "stills": {
+        "inbox": "shots/glasses-01-inbox.png"
+      }
+    },
+    "hero": {
+      "status": "real simulator stills (one-objection capture)",
+      "note": "Nine stills sequenced to the storyboard. This capture has one objection; the film's step-6 beat is the intended second note, so the send-row/preview counters differ until a two-note run is recorded. A single later recording can replace the whole hero by setting `source`.",
+      "source": null,
+      "stills": {
+        "inbox": "shots/glasses-01-inbox.png",
+        "point1": "shots/glasses-02-review.png",
+        "point4": "shots/glasses-04-point4.png",
+        "recording": "shots/glasses-05-recording.png",
+        "note": "shots/glasses-06-note.png",
+        "send": "shots/glasses-07-send-row.png",
+        "preview": "shots/glasses-08-preview.png",
+        "sent": "shots/glasses-09-sent.png",
+        "inboxAfter": "shots/glasses-10-inbox-after.png"
+      },
+      "inputs": [
+        { "at": 0.4, "kind": "swipe", "label": "move to auth-refresh-fix", "note": "focus" },
+        { "at": 2.7, "kind": "tap", "label": "open the plan", "note": "open" },
+        { "at": 4.7, "kind": "swipe", "label": "next point", "note": "move" },
+        { "at": 10.0, "kind": "swipe", "label": "to step 4", "note": "move" },
+        { "at": 10.9, "kind": "tap", "label": "start voice", "note": "talk" },
+        { "at": 16.8, "kind": "talk", "label": "speak the objection", "note": "talk" },
+        { "at": 22.8, "kind": "tap", "label": "stop recording", "note": "stop" },
+        { "at": 30.4, "kind": "swipe", "label": "to the send row", "note": "move" },
+        { "at": 38.5, "kind": "tap", "label": "open preview", "note": "open" },
+        { "at": 45.4, "kind": "tap", "label": "send the review", "note": "send" }
+      ]
+    },
+    "payoff": {
+      "status": "placeholder — illustrative T3 Code thread until the real screen capture exists",
+      "note": "Replace with the real T3 Code window capture after the live run: set source to {kind:'clip',src:'clips/t3-review.mp4'}; it renders full-frame.",
+      "source": null
+    },
+    "question": {
+      "status": "real simulator stills",
+      "stills": {
+        "options": "shots/glasses-11-options.png",
+        "answer": "shots/glasses-12-answer.png"
+      },
+      "inputs": [
+        { "at": 2.9, "kind": "tap", "label": "pick Stay on 6", "note": "choose" }
+      ]
+    },
+    "inbox": {
+      "status": "placeholder — no inbox-morning capture yet; built from the real fixture deck",
+      "note": "Four draft glances are the fixture's own text. Replace the board with frames from demo/shots/tmp/inbox-morning when recorded.",
+      "source": null
+    },
+    "telegram": {
+      "status": "placeholder — illustrative Telegram topic until the real bot capture exists",
+      "note": "The review text and quote-reply sentences come from the fixture. Set source to a clip of the real phone to replace the whole scene full-frame.",
+      "source": null
+    },
+    "close": {
+      "status": "design",
+      "source": null
+    }
+  }
+}

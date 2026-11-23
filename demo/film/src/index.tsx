@@ -7,6 +7,8 @@ import {Threads, Receipt} from "./scenes/ThreadJourney";
 import {Conversation, JourneyClose, JourneyOpen, PlatformSequence, WalkSequence} from "./scenes/Journey";
 import {clamp, ff, fps, useTall} from "./ui";
 import captions from "./captions.json";
+import {PinpointDemo} from "./pinpoint/Film";
+import {DURATION} from "./pinpoint/timeline";
 
 const duration = 82;
 const sceneTable = [
@@ -48,6 +50,7 @@ function Root() {
     <Composition id="Landscape" component={Film} width={1920} height={1080} fps={fps} durationInFrames={ff(duration)}/>
     <Composition id="Portrait" component={Film} width={1080} height={1920} fps={fps} durationInFrames={ff(duration)}/>
     <Composition id="Cover" component={Cover} width={1920} height={1080} fps={fps} durationInFrames={1}/>
+    <Composition id="PinpointDemo" component={PinpointDemo} width={1920} height={1080} fps={30} durationInFrames={DURATION * 30}/>
   </>;
 }
 

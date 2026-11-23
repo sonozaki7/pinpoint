@@ -1,3 +1,5 @@
+> The Pinpoint hackathon demo (2026-11) reuses this project’s type, caption and colour system. Its pipeline is documented in [PINPOINT.md](PINPOINT.md).
+
 # Visual production — Japan journey edition
 
 The new film replaces the original workflow, story structure, footage plates, and interfaces. It moves from a mobile thread list into a day in Japan: a walk, the Shinkansen waiting area, and a conversation. The station is the main decision sequence, not an onboard workspace. The generated photographic stills are animated and combined with a custom phone interface, point-of-view text, and timed R1 input illustrations in Remotion.
