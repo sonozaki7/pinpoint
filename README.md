@@ -4,13 +4,15 @@
 
 Review your AI agents' work from Even G2 — point by point, with the precision of your laptop.
 
-**Demo video:** placeholder — link added before submission (under 3 minutes) · **Site:** https://sonozaki7.github.io/pinpoint/
+**Demo video:** [pinpoint-demo.mp4](https://github.com/sonozaki7/pinpoint/releases/download/v1.0.0/pinpoint-demo.mp4) · **Site:** https://sonozaki7.github.io/pinpoint/ — both published at submission (video under 3 minutes).
 
 ![Pinpoint review screen in the Even Hub simulator](demo/shots/glasses-02-review.png)
 
 *Simulator capture, not physical glasses.*
 
 Pinpoint turns a long agent reply into a short list of one-line points. You move through them with the ring, say nothing when a point is fine, and speak only about the point that is wrong. It then sends one cited review back to the agent. It runs as an Even Hub app (an app for the glasses, loaded through Even's phone app), a local server next to T3 Code (the open-source harness that runs coding agents such as Claude Code and Codex), and a Telegram companion.
+
+**Prior work, stated up front:** the repository starts from three parts of the author's earlier Agent Relay project, imported unchanged at the first commit. Everything built during this hackathon, and everything that was not, is listed in [What existed before Nov 23](#what-existed-before-nov-23) and in [PRIOR_WORK.md](PRIOR_WORK.md).
 
 ## The problem
 
@@ -34,13 +36,12 @@ A review sent from the 7-step `auth-refresh-fix` plan in demo mode:
 
 ```
 Review from G2 (Pinpoint) — 7 points
-✗ 4. "Force-logout every user by truncating the sessions table" → No. Migrate existing sessions instead.
-✗ 6. "Wrap refreshToken() in a mutex." → Use a request queue; a mutex deadlocks with the retry path.
-● 5. "Backfill rotated_at for old rows." → Make it a separate job.
-✓ Agreed: 1, 2, 3, 7. Go ahead with the rest of the plan.
+✗ 4. "Force-logout every user by truncating the sessions table" → No. Don't log everyone out. Migrate the existing sessions instead.
+● 6. "Wrap refreshToken() in a mutex." → Use a request queue. A mutex deadlocks with the retry path.
+✓ Agreed: 1, 2, 3, 5, 7. Go ahead with the rest of the plan.
 ```
 
-Two objections and one note, each attached to the exact line it refers to. For a question, the same line answers with the chosen option: `? 2. "Upgrade to Vite 7 now?" → Stay on 6 for now.` The agent can act on that; "approved" tells it nothing.
+One objection and one note, each attached to the exact line it refers to. For a question, the same line answers with the chosen option: `? 2. "Upgrade to Vite 7 now?" → Stay on 6 for now.` The agent can act on that; "approved" tells it nothing.
 
 ## Why glasses, and why not just the phone
 
@@ -64,6 +65,8 @@ Pinpoint mirrors each thread that needs you into its own topic in one private Te
 This covers the glasses' two real gaps: the phone's notification shows up on the glasses while the app is closed, and the phone holds the full text when ten lines are not enough.
 
 Setup, dry-run mode, and troubleshooting: [docs/telegram-setup.md](docs/telegram-setup.md).
+
+One command checks the real bot: `npx tsx --env-file=apps/server/.env scripts/telegram-verify.mjs` creates the demo topic, posts the header, the full plan, the composed review and both quote-replies, then prints a link for every message. Add `--dry-run` to see the whole order without a bot. Take the two phone screenshots for the submission from that run.
 
 ## Architecture
 
@@ -91,29 +94,23 @@ Even G2 + R1  ── touch, mic ──►  Even app on the phone (WebView)
 
 The glasses app talks only to the local server. It holds no keys. All credentials live in `apps/server/.env`, which is ignored by Git.
 
-## Quick start (demo mode)
+## Quick start
 
-No T3 Code, no Telegram bot, no API key. Node.js 22.13 or newer.
-
-Terminal 1 — server:
+Node.js 22.13 or newer. One command:
 
 ```sh
-npm --prefix apps/server ci && PINPOINT_MODE=demo npm --prefix apps/server start
+npm run demo
 ```
 
-Terminal 2 — glasses preview:
+It installs missing dependencies, starts the demo server on port 8787 and the glasses preview on port 4173, prints both URLs and the simulator command, and stops both processes on Ctrl-C. Demo mode needs no T3 Code, no Telegram bot and no API key. Nothing leaves the machine.
 
-```sh
-npm --prefix apps/glasses ci && npm --prefix apps/glasses run dev
-```
-
-Open `http://127.0.0.1:4173`. The page shows the glasses screen; the buttons below it act as the touchpad and ring (up, down, tap, double tap, menu). The preview reads the demo server at port 8787. To see the screen with built-in sample data and no server at all, open `http://127.0.0.1:4173/?mock=1`.
-
-Terminal 3 — the official Even Hub simulator:
+For the official Even Hub simulator, in a second terminal:
 
 ```sh
 npm --prefix apps/glasses run simulator -- http://127.0.0.1:4173
 ```
+
+Open `http://127.0.0.1:4173` for the same screens in a plain browser page. The buttons below the screen act as the touchpad and ring (up, down, tap, double tap, menu). To see the screen with built-in sample data and no server at all, open `http://127.0.0.1:4173/?mock=1`.
 
 Check the server is up:
 
@@ -122,7 +119,28 @@ curl -s http://127.0.0.1:8787/api/health
 # {"ok":true,"mode":"demo","t3":"off","telegram":"dry-run","splitter":"fixture"}
 ```
 
-In demo mode you get four fixed threads: `auth-refresh-fix` (plan, 7 steps, step 4 is destructive), `deps-upgrade` (a question with three options), `flaky-e2e` (a failed run), and `inbox-morning` (a report with four draft replies). Sending writes the review to the server log and to the Telegram dry-run log. Nothing leaves the machine.
+In demo mode you get four fixed threads: `auth-refresh-fix` (plan, 7 steps, step 4 is destructive), `deps-upgrade` (a question with three options), `flaky-e2e` (a failed run), and `inbox-morning` (a report with four draft replies). Sending writes the review to the server log and to the Telegram dry-run log.
+
+`npm run check` runs every automated check: server tests, server typecheck, glasses tests, glasses build, the browser UI check, and the fixture quote checker.
+
+## What we verified
+
+All of this was measured on this Mac, in the official Even Hub simulator. No physical G2 or R1 was available.
+
+| What | Measured result | Recorded in |
+|---|---|---|
+| Official simulator, end to end | The full demo flow runs in the official Even Hub simulator against the real local server: inbox, 7-point plan review, question with options, report with drafts, send. | `demo/recordings/*.mp4`, [docs/recording-log.md](docs/recording-log.md) |
+| Live T3 Code thread, reviewed from the simulator | Open to Send: **20.4 s**. **2 notes** (an objection on point 4, a note on point 6). The agent replied **7.3 s** after the review landed. | [docs/recording-log.md](docs/recording-log.md) |
+| Live splitter on a real reply | **5/5** exact quotes on a 5-point reply; **30/30** exact quotes across every deck built in that run. | [docs/live-run.md](docs/live-run.md) |
+| Voice | A spoken note was transcribed locally by T3 in about **0.18 s** in the measured test. | measured during the live run on this machine |
+| Automated checks | **155 server tests** and **19 glasses tests** pass, plus typecheck, build, the browser UI check and the fixture checker. | [docs/review-notes.md](docs/review-notes.md) |
+
+Two honest notes about what is and is not proven:
+
+- The recorded live review used the prepared 7-point deck (`PINPOINT_DECK_FIXTURE`) so the two notes land on the storyboard's points 4 and 6. The thread, the review send and the 7.3 s reply are real; only the point order is pinned for the recording. The splitter is verified separately: on a cold build it made a 10-point deck from the same plan, and every quote in every deck built during the live run matched the source exactly.
+- Telegram is verified in dry-run mode so far. The real bot run, with phone screenshots, is the last step before submission.
+
+The demo has not been tried on physical G2 or R1 hardware. See [Limitations](#limitations).
 
 ## Live mode with T3 Code
 
