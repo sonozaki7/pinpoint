@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pinpoint — Ring for where. Voice for what.</title>
+<meta name="description" content="Review your AI agents’ work from Even G2 — point by point, with the precision of your laptop. Built for the Heads Up hackathon, Nov 2026.">
+<link rel="canonical" href="https://sonozaki7.github.io/pinpoint/">
+<meta name="theme-color" content="#050706">
+<meta name="color-scheme" content="dark">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Pinpoint">
+<meta property="og:title" content="Pinpoint — Ring for where. Voice for what.">
+<meta property="og:description" content="Review your AI agents’ work from Even G2 — point by point, with the precision of your laptop.">
+<meta property="og:url" content="https://sonozaki7.github.io/pinpoint/">
+<meta property="og:image" content="https://sonozaki7.github.io/pinpoint/media/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Pinpoint: a G2 lens showing seven one-line plan points, one flagged with a spoken objection.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Pinpoint — Ring for where. Voice for what.">
+<meta name="twitter:description" content="Review your AI agents’ work from Even G2 — point by point, with the precision of your laptop.">
+<meta name="twitter:image" content="https://sonozaki7.github.io/pinpoint/media/og.png">
+
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="media/apple-touch-icon.png">
+<link rel="preload" href="media/inter-var-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="media/plex-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="brand" href="#top" aria-label="Pinpoint, back to top">
+      <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <circle cx="12" cy="12" r="5.2" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M12 1.5v5M12 17.5v5M1.5 12h5M17.5 12h5" stroke="currentColor" stroke-width="1.4"/>
+        <circle cx="12" cy="12" r="1.6" fill="currentColor"/>
+      </svg>
+      <span>Pinpoint</span>
+    </a>
+    <nav class="nav" aria-label="Sections">
+      <a href="#difference">Difference</a>
+      <a href="#how">How it works</a>
+      <a href="#telegram">Telegram</a>
+      <a href="#stack">Stack</a>
+      <a class="nav-gh" href="https://github.com/sonozaki7/pinpoint" rel="noopener">GitHub <span aria-hidden="true">↗</span></a>
+    </nav>
+    <a class="btn btn-small" href="#demo">Watch demo</a>
+  </div>
+</header>
+
+<main id="main">
+
+  <!-- HERO -->
+  <section class="hero" id="top">
+    <div class="hero-glow" aria-hidden="true"></div>
+    <div class="wrap hero-grid">
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="pulse" aria-hidden="true"></span> Heads Up hackathon · Nov 2026</p>
+        <h1 class="hero-title">Pinpoint<span class="title-dot">.</span></h1>
+        <p class="tagline">Ring for where. Voice for what.</p>
+        <p class="lede">Review your AI agents’ work from Even G2 — point by point, with the precision of your laptop.</p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="#demo">
+            <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M4 2.8v10.4L13 8 4 2.8z" fill="currentColor"/></svg>
+            Watch the 3-minute demo
+          </a>
+          <a class="btn btn-ghost" href="https://github.com/sonozaki7/pinpoint" rel="noopener">View on GitHub <span aria-hidden="true">↗</span></a>
+        </div>
+        <p class="proof">7-step plan <span aria-hidden="true">·</span> reviewed in 38 s <span aria-hidden="true">·</span> 2 precise corrections <span aria-hidden="true">·</span> 0 laptops</p>
+      </div>
+
+      <!-- G2 review screen, illustrative -->
+      <figure class="lens-rig" aria-labelledby="lens-caption">
+        <div class="rig-bar" aria-hidden="true">
+          <span>EVEN G2</span>
+          <span class="rig-live"><span class="pulse"></span> SIMULATOR</span>
+        </div>
+        <div class="lens lens-hero">
+          <div class="lens-status">
+            <span>auth-refresh-fix</span>
+            <span aria-hidden="true">4/7 · x2 *1</span>
+          </div>
+          <ol class="points" aria-label="Seven plan points; point four is flagged">
+            <li class="point"><span class="mk" aria-hidden="true">o</span><span class="n">1</span><span class="gl">Add session family + rotation columns</span></li>
+            <li class="point"><span class="mk" aria-hidden="true">+</span><span class="n">2</span><span class="gl">Hash stored tokens, keep no plaintext</span></li>
+            <li class="point"><span class="mk" aria-hidden="true">+</span><span class="n">3</span><span class="gl">Unique index stops forked families</span></li>
+            <li class="point is-focus">
+              <span class="mk" aria-hidden="true">!</span><span class="n">4</span><span class="gl">Truncate sessions: signs out everyone</span><span class="st" aria-hidden="true">x</span>
+            </li>
+            <li class="point"><span class="mk" aria-hidden="true">*</span><span class="n">5</span><span class="gl">Backfill rotated_at for old sessions</span></li>
+            <li class="point"><span class="mk" aria-hidden="true">o</span><span class="n">6</span><span class="gl">Mutex around refreshToken per family</span><span class="st" aria-hidden="true">x</span></li>
+            <li class="point"><span class="mk" aria-hidden="true">o</span><span class="n">7</span><span class="gl">Ship behind a flag, watch 401 rate</span></li>
+          </ol>
+          <div class="lens-quote">
+            <p class="lquote">“Force-logout every user by truncating the sessions table”</p>
+            <p class="lnote"><span aria-hidden="true">✗</span> No — migrate existing sessions.</p>
+          </div>
+          <p class="lens-foot" aria-hidden="true">tap: talk · 2x: back</p>
+        </div>
+        <figcaption class="sr-only" id="lens-caption">The G2 review screen: seven one-line points from an agent plan, with point four flagged and a spoken objection recorded.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- VIDEO -->
+  <section class="section section-demo" id="demo" aria-labelledby="demo-title">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="kicker"><span>01</span> Demo</p>
+        <h2 id="demo-title">Three minutes, no laptop.</h2>
+        <p class="section-sub">Real simulator, a real T3 Code thread, real Telegram. Captions burned in.</p>
+      </div>
+
+      <div class="video-shell" data-video>
+        <video class="demo-video" controls preload="none" playsinline poster="media/demo-poster.png">
+          <source src="media/pinpoint-demo.mp4" type="video/mp4">
+          Your browser does not support the video element.
+        </video>
+        <p class="video-note" hidden>Video render pending — it lands here as <code>media/pinpoint-demo.mp4</code>. The poster above is a stand-in.</p>
+      </div>
+      <div class="video-meta">
+        <span>2:40</span><span>1920 × 1080</span><span>h264</span><span>captioned</span>
+        <span class="video-meta-end">Ring for where. Voice for what.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- DIFFERENCE -->
+  <section class="section" id="difference" aria-labelledby="difference-title">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="kicker"><span>02</span> The difference</p>
+        <h2 id="difference-title">Everyone built “approve from your glasses”.<br> <em>Approval isn’t feedback.</em></h2>
+      </div>
+
+      <div class="contrast-grid">
+        <div class="panel wall-panel">
+          <div class="panel-head">
+            <span>What the agent sent</span>
+            <span class="panel-tag">≈ 900 words</span>
+          </div>
+          <div class="wall">
+            <div class="wall-body">
+              <p class="wall-h">Plan: stop the “logged out mid-edit” 401s</p>
+              <p>Support has 14 reports this week of being signed out while typing. Sentry shows <code>AuthRefreshError: token already rotated</code> at 3.1k/day, almost all of it from <code>apps/web/lib/auth/refresh.ts</code>. Two tabs refresh the same token at the same moment, one wins, the other gets a 401 and the app clears the session.</p>
+              <p>1. <strong>Add rotation metadata.</strong> New columns <code>sessions.family_id</code> and <code>sessions.rotated_at</code>, backfilled from <code>user_id</code>, indexed because every refresh reads it.</p>
+              <p>2. <strong>Hash stored tokens.</strong> Store <code>sha256(token)</code> and compare hashes. A database dump then holds no usable refresh tokens.</p>
+              <p>3. <strong>Add a unique index on the session family.</strong> A double insert fails loudly instead of silently forking a family and leaving one branch orphaned.</p>
+              <p>4. <strong>Force-logout every user by truncating the sessions table.</strong> <code>TRUNCATE sessions CASCADE</code> clears stale rotation rows in one shot. This is irreversible: it ends all active sessions at deploy time.</p>
+              <p>5. <strong>Backfill rotated_at for old rows.</strong> Set it to <code>created_at</code> where null, so the grace-window check does not reject sessions that predate the migration.</p>
+            </div>
+            <div class="wall-fade" aria-hidden="true"></div>
+          </div>
+          <p class="wall-caption">A wall of text. You’re on a train. You won’t read it.</p>
+        </div>
+
+        <div class="panel lens-panel">
+          <div class="panel-head">
+            <span>What you see on G2</span>
+            <span class="panel-tag">7 points</span>
+          </div>
+          <div class="lens lens-compact">
+            <div class="lens-status">
+              <span>auth-refresh-fix</span>
+              <span aria-hidden="true">4/7 · x2</span>
+            </div>
+            <ol class="points" aria-label="Seven one-line points; point four is highlighted">
+              <li class="point"><span class="mk" aria-hidden="true">o</span><span class="n">1</span><span class="gl">Add session family + rotation columns</span></li>
+              <li class="point"><span class="mk" aria-hidden="true">+</span><span class="n">2</span><span class="gl">Hash stored tokens, keep no plaintext</span></li>
+              <li class="point"><span class="mk" aria-hidden="true">+</span><span class="n">3</span><span class="gl">Unique index stops forked families</span></li>
+              <li class="point is-focus"><span class="mk" aria-hidden="true">!</span><span class="n">4</span><span class="gl">Truncate sessions: signs out everyone</span><span class="st" aria-hidden="true">x</span></li>
+              <li class="point"><span class="mk" aria-hidden="true">*</span><span class="n">5</span><span class="gl">Backfill rotated_at for old sessions</span></li>
+              <li class="point"><span class="mk" aria-hidden="true">o</span><span class="n">6</span><span class="gl">Mutex around refreshToken per family</span></li>
+              <li class="point"><span class="mk" aria-hidden="true">o</span><span class="n">7</span><span class="gl">Ship behind a flag, watch 401 rate</span></li>
+            </ol>
+            <p class="lens-foot" aria-hidden="true">tap: talk · 2x: back</p>
+          </div>
+          <div class="lens-note">
+            <p><span aria-hidden="true">!</span> Point 4 flagged high-risk</p>
+            <p><span aria-hidden="true">✗</span> “No — migrate existing sessions.”</p>
+            <p><span aria-hidden="true">+</span> 5 points agreed in silence</p>
+          </div>
+          <p class="panel-foot">One line per step. Every line tied to an exact quote.</p>
+        </div>
+      </div>
+
+      <p class="contrast-end">Same plan. 7 decisions. <span>38 seconds.</span></p>
+    </div>
+  </section>
+
+  <div class="principle-band">
+    <div class="wrap">
+      <p class="principle">Silence means agree. <span>You only speak when something’s wrong.</span></p>
+    </div>
+  </div>
+
+  <!-- HOW IT WORKS -->
+  <section class="section" id="how" aria-labelledby="how-title">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="kicker"><span>03</span> How it works</p>
+        <h2 id="how-title">Point at the step. Say what’s wrong.</h2>
+        <p class="section-sub">The agent doesn’t need selected words. It needs which point, your verdict, and a short reason.</p>
+      </div>
+
+      <ol class="steps">
+        <li class="step">
+          <p class="step-num">01</p>
+          <h3>Split</h3>
+          <p>AI turns the reply into 4–10 one-line points. Each point is tied to an exact quote from the reply — verified against the source, never invented.</p>
+          <p class="step-meta">splitter · quote-verified</p>
+        </li>
+        <li class="step">
+          <p class="step-num">02</p>
+          <h3>Point</h3>
+          <p>Ring to move. Silence means agree. Tap, talk, tap to object — one sentence, on the point that’s wrong.</p>
+          <p class="step-meta">R1 · swipe / tap / voice</p>
+        </li>
+        <li class="step">
+          <p class="step-num">03</p>
+          <h3>Send</h3>
+          <p>Pinpoint writes a cited review: objections first, then answers, then agreed points. It lands in the thread and the agent keeps working.</p>
+          <p class="step-meta">composer · deterministic</p>
+        </li>
+      </ol>
+
+      <div class="review-block">
+        <div class="review-copy">
+          <p class="kicker kicker-plain"><span>·</span> The review</p>
+          <h3>What lands in the thread</h3>
+          <p>No rewritten prose. Every note sits next to the exact quote it answers, so the agent knows what to change and what to leave alone.</p>
+          <ul class="ticks">
+            <li>Objections first, then answers, then agreed.</li>
+            <li>Quotes copied verbatim from the reply.</li>
+            <li>No LLM in the composer — same input, same message.</li>
+          </ul>
+        </div>
+        <div class="review-card" role="figure" aria-label="Example review message sent to the agent">
+          <div class="review-head">
+            <span class="review-light" aria-hidden="true"></span>
+            <span>sent to T3 Code</span>
+            <span class="review-time">auth-refresh-fix</span>
+          </div>
+          <pre class="review-pre"><span class="r-h">Review from G2 (Pinpoint) — 7 points</span>
+<span class="r-x">✗ 4. "Force-logout every user by truncating the sessions table" → No. Migrate existing sessions instead.</span>
+<span class="r-x">✗ 6. "Wrap refreshToken() in a mutex" → Use a request queue; a mutex deadlocks with the retry path.</span>
+<span class="r-q">? 2. "Upgrade to Vite 7 now?" → Stay on 6 for now.</span>
+<span class="r-n">● 5. "Add a 30s timeout" → Make it configurable.</span>
+<span class="r-a">✓ Agreed: 1, 3, 7. Go ahead with the rest of the plan.</span></pre>
+        </div>
+      </div>
+
+      <!-- REAL SIMULATOR SCREENS
+           Captured from the G2 simulator at 576×288 (source: demo/shots).
+           To refresh: copy a new capture over the file in media/ — the frame
+           already scales pixelated at 2:1. Keep width/height attributes. -->
+      <div class="shots">
+        <div class="shots-head">
+          <h3>Real simulator screens</h3>
+          <p>576 × 288 · native G2 render</p>
+        </div>
+        <div class="shots-grid">
+          <figure class="shot">
+            <a class="shot-link" href="media/glasses-inbox.png" target="_blank" rel="noopener">
+              <div class="shot-frame">
+                <img src="media/glasses-inbox.png" alt="G2 inbox: three agents need you — deps-upgrade, auth-refresh-fix, flaky-e2e and inbox-morning." width="576" height="288" loading="lazy" decoding="async">
+              </div>
+            </a>
+            <figcaption>Inbox · three agents need you</figcaption>
+          </figure>
+          <figure class="shot">
+            <a class="shot-link" href="media/glasses-point4.png" target="_blank" rel="noopener">
+              <div class="shot-frame">
+                <img src="media/glasses-point4.png" alt="G2 review screen: point 4, force-logout all users, is focused with its exact quote shown below." width="576" height="288" loading="lazy" decoding="async">
+              </div>
+            </a>
+            <figcaption>Review · point 4 flagged, exact quote</figcaption>
+          </figure>
+          <figure class="shot">
+            <a class="shot-link" href="media/glasses-note.png" target="_blank" rel="noopener">
+              <div class="shot-frame">
+                <img src="media/glasses-note.png" alt="G2 review screen after a spoken objection: point 4 is marked x and the transcript reads No, keep the existing sessions and migrate them instead." width="576" height="288" loading="lazy" decoding="async">
+              </div>
+            </a>
+            <figcaption>Objection · spoken, then marked x</figcaption>
+          </figure>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TELEGRAM -->
+  <section class="section" id="telegram" aria-labelledby="telegram-title">
+    <div class="wrap telegram-grid">
+      <div class="telegram-copy">
+        <div class="section-head">
+          <p class="kicker"><span>04</span> Companion</p>
+          <h2 id="telegram-title">The phone fills the two gaps.</h2>
+          <p class="section-sub">The glasses mirror phone notifications, and long technical text lives in Telegram. Same thread, same notes.</p>
+        </div>
+        <ul class="feature-list">
+          <li>
+            <span class="f-num">01</span>
+            <div><h3>Alerts, mirrored</h3><p>A thread needs you. The Telegram alert shows up on the glasses while the app is closed.</p></div>
+          </li>
+          <li>
+            <span class="f-num">02</span>
+            <div><h3>The full reply</h3><p>Every T3 thread gets a topic in Pinpoint Desk, with the complete plan or reply — no 44-character summaries.</p></div>
+          </li>
+          <li>
+            <span class="f-num">03</span>
+            <div><h3>Notes on the sentence</h3><p>Each objection becomes a quote-reply on the exact sentence it corrects.</p></div>
+          </li>
+          <li>
+            <span class="f-num">04</span>
+            <div><h3>Read on phone</h3><p>One tap on the glasses posts that point to the topic and returns a link that lands on it.</p></div>
+          </li>
+        </ul>
+      </div>
+
+      <div class="phone-wrap">
+        <div class="phone" role="img" aria-label="Telegram topic for the auth-refresh-fix thread, with the full plan and a quote-reply objection on point four.">
+          <div class="phone-screen">
+            <div class="tg-top" aria-hidden="true">
+              <span class="tg-back">‹</span>
+              <span class="tg-title">Pinpoint Desk<small>auth-refresh-fix</small></span>
+              <span class="tg-more">⋯</span>
+            </div>
+            <div class="tg-feed" aria-hidden="true">
+              <p class="tg-stamp">Today · topic created by Pinpoint</p>
+              <div class="tg-bot">Needs you · plan · 7 points</div>
+              <div class="tg-msg">
+                <p class="tg-strong">Plan: stop the “logged out mid-edit” 401s</p>
+                <p>Support has 14 reports this week of being signed out while typing. Two tabs refresh the same token at the same moment; one wins, the other gets a 401.</p>
+                <p>1. Add rotation metadata. 2. Hash stored tokens. 3. Unique index on the session family. 4. Force-logout every user by truncating the sessions table…</p>
+                <span class="tg-btn">Agree all &amp; continue</span>
+              </div>
+              <div class="tg-reply">
+                <span class="tg-reply-label">Point 4 — from your glasses</span>
+                <blockquote>Force-logout every user by truncating the sessions table</blockquote>
+                <p><span class="tg-x">✗</span> No — migrate existing sessions instead.</p>
+              </div>
+              <div class="tg-link">Read on phone <span>↗</span></div>
+            </div>
+            <div class="tg-input" aria-hidden="true">Message</div>
+          </div>
+        </div>
+        <p class="phone-caption">One private supergroup. One topic per thread.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- STACK -->
+  <section class="section" id="stack" aria-labelledby="stack-title">
+    <div class="wrap stack-grid">
+      <div class="stack-copy">
+        <div class="section-head">
+          <p class="kicker"><span>05</span> Built with</p>
+          <h2 id="stack-title">A small stack you can run tonight.</h2>
+          <p class="section-sub">Glasses for input and display. T3 Code for the agents. Telegram for the phone. The server runs on the Mac that already runs your agents.</p>
+        </div>
+        <ul class="chips" aria-label="Built with">
+          <li>Even G2 + R1</li>
+          <li>T3 Code</li>
+          <li>Telegram</li>
+          <li>Your Mac</li>
+          <li>Open source</li>
+        </ul>
+        <p class="stack-note">Simulator-only demo — the whole path runs without hardware.</p>
+        <a class="text-link" href="https://github.com/sonozaki7/pinpoint" rel="noopener">Read the code on GitHub <span aria-hidden="true">↗</span></a>
+      </div>
+
+      <div class="diagram-panel">
+        <p class="diagram-label">One request path</p>
+        <svg class="diagram" viewBox="0 0 400 510" role="img" aria-labelledby="diagram-title">
+          <title id="diagram-title">Architecture: Even G2 and R1 talk to the Pinpoint app in the Even phone app, which calls the Pinpoint server on your Mac. The server talks to T3 Code and the Telegram Bot API.</title>
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0 0 10 5 0 10z" fill="#3dff8a" opacity=".65"/>
+            </marker>
+          </defs>
+
+          <g class="d-box">
+            <rect x="20" y="10" width="360" height="60" rx="4"/>
+            <text x="36" y="36" class="d-t">EVEN G2 + R1</text>
+            <text x="36" y="55" class="d-s">576×288 display · ring input</text>
+          </g>
+          <line class="d-line" x1="200" y1="70" x2="200" y2="104" marker-end="url(#arrow)"/>
+          <text x="212" y="92" class="d-a">phone notifications</text>
+
+          <g class="d-box">
+            <rect x="20" y="108" width="360" height="60" rx="4"/>
+            <text x="36" y="134" class="d-t">EVEN APP · PHONE</text>
+            <text x="36" y="153" class="d-s">Pinpoint app in the WebView</text>
+          </g>
+          <line class="d-line" x1="200" y1="168" x2="200" y2="202" marker-end="url(#arrow)"/>
+          <text x="212" y="190" class="d-a">HTTP · local network</text>
+
+          <g class="d-box d-server">
+            <rect x="20" y="206" width="360" height="176" rx="4"/>
+            <text x="36" y="232" class="d-t">PINPOINT SERVER · YOUR MAC</text>
+            <rect class="d-chip" x="34" y="248" width="152" height="46" rx="3"/>
+            <text x="46" y="266" class="d-c">T3 client</text>
+            <text x="46" y="282" class="d-s2">threads · plans</text>
+            <rect class="d-chip" x="214" y="248" width="152" height="46" rx="3"/>
+            <text x="226" y="266" class="d-c">Splitter</text>
+            <text x="226" y="282" class="d-s2">points + quotes</text>
+            <rect class="d-chip" x="34" y="306" width="152" height="46" rx="3"/>
+            <text x="46" y="324" class="d-c">Voice</text>
+            <text x="46" y="340" class="d-s2">speech → text</text>
+            <rect class="d-chip" x="214" y="306" width="152" height="46" rx="3"/>
+            <text x="226" y="324" class="d-c">Telegram</text>
+            <text x="226" y="340" class="d-s2">topics · replies</text>
+            <text x="36" y="370" class="d-s2">composer · review store · CORS routes</text>
+          </g>
+
+          <line class="d-line" x1="120" y1="382" x2="120" y2="430" marker-end="url(#arrow)"/>
+          <line class="d-line d-dash" x1="290" y1="382" x2="290" y2="430" marker-end="url(#arrow)"/>
+          <text x="132" y="408" class="d-a">send review</text>
+          <text x="302" y="408" class="d-a">alerts</text>
+
+          <g class="d-box">
+            <rect x="20" y="434" width="200" height="60" rx="4"/>
+            <text x="36" y="460" class="d-t">T3 CODE</text>
+            <text x="36" y="479" class="d-s">the agent keeps working</text>
+          </g>
+          <g class="d-box">
+            <rect x="240" y="434" width="140" height="60" rx="4"/>
+            <text x="256" y="460" class="d-t">TELEGRAM</text>
+            <text x="256" y="479" class="d-s">topics · quotes</text>
+          </g>
+        </svg>
+        <p class="diagram-caption">No cloud account · no secrets in the app · demo mode replays fixtures</p>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap footer-top">
+    <a class="brand" href="#top" aria-label="Pinpoint, back to top">
+      <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <circle cx="12" cy="12" r="5.2" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M12 1.5v5M12 17.5v5M1.5 12h5M17.5 12h5" stroke="currentColor" stroke-width="1.4"/>
+        <circle cx="12" cy="12" r="1.6" fill="currentColor"/>
+      </svg>
+      <span>Pinpoint</span>
+    </a>
+    <nav class="footer-nav" aria-label="Footer">
+      <a href="#demo">Demo</a>
+      <a href="#how">How it works</a>
+      <a href="https://github.com/sonozaki7/pinpoint" rel="noopener">GitHub ↗</a>
+    </nav>
+  </div>
+  <div class="wrap footer-bottom">
+    <p>Built for the Heads Up hackathon (Even Realities × TVM Ventures), Nov 2026.</p>
+    <p class="fine">Not affiliated with Even Realities, T3 Tools, Telegram, or Anthropic.</p>
+  </div>
+</footer>
+
+<script src="script.js" defer></script>
+</body>
+</html>
