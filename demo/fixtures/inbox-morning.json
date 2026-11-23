@@ -1,0 +1,67 @@
+{
+  "thread": {
+    "threadId": "inbox-morning",
+    "title": "inbox-morning",
+    "project": "mail-triage",
+    "attention": "report",
+    "updatedAt": "2026-11-23T21:52:30.000Z"
+  },
+  "source": {
+    "sourceMessageId": "01JCQ1M8T3RW6YB9HK2D4NPQ7C",
+    "kind": "reply",
+    "text": "# Morning inbox — 23 unread, 4 drafts ready\n\nRan the 06:40 pass on `hello@northloop.studio`. Filed 11 (receipts, CI alerts, two Stripe payouts), archived 6 newsletters, and left 2 threads untouched because they need your judgement rather than a reply. Four drafts are below; each one is a plain reply you can send as-is.\n\n## 1. Priya Raman — contract redlines (reply drafted)\n\nShe sent the signed SOW back with two edits: clause 7 now says net-45, and clause 12 adds a 30-day cure period. Everything else matches our template.\n\n> Hi Priya, thanks for turning this around. Net-45 is fine for us. On clause 12, a 30-day cure period works, but please make it apply to payment terms only; for confidentiality we need the shorter window to stay. If that reads right to you, I will get the counter-signed copy back today. — Sam\n\n## 2. Tomas Okafor — podcast invite (reply drafted)\n\nHe wants 45 minutes on the product, records remotely, and asked for a slot next week. He proposed Tuesday 10:00 or Wednesday 14:00 your time.\n\n> Hi Tomas, happy to come on. Tuesday 10:00 works well on my side; I can do 45 minutes with 10 minutes of buffer after. Send the Riverside link and a short outline of the questions and I will prepare. — Sam\n\n## 3. Cassie Lin — invoice 2291 (reply drafted)\n\nHer note says invoice 2291 is overdue. It is not: 2291 was paid on the 6th, and the payment reference is in the Stripe export for October. She is probably looking at invoice 2290, which is genuinely unpaid and due Friday.\n\n> Hi Cassie, 2291 was paid on the 6th; the Stripe reference ends 4471 and I have attached the receipt. It looks like 2290 is the one still open, and that one is due Friday, so it is on schedule. Let me know if the receipt does not match your records. — Sam\n\n## 4. Airbnb — check-in details (reply drafted)\n\nThe host sent the door code and a note that the building lift is out until Friday. Check-in is 16:00.\n\n> Thanks for the heads-up about the lift. We will arrive around 17:30 on Thursday with two small bags, so the stairs are fine. Could you confirm which entrance has the keypad? — Sam\n\n## Left for you\n\n- **Northwind renewal** — legal wants a call and there is no reply drafted; that is a you decision, not an email.\n- **Recruiter follow-up** — asked for a salary range and I did not guess.\n\nNext pass at 12:40. If you send these four, the inbox is down to the two above.\n"
+  },
+  "deck": {
+    "threadId": "inbox-morning",
+    "sourceMessageId": "01JCQ1M8T3RW6YB9HK2D4NPQ7C",
+    "title": "inbox-morning",
+    "attention": "report",
+    "headline": "Inbox: 4 drafts, 2 need you",
+    "points": [
+      {
+        "id": "p1",
+        "index": 1,
+        "kind": "claim",
+        "glance": "23 unread: 11 filed, 4 drafted",
+        "quote": "23 unread, 4 drafts ready"
+      },
+      {
+        "id": "p2",
+        "index": 2,
+        "kind": "draft",
+        "glance": "Priya: net-45 ok, narrow clause 12",
+        "quote": "Net-45 is fine for us."
+      },
+      {
+        "id": "p3",
+        "index": 3,
+        "kind": "draft",
+        "glance": "Tomas: podcast, Tuesday 10:00 works",
+        "quote": "Tuesday 10:00 works well on my side"
+      },
+      {
+        "id": "p4",
+        "index": 4,
+        "kind": "draft",
+        "glance": "Cassie: 2291 paid, 2290 due Friday",
+        "quote": "2291 was paid on the 6th"
+      },
+      {
+        "id": "p5",
+        "index": 5,
+        "kind": "draft",
+        "glance": "Airbnb: 17:30 Thursday, lift is out",
+        "quote": "We will arrive around 17:30 on Thursday"
+      },
+      {
+        "id": "p6",
+        "index": 6,
+        "kind": "claim",
+        "glance": "Two left: Northwind, recruiter",
+        "quote": "left 2 threads untouched"
+      }
+    ],
+    "createdAt": "2026-11-23T21:52:44.000Z",
+    "splitter": "fixture"
+  }
+}

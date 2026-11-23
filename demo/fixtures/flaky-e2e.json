@@ -1,0 +1,68 @@
+{
+  "thread": {
+    "threadId": "flaky-e2e",
+    "title": "flaky-e2e",
+    "project": "storefront",
+    "attention": "failed",
+    "updatedAt": "2026-11-23T22:58:10.000Z"
+  },
+  "source": {
+    "sourceMessageId": "01JCQ2F5M9XK4TB7QN3V8HSZ6A",
+    "kind": "reply",
+    "text": "## Run failed: e2e shard 3/4 on main\n\n`main@b4f21c9` — 1 failed, 47 passed, 2 skipped, 6m41s. As far as I can tell this is not a product regression; it is a race in the checkout spec that the new tax step made visible. Everything else on the shard passed, including the three other specs that touch checkout.\n\n```\nFAIL test/e2e/checkout.spec.ts:212 > guest checkout > applies tax for a US address\nTimeoutError: locator.click: Timeout 15000ms exceeded.\nCall log:\n  - waiting for getByRole('button', { name: 'Place order' })\n  - locator resolved to <button disabled aria-disabled=\"true\">Place order</button>\n  - element is not enabled\n    at test/e2e/checkout.spec.ts:236\n```\n\n### What happens\n\nThe checkout page asks `POST /api/tax/quote` for a quote on mount and again when the address changes. The Place order button stays disabled until the quote resolves. The test clicks after a fixed 400 ms sleep instead of waiting for the quote.\n\nOn CI the quote took 900-1400 ms in 4 of the 5 retries, so the click landed while the button was still disabled. On my machine the quote answers in 120 ms and the spec passes 20 out of 20 times. Shard 3 runs 12 specs in parallel on a 2-core runner, and that is where the latency comes from.\n\nI checked whether the tax service itself got slow: p95 on `/api/tax/quote` is 180 ms in production and 140 ms in staging. So it is the runner, not the service.\n\n### Two fixes I would take\n\n1. **Wait for the quote response, not the clock.** In `test/e2e/checkout.spec.ts`, replace the sleep with `await page.waitForResponse((r) => r.url().includes('/api/tax/quote') && r.status() === 200)`, then click. That kills the race at the source and the happy path gets faster.\n\n2. **Disable the button on first paint.** `app/checkout/OrderButton.tsx` starts enabled and only disables itself after a `useEffect` runs, so a cold first frame has a clickable button. Move the disabled state into the initial render. That also closes a real-user hole: a fast clicker on a slow phone can submit an order before tax is applied.\n\n### Why not just retry\n\nPlaywright retried the failure twice and it passed both times, which is why the run looked flaky rather than broken. Retrying hides the real problem, which is that the button is clickable while the total is not final. I would fix the two things above and keep retries at 2.\n\nNothing is pushed. Say the word and I will do both in one PR, or only the test fix if you would rather review the UI change on its own.\n"
+  },
+  "deck": {
+    "threadId": "flaky-e2e",
+    "sourceMessageId": "01JCQ2F5M9XK4TB7QN3V8HSZ6A",
+    "title": "flaky-e2e",
+    "attention": "failed",
+    "headline": "E2E failed: checkout race",
+    "points": [
+      {
+        "id": "p1",
+        "index": 1,
+        "kind": "claim",
+        "glance": "Shard 3 red: 1 failed of 47 e2e",
+        "quote": "1 failed, 47 passed"
+      },
+      {
+        "id": "p2",
+        "index": 2,
+        "kind": "claim",
+        "glance": "Place order waits for tax quote",
+        "quote": "The Place order button stays disabled until the quote resolves."
+      },
+      {
+        "id": "p3",
+        "index": 3,
+        "kind": "claim",
+        "glance": "Test sleeps 400 ms, quote takes 900",
+        "quote": "The test clicks after a fixed 400 ms sleep instead of waiting for the quote."
+      },
+      {
+        "id": "p4",
+        "index": 4,
+        "kind": "step",
+        "glance": "Wait for the tax quote, then click",
+        "quote": "Wait for the quote response, not the clock."
+      },
+      {
+        "id": "p5",
+        "index": 5,
+        "kind": "step",
+        "glance": "Start disabled on first paint",
+        "quote": "Disable the button on first paint."
+      },
+      {
+        "id": "p6",
+        "index": 6,
+        "kind": "risk",
+        "glance": "Slow phones can submit before tax",
+        "quote": "a fast clicker on a slow phone can submit an order before tax is applied",
+        "risk": "low"
+      }
+    ],
+    "createdAt": "2026-11-23T22:58:26.000Z",
+    "splitter": "fixture"
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "thread": {
+    "threadId": "auth-refresh-fix",
+    "title": "auth-refresh-fix",
+    "project": "acme-web",
+    "attention": "plan",
+    "updatedAt": "2026-11-24T00:12:40.000Z"
+  },
+  "source": {
+    "sourceMessageId": "01JCQ3ZK8WQ7RM4T2V6P9XH1DA",
+    "kind": "plan",
+    "text": "## Plan: stop the \"logged out mid-edit\" 401s\n\n**Context.** Support has 14 reports this week of being signed out while typing. Sentry shows `AuthRefreshError: token already rotated` at 3.1k/day, almost all of it from `apps/web/lib/auth/refresh.ts`. Two tabs refresh the same token at the same moment, one wins, the other gets a 401 and the app clears the session.\n\n**What I found**\n\n- `apps/web/lib/auth/refresh.ts:48` calls the refresh endpoint from every tab, with no cross-tab guard.\n- `packages/api/src/routes/auth.ts:112` rotates the token but leaves the old row readable for 24 h, so a losing request looks fine for a while and fails later.\n- `packages/api/src/db/schema/sessions.sql` has no unique constraint on a session family, so two rotations can fork into two live families.\n- The retry path in `packages/api/src/auth/retry.ts` calls `refreshToken()` again while the first call is still inside the rotation transaction.\n\n### Steps\n\n1. **Add rotation metadata.** New columns `sessions.family_id` and `sessions.rotated_at` in `packages/api/src/db/migrations/0042_session_family.sql`, backfilled from `user_id` for existing rows. Index `family_id` because every refresh reads it.\n\n2. **Hash stored tokens.** Store `sha256(token)` in `refresh_tokens.token_hash` and compare hashes in `packages/api/src/auth/verify.ts`. A database dump then holds no usable refresh tokens, and it makes the mutex key cheap to compute.\n\n3. **Add a unique index on the session family.** `CREATE UNIQUE INDEX sessions_family_device ON sessions (family_id, device_id)` in the same migration, so a double insert fails loudly instead of silently forking a family and leaving one branch orphaned.\n\n4. **Force-logout every user by truncating the sessions table.** `TRUNCATE sessions CASCADE` in the migration clears stale rotation rows in one shot and every user signs in once more. This is irreversible: it ends all active sessions at deploy time, including the mobile app and the CLI.\n\n5. **Backfill rotated_at for old rows.** Set it to `created_at` where null, so the grace-window check in `verify.ts` does not reject sessions that predate the migration. Rehearse it against the prod snapshot before running it for real.\n\n6. **Wrap refreshToken() in a mutex.** In `packages/api/src/auth/refresh.ts`, take a per-family lock before reading and rotating:\n\n```ts\nexport async function refreshToken(token: string, deviceId: string) {\n  const family = familyOf(token);\n  return withLock(`refresh:${family}`, async () => {\n    const row = await findRefresh(sha256(token));\n    if (!row || row.rotatedAt) throw new AuthRefreshError(\"token already rotated\");\n    await markRotated(row.id);\n    return issuePair(row.userId, family, deviceId);\n  });\n}\n```\n\n7. **Ship behind a flag and watch the 401 rate.** `AUTH_ROTATION_V2` stays off at first, then 10% of users, then everyone. Alert when `auth.refresh.401` passes 0.5% of refresh requests, and keep the old path for one release so a rollback is a flag flip.\n\n**Verification.** `pnpm test -F api auth` covers rotation, the grace window and two refreshes landing at once. `k6 run load/refresh.js` at 2k rps confirms the lock is per family, not global. Once step 4 has run against a snapshot I will replay the 14 support cases on staging.\n\n**Open question.** Do you want step 4 kept, or should I migrate sessions in place and skip the forced logout? Truncating is the fastest way to a clean state, but it signs out everyone once, and that includes anyone mid-checkout at deploy time.\n"
+  },
+  "deck": {
+    "threadId": "auth-refresh-fix",
+    "sourceMessageId": "01JCQ3ZK8WQ7RM4T2V6P9XH1DA",
+    "title": "auth-refresh-fix",
+    "attention": "plan",
+    "headline": "Auth refresh: 7-step plan",
+    "points": [
+      {
+        "id": "p1",
+        "index": 1,
+        "kind": "step",
+        "glance": "Add session family + rotation columns",
+        "quote": "Add rotation metadata."
+      },
+      {
+        "id": "p2",
+        "index": 2,
+        "kind": "step",
+        "glance": "Hash stored tokens, keep no plaintext",
+        "quote": "Hash stored tokens."
+      },
+      {
+        "id": "p3",
+        "index": 3,
+        "kind": "step",
+        "glance": "Unique index stops forked families",
+        "quote": "Add a unique index on the session family."
+      },
+      {
+        "id": "p4",
+        "index": 4,
+        "kind": "risk",
+        "glance": "Truncate sessions: signs out everyone",
+        "quote": "Force-logout every user by truncating the sessions table",
+        "risk": "high"
+      },
+      {
+        "id": "p5",
+        "index": 5,
+        "kind": "step",
+        "glance": "Backfill rotated_at for old sessions",
+        "quote": "Backfill rotated_at for old rows."
+      },
+      {
+        "id": "p6",
+        "index": 6,
+        "kind": "step",
+        "glance": "Mutex around refreshToken per family",
+        "quote": "Wrap refreshToken() in a mutex."
+      },
+      {
+        "id": "p7",
+        "index": 7,
+        "kind": "step",
+        "glance": "Ship behind a flag, watch 401 rate",
+        "quote": "Ship behind a flag and watch the 401 rate."
+      }
+    ],
+    "createdAt": "2026-11-24T00:12:52.000Z",
+    "splitter": "fixture"
+  }
+}
