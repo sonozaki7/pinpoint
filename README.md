@@ -138,7 +138,7 @@ All of this was measured on this Mac, in the official Even Hub simulator. No phy
 Two honest notes about what is and is not proven:
 
 - The recorded live review used the prepared 7-point deck (`PINPOINT_DECK_FIXTURE`) so the two notes land on the storyboard's points 4 and 6. The thread, the review send and the 7.3 s reply are real; only the point order is pinned for the recording. The splitter is verified separately: on a cold build it made a 10-point deck from the same plan, and every quote in every deck built during the live run matched the source exactly.
-- Telegram is verified in dry-run mode so far. The real bot run, with phone screenshots, is the last step before submission.
+- Telegram is verified against the real bot: a private forum group, one topic for the 7-point plan, the header, the full plan, the composed review, and both notes as exact quote-replies on the sentences they change. The screenshots in `demo/recordings/` come from that run.
 
 The demo has not been tried on physical G2 or R1 hardware. See [Limitations](#limitations).
 

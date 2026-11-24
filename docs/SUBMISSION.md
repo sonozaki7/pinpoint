@@ -23,7 +23,7 @@ Tracks: AI Assistants & Work (main), Messaging & News (second), plus the Best Te
 
 On the G2 the list is four rows at a time. Swipe to move the focus. Silence means agree. Tap, speak one sentence, tap again: the point becomes an objection or a note. An agent question becomes options, one tap each. One tap then composes a review that cites each changed point by number and quote, shows a preview, and sends it as a normal message. The agent reads it as feedback and continues.
 
-**Verified.** In the official Even Hub simulator, a live T3 Code thread was reviewed from the glasses in 20.4 s. Two notes were sent, and the agent replied in 7.3 s. The splitter matched 5 of 5 quotes on a real reply, 155 server tests and 19 glasses tests pass, and T3 transcribed a spoken note locally in about 0.18 s. No physical G2 or R1 was available. Telegram is verified in dry-run until the final bot run.
+**Verified.** In the official Even Hub simulator, a live T3 Code thread was reviewed from the glasses in 20.4 s. Two notes were sent, and the agent replied in 7.3 s. The splitter matched 5 of 5 quotes on a real reply, 155 server tests and 19 glasses tests pass, and T3 transcribed a spoken note locally in about 0.18 s. No physical G2 or R1 was available. Telegram is verified against the real bot: a private forum group with one topic per thread, the full plan, the composed review, and both notes as exact quote-replies on the sentences they change.
 
 **Why glasses.** The moment is hands-free. Ten lines on a 576 × 288 display force a long reply down to what matters.
 

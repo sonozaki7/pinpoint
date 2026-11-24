@@ -101,7 +101,7 @@ async function loadIntegration() {
   return {
     findQuoteMatch: telegram.findQuoteMatch,
     messageLink: telegram.messageLink,
-    renderParts: telegram.renderParts,
+    renderSourceParts: telegram.renderSourceParts,
     splitPlainText: telegram.splitPlainText,
     TelegramTransport: transport.TelegramTransport,
     TelegramApiError: transport.TelegramApiError,
@@ -137,7 +137,7 @@ try {
 const {
   findQuoteMatch,
   messageLink,
-  renderParts,
+  renderSourceParts,
   splitPlainText,
   TelegramTransport,
   TelegramApiError,
@@ -183,7 +183,7 @@ if (!point4 || !point6) throw new Error('The fixture deck is missing point 4 or 
 
 // Render the plan before posting anything, then prove both note quotes land on a real
 // message part. A missing quote would otherwise send a plain reply instead of a quote-reply.
-const planParts = renderParts(source.text);
+const planParts = renderSourceParts(source.text);
 const match4 = findQuoteMatch(planParts, point4.quote);
 const match6 = findQuoteMatch(planParts, point6.quote);
 if (!match4 || !match6) {

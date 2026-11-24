@@ -64,6 +64,26 @@ describe('markdown to Telegram HTML', () => {
   });
 });
 
+describe('quote-safe source rendering', () => {
+  it('drops bold but keeps code, links and the same visible text', () => {
+    const source = 'Step 4: **Force-logout everyone** and run `npm test` per [docs](https://example.com).';
+    const normal = markdownToHtml(source);
+    const safe = markdownToHtml(source, { quoteSafe: true });
+    expect(normal).toContain('<b>Force-logout everyone</b>');
+    expect(safe).not.toContain('<b>');
+    expect(safe).not.toContain('**');
+    expect(safe).toContain('<code>npm test</code>');
+    expect(safe).toContain('<a href="https://example.com">docs</a>');
+    expect(htmlToPlain(safe)).toBe(htmlToPlain(normal));
+  });
+
+  it('keeps headings plain so a heading sentence stays quotable', () => {
+    const parts = renderParts('# Force-logout everyone\n\nBody.', undefined, { quoteSafe: true });
+    expect(parts[0]?.html).not.toContain('<b>');
+    expect(findQuoteMatch(parts, 'Force-logout everyone')).toBeDefined();
+  });
+});
+
 describe('message splitting', () => {
   const paragraph = (label: string): string =>
     `${label}\n\n${'A sentence that explains one part of the plan in plain words. '.repeat(25)}`;

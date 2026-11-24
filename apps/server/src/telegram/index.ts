@@ -13,7 +13,7 @@ import type { Deck, Point, ReviewDraft, Note } from '../../../../shared/contract
 import { errorMessage } from '../core/errors.js';
 import { AGREE_PREFIX, handleCallbackQuery } from './callbacks.js';
 import { headerText, messageLink, pointReplyText, reviewLine, topicName } from './format.js';
-import { renderParts, splitPlainText } from './markdown.js';
+import { renderParts, splitPlainText, type RenderedPart } from './markdown.js';
 import { findQuoteMatch } from './quotes.js';
 import { JsonStateStore, type StoredPart, type TopicRecord } from './store.js';
 import { TelegramApiError, TelegramTransport, type TelegramMessage } from './transport.js';
@@ -22,6 +22,16 @@ import type { SourceRef, ThreadRef } from './types.js';
 export type { SourceRef, ThreadRef } from './types.js';
 
 export { markdownToHtml, renderParts, splitPlainText } from './markdown.js';
+
+/**
+ * Render an agent reply for the phone. Quote replies are a core feature, and Telegram
+ * refuses a quote that lands inside bold or italic text, so replies are rendered
+ * quote-safe (code, links and block quotes stay). The header, review and notes keep
+ * their formatting.
+ */
+export function renderSourceParts(text: string, maxChars?: number): RenderedPart[] {
+  return renderParts(text, maxChars, { quoteSafe: true });
+}
 export { findQuoteMatch } from './quotes.js';
 export { messageLink } from './format.js';
 export { TelegramApiError } from './transport.js';
@@ -213,7 +223,7 @@ export function createTelegramNotifier(env: TelegramEnv, opts: NotifierOptions):
       return current;
     }
 
-    const parts = renderParts(source.text);
+    const parts = renderSourceParts(source.text);
     const posted: StoredPart[] = [];
     for (const part of parts) {
       const sent = await transport.call<TelegramMessage>('sendMessage', {

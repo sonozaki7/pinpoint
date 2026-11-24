@@ -29,16 +29,30 @@ type Block =
   | { kind: 'quote'; text: string }
   | { kind: 'hr' };
 
-export function markdownToHtml(markdown: string): string {
-  return renderUnits(markdown)
+export interface RenderOptions {
+  /**
+   * Keep every sentence quotable. Telegram rejects a quote reply when the quoted
+   * text sits inside a bold or italic entity (QUOTE_TEXT_INVALID), so agent
+   * messages that reviewers quote are rendered without inline emphasis. Code,
+   * links and block quotes stay, because Telegram accepts quotes from those.
+   */
+  quoteSafe?: boolean;
+}
+
+export function markdownToHtml(markdown: string, options: RenderOptions = {}): string {
+  return renderUnits(markdown, MAX_PART_CHARS, options)
     .map((unit) => unit.html)
     .join('\n\n');
 }
 
 /** Render markdown into one or more Telegram messages, each within `maxChars` visible characters. */
-export function renderParts(markdown: string, maxChars: number = MAX_PART_CHARS): RenderedPart[] {
+export function renderParts(
+  markdown: string,
+  maxChars: number = MAX_PART_CHARS,
+  options: RenderOptions = {},
+): RenderedPart[] {
   const budget = Math.max(500, Math.min(maxChars, MAX_PART_CHARS));
-  const units = renderUnits(markdown, budget);
+  const units = renderUnits(markdown, budget, options);
   const parts: RenderedPart[] = [];
   let current: RenderedPart | undefined;
 
@@ -103,10 +117,14 @@ function escapeAttr(text: string): string {
   return escapeHtml(text).replace(/"/g, '&quot;');
 }
 
-function renderUnits(markdown: string, maxChars: number = MAX_PART_CHARS): Unit[] {
+function renderUnits(
+  markdown: string,
+  maxChars: number = MAX_PART_CHARS,
+  options: RenderOptions = {},
+): Unit[] {
   const units: Unit[] = [];
   for (const block of parseBlocks(markdown)) {
-    units.push(...renderBlock(block, maxChars));
+    units.push(...renderBlock(block, maxChars, options));
   }
   return units;
 }
@@ -214,19 +232,20 @@ function parseBlocks(markdown: string): Block[] {
   return blocks;
 }
 
-function renderBlock(block: Block, maxChars: number): Unit[] {
+function renderBlock(block: Block, maxChars: number, options: RenderOptions = {}): Unit[] {
+  const quoteSafe = options.quoteSafe === true;
   switch (block.kind) {
     case 'code':
       return renderCode(block.text, block.lang, maxChars);
     case 'heading': {
-      const inner = inlineToHtml(block.text);
-      const html = `<b>${inner}</b>`;
+      const inner = inlineToHtml(block.text, quoteSafe);
+      const html = quoteSafe ? inner : `<b>${inner}</b>`;
       return [{ html, plain: htmlToPlain(html) }];
     }
     case 'list': {
       const lines = block.items.map((item, index) => {
         const bullet = block.ordered ? `${index + 1}.` : '•';
-        return `${bullet} ${inlineToHtml(item)}`;
+        return `${bullet} ${inlineToHtml(item, quoteSafe)}`;
       });
       return splitOversized({ html: lines.join('\n'), plain: lines.map((line) => htmlToPlain(line)).join('\n') }, maxChars, (text) => {
         // Re-render split groups as plain text lines; list bullets stay visible.
@@ -234,7 +253,7 @@ function renderBlock(block: Block, maxChars: number): Unit[] {
       });
     }
     case 'quote': {
-      const inner = inlineToHtml(block.text);
+      const inner = inlineToHtml(block.text, quoteSafe);
       const plain = htmlToPlain(inner);
       const tag = plain.length > LONG_SECTION_CHARS ? 'blockquote expandable' : 'blockquote';
       const unit: Unit = { html: `<${tag}>${inner}</${tag}>`, plain };
@@ -247,10 +266,10 @@ function renderBlock(block: Block, maxChars: number): Unit[] {
       // Monospace keeps the columns aligned; the code renderer also splits huge tables.
       return renderCode(block.text, '', maxChars);
     case 'hr':
-      return [{ html: '<b>────────</b>', plain: '────────' }];
+      return [{ html: quoteSafe ? '────────' : '<b>────────</b>', plain: '────────' }];
     case 'paragraph':
     default: {
-      const rendered = renderParagraph(block.text);
+      const rendered = renderParagraph(block.text, quoteSafe);
       // Re-split large paragraphs from their visible text (formatting was already
       // applied to the unsplit paragraph, so only escaping is needed here).
       return splitOversized(rendered, maxChars, (text) => {
@@ -264,8 +283,8 @@ function renderBlock(block: Block, maxChars: number): Unit[] {
   }
 }
 
-function renderParagraph(text: string): Unit {
-  const inner = inlineToHtml(text);
+function renderParagraph(text: string, quoteSafe = false): Unit {
+  const inner = inlineToHtml(text, quoteSafe);
   const plain = htmlToPlain(inner);
   if (plain.length > LONG_SECTION_CHARS) {
     return { html: `<blockquote expandable>${inner}</blockquote>`, plain };
@@ -367,7 +386,7 @@ function splitRawText(text: string, max: number): string[] {
   return chunks;
 }
 
-function inlineToHtml(text: string): string {
+function inlineToHtml(text: string, quoteSafe = false): string {
   // Inline code is replaced by a placeholder while bold/links are applied, so a bold span
   // may contain code (for example **run `npm test` first**). Placeholders are restored last.
   const codeSpans: string[] = [];
@@ -375,17 +394,24 @@ function inlineToHtml(text: string): string {
     codeSpans.push(code);
     return `\u0000${codeSpans.length - 1}\u0000`;
   });
-  const html = formatInline(withPlaceholders).replace(/\u0000(\d+)\u0000/g, (_whole, index: string) => {
+  const html = formatInline(withPlaceholders, quoteSafe).replace(/\u0000(\d+)\u0000/g, (_whole, index: string) => {
     const code = codeSpans[Number(index)] ?? '';
     return `<code>${escapeHtml(code)}</code>`;
   });
   return html;
 }
 
-function formatInline(text: string): string {
+function formatInline(text: string, quoteSafe = false): string {
   let html = escapeHtml(text);
-  html = html.replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>');
-  html = html.replace(/__([^_\n]+)__/g, '<b>$1</b>');
+  if (quoteSafe) {
+    // Keep the words, drop the emphasis: Telegram rejects quote replies that land inside
+    // bold or italic text, and every sentence of an agent reply must stay quotable.
+    html = html.replace(/\*\*([^*\n]+)\*\*/g, '$1');
+    html = html.replace(/__([^_\n]+)__/g, '$1');
+  } else {
+    html = html.replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>');
+    html = html.replace(/__([^_\n]+)__/g, '<b>$1</b>');
+  }
   html = html.replace(
     /\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)/g,
     (_whole, label: string, url: string) => `<a href="${url.replace(/"/g, '%22')}">${label}</a>`,
