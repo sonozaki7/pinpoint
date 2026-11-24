@@ -1,6 +1,6 @@
 name: Deploy landing page
 
-# Publishes apps/site to GitHub Pages at https://sonozaki7.github.io/pinpoint/
+# Publishes apps/site to GitHub Pages at https://pinpoint.qolso.com/
 # Activated by the repo owner once the repository is public and Pages is set to
 # "GitHub Actions". All asset links in the site are relative, so the /pinpoint/
 # project path works without changes.

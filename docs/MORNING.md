@@ -42,7 +42,7 @@ If a quote-reply shows as a plain reply instead, the plan text changed. Tell the
 The repository, the site and the video are ready but not published. Reply `public` to the assistant. It will then:
 
 1. Make `sonozaki7/pinpoint` public on GitHub.
-2. Turn on GitHub Pages for the site at https://sonozaki7.github.io/pinpoint/ .
+2. Turn on GitHub Pages for the site at https://pinpoint.qolso.com/ .
 3. Upload the final render, `demo/out/pinpoint-demo-v2.mp4`, as `pinpoint-demo.mp4` on release `v1.0.0`. A release is a downloadable file attached to a version tag, so the video link in the README and the form will open and play.
 4. Put the same file and the newer poster into the site's media folder, because the page plays `media/pinpoint-demo.mp4`.
 
@@ -71,7 +71,7 @@ Copy the message under "Eligibility question for Discord" in [SUBMISSION.md](SUB
 | Tagline | Ring for where. Voice for what. |
 | Short description | The 143-word block in [SUBMISSION.md](SUBMISSION.md), under "Short description". |
 | Long description | The 384-word block in the same file, under "Long description". |
-| Website | https://sonozaki7.github.io/pinpoint/ |
+| Website | https://pinpoint.qolso.com/ |
 | Demo video | https://github.com/sonozaki7/pinpoint/releases/download/v1.0.0/pinpoint-demo.mp4 |
 | Source code | https://github.com/sonozaki7/pinpoint |
 | Tracks | AI Assistants & Work (main). Messaging & News (second). |

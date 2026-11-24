@@ -114,7 +114,7 @@ export function Close() {
         <div className="pp-close-urls" style={{opacity: urlIn}}>
           <div className="pp-close-url">
             <small>SITE</small>
-            <span>https://sonozaki7.github.io/pinpoint/</span>
+            <span>https://pinpoint.qolso.com/</span>
           </div>
           <div className="pp-close-url">
             <small>SOURCE</small>

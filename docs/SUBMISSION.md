@@ -37,7 +37,7 @@ Tracks: AI Assistants & Work (main), Messaging & News (second), plus the Best Te
 
 | Field | Value |
 |---|---|
-| Website | https://sonozaki7.github.io/pinpoint/ |
+| Website | https://pinpoint.qolso.com/ |
 | Demo video | https://github.com/sonozaki7/pinpoint/releases/download/v1.0.0/pinpoint-demo.mp4 (published at submission) |
 | Source repository | https://github.com/sonozaki7/pinpoint (made public at submission) |
 | App package | `apps/glasses/pinpoint.ehpk`, built by `npm --prefix apps/glasses run pack` |

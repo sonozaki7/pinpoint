@@ -327,7 +327,7 @@ function Close() {
       </div>
 
       <div style={{position: "absolute", left: 82, top: 1060, opacity: urlIn, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 10}}>
-        <div className="pp-teaser-url">https://sonozaki7.github.io/pinpoint/</div>
+        <div className="pp-teaser-url">https://pinpoint.qolso.com/</div>
         <div className="pp-teaser-url" style={{color: "#5f7067"}}>github.com/sonozaki7/pinpoint</div>
       </div>
 

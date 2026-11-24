@@ -4,7 +4,7 @@
 
 Review your AI agents' work from Even G2 — point by point, with the precision of your laptop.
 
-**Demo video:** [pinpoint-demo.mp4](https://github.com/sonozaki7/pinpoint/releases/download/v1.0.0/pinpoint-demo.mp4) · **Site:** https://sonozaki7.github.io/pinpoint/ — both published at submission (video under 3 minutes).
+**Demo video:** [pinpoint-demo.mp4](https://github.com/sonozaki7/pinpoint/releases/download/v1.0.0/pinpoint-demo.mp4) · **Site:** https://pinpoint.qolso.com/ — both published at submission (video under 3 minutes).
 
 ![Pinpoint review screen in the Even Hub simulator](demo/shots/glasses-02-review.png)
 
