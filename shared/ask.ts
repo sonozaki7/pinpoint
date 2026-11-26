@@ -97,5 +97,6 @@ export function askText(question: string, sentences: AskSentence[]): AskMatch {
   });
   if (best < 0 || bestHits === 0 || bestScore < 0.12) return { ok: false, answer: 'Not in this output.' };
   const hit = sentences[best];
+  if (!hit) return { ok: false, answer: 'Not in this output.' };
   return { ok: true, answer: shorten(hit.text), quote: hit.text, ...(hit.pointId ? { pointId: hit.pointId } : {}) };
 }

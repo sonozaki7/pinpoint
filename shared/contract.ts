@@ -29,7 +29,35 @@ export interface InboxItem {
   app?: AppId; // source of the work; absent = 't3'
   needsYou?: number; // points that need your judgment (flagged); the rest are routine and count as agreed
   changed?: number; // points new or changed since your last review of this thread (revisions only)
+  kind?: 'review' | 'catch-up'; // 'catch-up' = one line per agent update since you last looked (read-only)
 }
+
+/** GET /api/inbox response. `status` is the glance line across all your agents. */
+export interface InboxResponse {
+  items: InboxItem[];
+  status?: AgentStatus;
+}
+
+/** "2 need you · 3 working · 4 done today" — every agent you run, at a glance. */
+export interface AgentStatus {
+  needYou: number;
+  working: number;
+  doneToday: number;
+}
+
+/** POST /api/task { text } — hand off a new task by voice ("Find a dentist open Saturday…").
+ * The desk starts a real agent (T3 Code: Codex or Claude) in an allowed project; it shows up in the
+ * inbox only when it needs you. The cloud sample simulates it and says so. */
+export interface TaskResult {
+  ok: boolean;
+  threadId?: string;
+  title?: string; // <= 30 ASCII chars, shown on the glasses
+  agent?: string; // e.g. "Codex"
+  error?: string;
+}
+
+/** Optional header choosing the cloud sample workspace: 'mixed' (default), 'developer' or 'everyday'. */
+export const SAMPLE_HEADER = 'X-Pinpoint-Sample';
 
 export type PointKind = 'step' | 'claim' | 'question' | 'risk' | 'draft';
 
@@ -45,6 +73,7 @@ export interface Point {
   flag?: string; // <= 24 ASCII chars: why this line is worth checking, e.g. "signs out everyone"
   why?: string; // <= 60 ASCII chars of evidence shown under a flagged line, e.g. "Your notes say net-45 (Acme, Nov 12)"
   changed?: boolean; // new or changed since your last review of this thread
+  threadRef?: string; // catch-up decks: the thread this line is about (tap opens it)
   anchor?: string; // where feedback lands in the source app, e.g. a Notion block id; server-side only
 }
 
