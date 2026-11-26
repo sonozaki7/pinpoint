@@ -27,6 +27,8 @@ export interface InboxItem {
   pointCount: number;
   draftNotes: number; // notes already saved for this thread
   app?: AppId; // source of the work; absent = 't3'
+  needsYou?: number; // points that need your judgment (flagged); the rest are routine and count as agreed
+  changed?: number; // points new or changed since your last review of this thread (revisions only)
 }
 
 export type PointKind = 'step' | 'claim' | 'question' | 'risk' | 'draft';
@@ -41,6 +43,8 @@ export interface Point {
   questionId?: string; // T3 user_input question id, when the point maps to one
   risk?: 'low' | 'high';
   flag?: string; // <= 24 ASCII chars: why this line is worth checking, e.g. "signs out everyone"
+  why?: string; // <= 60 ASCII chars of evidence shown under a flagged line, e.g. "Your notes say net-45 (Acme, Nov 12)"
+  changed?: boolean; // new or changed since your last review of this thread
   anchor?: string; // where feedback lands in the source app, e.g. a Notion block id; server-side only
 }
 
@@ -80,6 +84,20 @@ export interface EditResult {
   after?: string; // absent when the line was deleted or the edit failed
   method?: 'replace' | 'delete' | 'say' | 'rewrite';
   error?: string; // short, shown on the glasses, e.g. "Couldn't change this line"
+}
+
+/**
+ * POST /api/ask/:threadId { question } — ask about the output instead of scrolling it.
+ * The answer always points at an exact sentence of the source (quote is a verified substring), so it
+ * can't invent facts; with no good match it says so. Desk: local model picks the sentence and phrases a
+ * short answer; cloud sample: deterministic sentence retrieval (shared/ask.ts).
+ */
+export interface AskResult {
+  ok: boolean;
+  answer: string; // <= 2 G2 lines, e.g. "All of them: about 12,400 active sessions."
+  quote?: string; // exact sentence from the source that supports the answer
+  pointId?: string; // the point containing that sentence, to jump to it
+  error?: string;
 }
 
 export interface ReviewDraft {
