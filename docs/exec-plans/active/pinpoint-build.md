@@ -17,17 +17,18 @@ Spec: `docs/SPEC.md` · Host advice: `docs/host-qa-notes.md` · Device risks: `d
 | ID | Task | Owner | Status |
 |---|---|---|---|
 | C1 | Cloud mode (per-device sample workspace, whisper, limits) | DeepSeek | done (a44a548) |
-| C2 | Deploy Pinpoint Cloud on new-prod (pinpoint-api.qolso.com) | DeepSeek | running |
-| G1 | Glasses: real-device defaults, device id, phone page, lifecycle | DeepSeek | running |
+| C2 | Deploy Pinpoint Cloud on new-prod (pinpoint-api.qolso.com) | DeepSeek | container live (4 sample items); public HTTPS waits on owner's DNS A record, then `deploy/setup-https.sh` |
+| G1 | Glasses: real-device defaults, device id, phone page, lifecycle | DeepSeek | done (c2d14c5) |
 | R1 | Device readiness audit | DeepSeek | done (e4e50ed) |
-| V3 | Video v3 pipeline (one bad step, one fix) | DeepSeek | running → becomes v4 with the Morning brief |
-| T1 | Telegram redesign (card, status, one note per sentence, legend) | DeepSeek | running |
-| K1 | Connectors: Gmail, Calendar, Notion, OpenRouter + seed + setup scripts | DeepSeek | running (then trim: drop Calendar + OpenRouter) |
-| S1 | Review sources: Notion page review (block comments + status) and Gmail draft review (apply notes, glance, send) in live mode; receipts | DeepSeek | after K1 |
-| G2 | Glasses: audit P0/P1 fixes, calm screen (words not glyphs), CHECK flags, 24×24 icon | DeepSeek | running |
+| V3 | Video v3 (one bad step, one fix), 1:43 | DeepSeek | done (b8d625a); v4 after new screens + real Notion/Gmail/Telegram |
+| T1 | Telegram redesign (card, status, one note per sentence, legend) | DeepSeek | done (6d8f333), live in the group |
+| K1 | Connectors + setup/seed scripts | DeepSeek | done (2f75da1), trimmed in de34478 |
+| S1 | Review sources: Notion page review + Gmail draft in-place edits; receipts | DeepSeek | done (de34478); live Notion/Gmail wait on owner sharing/consent |
+| G2 | Glasses: audit P0/P1 fixes, calm screen, CHECK flags, 24×24 icon | DeepSeek | done (38b0d5a) |
+| G3 | Glasses: gesture budget (docs/ux-budget.md) + budget tests | DeepSeek | running |
 | W1 | Web simulator site: real app code + browser mock backend + datasets (coding agents; docs & drafts) + app panels | DeepSeek | running |
 | L1 | Landscape research (store 1,148 apps, 113 hackathon builds) | DeepSeek | done (cb244ab) |
-| T2 | Telegram: receipts with links for Notion/Gmail reviews; optional Slack/Discord companions | DeepSeek | after T1 |
+| T2 | Telegram: question buttons, Notion/Gmail cards, receipts, agent replied | DeepSeek | running |
 | P2 | Desk pairing relay (real G2 reaches your own desk anywhere) | DeepSeek | after S1 |
 | D1 | README, SUBMISSION, FEATURE_REQUESTS, business model, privacy page, 24×24 icon | DeepSeek + Opus | Sat |
 | X1 | Real end-to-end run with owner's Google/Notion (demo label/calendar) + footage | DeepSeek | Sat |
@@ -44,4 +45,5 @@ Spec: `docs/SPEC.md` · Host advice: `docs/host-qa-notes.md` · Device risks: `d
 
 - 2026-11-24 night | first build: simulator-verified app, live T3 run, video v2, site, Telegram bot.
 - 2026-11-27 00:30 | owner: video too complex, real-G2 doubts, Telegram confusing, wants Google/Notion + web simulator. Replanned (this file).
+- 2026-11-27 02:30 | gesture budget rule added (docs/ux-budget.md); Telegram redesign live; review sources done; cloud redeployed with 4 sample items.
 - 2026-11-27 01:50 | owner: no AI slop, check existing apps. Landscape research → scope locked to review sources (agents, Notion, Gmail drafts). Notion token saved; Google client + DNS record pending from owner.
