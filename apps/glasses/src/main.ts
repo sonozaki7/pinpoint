@@ -6,25 +6,26 @@ import {
 } from "./api";
 import { MockPinpointApi } from "./mock";
 import {
-  adoptInbox, applyHealth, applyVoice, canSend, clearFlash, clearNotes, deckFailed, doubleTap, draftFor, endRecording,
-  finishSend, focusedPoint, goPreview, initialState, markLoading, markOffline, markSending, markSent,
-  mergeDeck, moveFocus, noteFor, openDeck, press, previewFailed, recordingOnSurface, recordingTickDelay,
-  resetWorkspace, sendFailed, setFlash, setInboxFocus, setPreview, shouldAcceptSwipe, startReview,
-  SENT_HOLD_MS,
+  adoptInbox, applyEdit, applyHealth, applyVoice, cancelCountdown, clearFlash, clearNotes, countdownDue, deckFailed, doubleTap,
+  draftFor, endRecording, finishSend, focusedPoint, initialState, markLoading, markOffline, markSending,
+  mergeDeck, moveFocus, noteFor, openDeck, press, receiptDue, recordingOnSurface, recordingTickDelay,
+  resetWorkspace, sendFailed, setFlash, setInboxFocus, shouldAcceptSwipe, showReceipt, startCountdown,
+  startInboxCountdown, startReview, RECEIPT_HOLD_MS,
   type Effect, type State,
 } from "./model";
 import { pageFor, type PageModel } from "./display";
 import { connectEven } from "./even";
 import type { Input } from "./events";
-import { PcmRecorder } from "./voice";
+import { PcmRecorder, SilenceGate } from "./voice";
 
 const params = new URLSearchParams(location.search);
 const forceMock = params.get("mock") === "1";
 const bootedAt = Date.now();
 
-let api: PinpointApi = new MockPinpointApi();
+let api: PinpointApi = new MockPinpointApi({ extended: forceMock });
 let state = initialState({ demo: forceMock, loading: true, cloud: SERVER_IS_CLOUD });
 const recorder = new PcmRecorder();
+const silence = new SilenceGate();
 let hardware: Awaited<ReturnType<typeof connectEven>> | undefined;
 let clockTimer: ReturnType<typeof setTimeout> | undefined;
 let tapTimer: ReturnType<typeof setTimeout> | undefined;
@@ -34,7 +35,6 @@ let lastDoubleAt = 0;
 let lastSwipeAt = Number.NEGATIVE_INFINITY;
 let lastForegroundRefresh = 0;
 let sendInFlight = false;
-let previewInFlight = false;
 let inboxInFlight = false;
 let resetInFlight = false;
 let samplePoll = 0;
@@ -126,18 +126,28 @@ function updateButtons() {
     ? "Open"
     : state.screen === "options"
       ? "Choose"
-      : state.screen === "preview"
-        ? state.sent || state.sending
-          ? "Wait"
-          : state.preview || state.previewLoading ? "Back" : "Retry"
-        : state.screen === "review" && state.deck === null
-          ? "Retry"
-          : record
-            ? "Stop"
-            : sendRow ? "Preview" : focusedPoint(state)?.kind === "question" ? "Options" : "Talk");
-  setText(el.double, state.screen === "preview" && canSend(state)
-    ? "Send"
-    : state.screen === "inbox" ? "Exit" : "Back");
+      : state.screen === "countdown"
+        ? "Undo"
+        : state.screen === "receipt"
+          ? "Inbox"
+          : state.screen === "preview"
+            ? state.sent || state.sending
+              ? "Wait"
+              : state.preview || state.previewLoading ? "Back" : "Retry"
+            : state.screen === "review" && state.deck === null
+              ? "Retry"
+              : record
+                ? "Stop"
+                : sendRow ? "Send" : focusedPoint(state)?.kind === "question" ? "Options" : "Talk");
+  setText(el.double, state.screen === "countdown"
+    ? "Undo"
+    : state.screen === "receipt"
+      ? "Inbox"
+      : state.screen === "options"
+        ? "List"
+        : state.screen === "preview" && state.preview
+          ? "Send"
+          : state.screen === "inbox" ? "Exit" : "Back");
   setText(el.menuButton, "Hold menu");
   el.up.disabled = ifInboxEmpty();
   el.down.disabled = ifInboxEmpty();
@@ -214,13 +224,22 @@ function scheduleClock() {
     clockTimer = setTimeout(() => render(), Math.max(60, delay));
     return;
   }
-  if (state.sent && state.sentAt !== null) {
-    const left = state.sentAt + SENT_HOLD_MS - now;
-    if (left <= 0) {
+  if (state.screen === "countdown" && state.countdownStartedAt !== null) {
+    // One pane update per second, then the send itself. A tap cancels first.
+    if (countdownDue(state, now)) {
+      void sendReview();
+      return;
+    }
+    const elapsed = now - state.countdownStartedAt;
+    clockTimer = setTimeout(() => render(), Math.max(60, 1_000 - (elapsed % 1_000) + 30));
+    return;
+  }
+  if (state.screen === "receipt" && state.receiptAt !== null) {
+    if (receiptDue(state, now)) {
       finishSent();
       return;
     }
-    clockTimer = setTimeout(finishSent, left);
+    clockTimer = setTimeout(finishSent, state.receiptAt + RECEIPT_HOLD_MS - now);
     return;
   }
   if (state.flash) {
@@ -234,7 +253,10 @@ function scheduleClock() {
 
 function handleInput(input: Input) {
   if (input.kind === "audio") {
-    if (state.recordingStartedAt !== null) recorder.push(input.pcm);
+    if (state.recordingStartedAt !== null) {
+      recorder.push(input.pcm);
+      if (silence.push(input.pcm)) void stopRecording();
+    }
     return;
   }
   if (input.kind === "hold") {
@@ -347,9 +369,6 @@ async function runEffect(effect: Effect) {
       break;
     case "open":
       await openThread(effect.index);
-      break;
-    case "preview":
-      await openPreview();
       break;
     case "send":
       await sendReview();
@@ -489,6 +508,7 @@ async function openThreadItem(item: InboxItem) {
 async function startRecording() {
   if (state.recordingStartedAt === null) return;
   recorder.start();
+  silence.reset();
   console.info(`[pinpoint] recording point=${focusedPoint(state)?.id ?? "none"}`);
   const ok = await hardware?.mic(true);
   if (ok === false) {
@@ -506,19 +526,26 @@ function discardRecording() {
 
 async function stopRecording() {
   if (state.recordingStartedAt === null) return;
+  const point = focusedPoint(state);
+  const threadId = state.deck?.threadId;
   state = endRecording(state);
+  // No silent waits: transcription can take a moment on the live server.
+  state = setFlash(state, "Working...", Date.now(), 60_000);
   render();
   await hardware?.mic(false);
   const pcm = recorder.stop();
   console.info(`[pinpoint] voice pcm-bytes=${pcm.length}`);
   const before = state;
   try {
-    const { text, verdict } = await api.voice(pcm);
+    const { text, verdict } = await api.voice(
+      pcm,
+      point && threadId ? { threadId, pointId: point.id } : undefined,
+    );
     state = applyVoice(state, text, Date.now(), verdict);
     maybePersist(before, state);
-    const point = focusedPoint(state);
-    const note = point ? noteFor(state, point.id) : undefined;
-    console.info(`[pinpoint] note=${point?.id ?? "none"} verdict=${note?.verdict ?? "none"} text="${text}"`);
+    const noted = point ? noteFor(state, point.id) : undefined;
+    console.info(`[pinpoint] note=${point?.id ?? "none"} verdict=${noted?.verdict ?? "none"} text="${text}"`);
+    if (state.pendingEdit) await applyPendingEdit();
     console.info(`[pinpoint] review-header="${pageFor(state, Date.now()).title}"`);
   } catch (error) {
     console.warn("[pinpoint] voice", error);
@@ -531,45 +558,34 @@ async function stopRecording() {
   render();
 }
 
-async function openPreview() {
-  if (previewInFlight) return;
-  previewInFlight = true;
+/**
+ * A 'draft' point is fixed in place: POST the spoken note and show the returned
+ * sentence at once. The note stays saved if the edit fails.
+ */
+async function applyPendingEdit() {
+  const pending = state.pendingEdit;
+  if (!pending) return;
   const before = state;
   try {
-    state = goPreview(state);
-    render();
-    const deck = state.deck;
-    const draft = draftFor(state, Date.now());
-    if (!deck || !draft) {
-      state = previewFailed(state, "No draft to preview", Date.now());
-      render();
-      return;
-    }
-    try {
-      await api.putReview(draft);
-      const preview = await api.preview(deck.threadId, draft);
-      if (state.screen !== "preview") return;
-      state = setPreview(state, preview);
-      console.info(`[pinpoint] preview objections=${preview.counts.objections} answers=${preview.counts.answers} notes=${preview.counts.notes} agreed=${preview.counts.agreed}`);
-    } catch (error) {
-      console.warn("[pinpoint] preview", error);
-      if (state.screen !== "preview") return;
-      state = previewFailed(
-        state,
-        isNetworkFailure(error) ? shortUnreachable() : "Preview failed. Tap to retry.",
-        Date.now(),
-      );
-    }
-    maybePersist(before, state);
-    render();
-  } finally {
-    previewInFlight = false;
+    const result = await api.edit(pending.threadId, pending.pointId, pending.text);
+    state = applyEdit(state, result);
+    console.info(`[pinpoint] edit=${pending.pointId} ok=${result.ok} method=${result.method ?? "none"} after="${result.after ?? ""}"`);
+  } catch (error) {
+    console.warn("[pinpoint] edit", error);
+    state = applyEdit(state, {
+      ok: false,
+      pointId: pending.pointId,
+      before: "",
+      error: "Couldn't change this line",
+    });
   }
+  maybePersist(before, state);
+  render();
 }
 
 async function sendReview() {
-  const deck = state.deck;
-  if (!deck || sendInFlight || state.sent || !state.preview || state.previewLoading) return;
+  const threadId = state.deck?.threadId ?? state.pendingSend?.threadId;
+  if (!threadId || sendInFlight || state.sending) return;
   // A debounced autosave must not land after send clears the draft and
   // recreate it with the notes that were just delivered.
   clearTimeout(saveTimer);
@@ -577,22 +593,22 @@ async function sendReview() {
   const known = new Map<string, ThreadAttention>(
     state.inbox.map((item) => [item.threadId, item.attention]),
   );
-  known.set(deck.threadId, deck.attention);
+  if (state.deck) known.set(state.deck.threadId, state.deck.attention);
   state = markSending(state);
   render();
   sendInFlight = true;
   try {
     const draft = draftFor(state, Date.now());
     if (draft) await api.putReview(draft);
-    const result = await api.send(deck.threadId);
+    const result = await api.send(threadId);
     if (!result.ok) {
       console.warn("[pinpoint] send rejected", result.error);
       state = sendFailed(state, "Send failed. Try again.", Date.now());
       render();
       return;
     }
-    console.info(`[pinpoint] sent ${result.delivered}`);
-    state = markSent(state, Date.now());
+    console.info(`[pinpoint] sent ${result.delivered} lines=${result.receipt?.lines.length ?? 0}`);
+    state = showReceipt(state, result, Date.now());
     render();
     if (state.workspace === "sample") void pollSampleReply(known);
   } catch (error) {
@@ -632,20 +648,16 @@ async function pollSampleReply(known: Map<string, ThreadAttention>) {
 }
 
 function finishSent() {
-  if (state.screen !== "preview" || !state.sent) return;
+  if (state.screen !== "receipt") return;
   clearTimeout(saveTimer);
   saveTimer = undefined;
   state = finishSend(state);
   render();
-  console.info(`[pinpoint] screen=inbox items=${state.inbox.length}`);
+  console.info(`[pinpoint] screen=inbox items=${state.inbox.length} focus=${state.inboxFocus}`);
   void loadInbox(true);
 }
 
 async function refreshCurrent() {
-  if (state.screen === "preview") {
-    await openPreview();
-    return;
-  }
   const deck = state.deck;
   if (!deck) {
     await retryDeck();
@@ -697,12 +709,26 @@ async function handleMenu(id: number) {
   }
   if (state.screen === "inbox") {
     if (id === 4) await loadInbox(false);
+    if (id === 6) {
+      const item = state.inbox[state.inboxFocus];
+      if (item && item.attention !== "question") {
+        state = startInboxCountdown(state, item, now);
+        render();
+        console.info(`[pinpoint] agree-send=${item.threadId}`);
+      }
+    }
     return;
   }
   switch (id) {
     case 1:
-      if (state.screen === "preview" && state.preview) await sendReview();
-      else await openPreview();
+      // "Send review" is the same undo countdown as the Send row.
+      if (state.screen === "countdown") {
+        state = cancelCountdown(state);
+        render();
+      } else {
+        state = startCountdown(state, Date.now());
+        render();
+      }
       break;
     case 2:
       await readOnPhone();

@@ -1,6 +1,6 @@
-import type { InboxItem, Point } from "../../../shared/contract";
+import { APP_TAG, type AppId, type InboxItem, type Point } from "../../../shared/contract";
 import {
-  countNotes, focusedPoint, noteFor, REVIEW_ROWS, type State,
+  countdownLeft, countNotes, focusedPoint, noteFor, REVIEW_ROWS, type State,
 } from "./model";
 import {
   HEADER_MAX_PX, LIST_ITEM_MAX_PX, LIST_MAX_CHARS, PANE_MAX_PX, PREVIEW_MAX_PX,
@@ -142,6 +142,8 @@ function rightLabel(text: string, label: string, maxPx = ROW_MAX_PX): string {
 function rowLabel(point: Point, state: State): string {
   const note = noteFor(state, point.id);
   if (note) {
+    // A draft sentence that came back changed reads as CHANGED, not CHANGE.
+    if (note.after !== undefined) return "CHANGED";
     if (note.verdict === "object") return "CHANGE";
     if (note.verdict === "note") return "NOTE";
     return note.option ?? "ANSWER";
@@ -187,11 +189,20 @@ export function reviewSlots(state: State): Slot[] {
   return items.slice(start, start + rows);
 }
 
-/** `<title>  <summary>` — no leading symbol; the summary already says what it is. */
-export function inboxRow(item: InboxItem): string {
+/**
+ * `<title>  <summary>`, or `Mail  <title>  <summary>` when the inbox mixes
+ * apps. The tag is only useful when more than one source is present.
+ */
+export function inboxRow(item: InboxItem, showAppTag = false): string {
+  const tag = showAppTag ? `${APP_TAG[item.app ?? "t3"]}  ` : "";
   const title = toAscii(item.title);
   const summary = toAscii(item.summary);
-  return fitLine(`${title}  ${summary}`, LIST_ITEM_MAX_PX, LIST_WIDTH);
+  return fitLine(`${tag}${title}  ${summary}`, LIST_ITEM_MAX_PX, LIST_WIDTH);
+}
+
+/** True when the inbox holds work from more than one app. */
+export function mixedApps(items: readonly InboxItem[]): boolean {
+  return new Set(items.map((item) => item.app ?? "t3")).size > 1;
 }
 
 /** Fit a title plus suffix into the header, shortening the title first. */
@@ -249,6 +260,13 @@ function reviewPane(state: State, now: number): string {
     return `Recording ${seconds}s${DOT}tap to stop`;
   }
   if (state.flash && state.flash.until > now) return wrapAscii(state.flash.text);
+  // The applied draft sentence stays visible even after the focus moved on, so
+  // the user reads the new wording before the send countdown starts.
+  if (state.editResult) {
+    return state.editResult.error
+      ? wrapAscii(state.editResult.error)
+      : wrapAscii(`Now: ${state.editResult.after ?? "line removed"}`);
+  }
   const deck = state.deck;
   if (!deck) {
     return state.deckError
@@ -256,9 +274,16 @@ function reviewPane(state: State, now: number): string {
       : "Building points...";
   }
   const point = deck.points[state.focus];
-  if (!point) return wrapAscii(`Send your review to ${deck.title}.`);
+  if (!point) {
+    const last = state.notes[state.notes.length - 1];
+    if (last?.after !== undefined) return wrapAscii(`Now: ${last.after || "line removed"}`);
+    if (last?.option) return wrapAscii(`You chose: ${last.option}`);
+    if (last?.text) return wrapAscii(`You said: ${last.text}`);
+    return wrapAscii(`Send your review to ${deck.title}.`);
+  }
   const note = noteFor(state, point.id);
   if (note) {
+    if (note.after !== undefined) return wrapAscii(`Now: ${note.after || "line removed"}`);
     if (note.option) return wrapAscii(`You chose: ${note.option}`);
     if (note.text) return wrapAscii(`You said: ${note.text}`);
   }
@@ -270,8 +295,9 @@ function reviewFooter(state: State): string {
   if (state.recordingStartedAt !== null) return `Tap: stop${DOT}Double-tap: back`;
   if (!state.deck) return state.deckError ? `Tap: retry${DOT}Double-tap: back` : "Double-tap: back";
   const point = state.deck.points[state.focus];
-  if (!point) return `Tap: preview${DOT}Double-tap: back`;
+  if (!point) return `Tap: send${DOT}Double-tap: back`;
   if (point.kind === "question") return `Tap: answer${DOT}Double-tap: back`;
+  if (point.kind === "draft") return `Tap: fix${DOT}Double-tap: back`;
   return `Tap: talk${DOT}Double-tap: back`;
 }
 
@@ -283,9 +309,13 @@ const REVIEW_MENU: MenuEntry[] = [
 ];
 
 function inboxMenu(state: State): MenuEntry[] {
-  return state.workspace === "sample"
-    ? [{ id: 4, label: "Refresh" }, { id: 5, label: "Reset sample" }]
-    : [{ id: 4, label: "Refresh" }];
+  const entries: MenuEntry[] = [];
+  const item = state.inbox[state.inboxFocus];
+  // A question needs an answer, so "Agree & send" is only offered for the rest.
+  if (item && item.attention !== "question") entries.push({ id: 6, label: "Agree & send" });
+  entries.push({ id: 4, label: "Refresh" });
+  if (state.workspace === "sample") entries.push({ id: 5, label: "Reset sample" });
+  return entries;
 }
 
 function reviewMenu(state: State): MenuEntry[] {
@@ -294,14 +324,48 @@ function reviewMenu(state: State): MenuEntry[] {
     : REVIEW_MENU;
 }
 
-function sendLabel(count: number, total: number): string {
-  const changed = Math.max(0, Math.min(count, total));
-  const ok = Math.max(0, total - changed);
-  const parts: string[] = [];
-  if (changed > 0) parts.push(`${changed} change${changed === 1 ? "" : "s"}`);
-  if (ok > 0) parts.push(`${ok} OK`);
-  if (parts.length === 0) parts.push("0 OK");
-  return `Send review${DOT}${parts.join(", ")}`;
+/** The source app of the open thread; older saved states had no app field. */
+export function reviewAppOf(state: State): AppId {
+  if (state.reviewApp) return state.reviewApp;
+  const item = state.inbox.find((entry) => entry.threadId === state.reviewThreadId);
+  return item?.app ?? "t3";
+}
+
+/** "Draft reply to Priya: contract terms" -> "Priya"; "Priya: terms" -> "Priya". */
+export function recipientFor(title: string): string | null {
+  const afterTo = /\bto\s+([^:,·]+)/i.exec(title)?.[1]?.trim();
+  const beforeColon = /^([A-Z][A-Za-z0-9'’-]*(?:\s+[A-Z][A-Za-z0-9'’-]*)?)\s*:/.exec(title)?.[1]?.trim();
+  const name = afterTo ?? beforeColon;
+  if (!name || name.length > 20) return null;
+  return name;
+}
+
+function changeWords(count: number): string {
+  return `${count} change${count === 1 ? "" : "s"}`;
+}
+
+/**
+ * The Send row names the real destination, so nobody wonders what "send"
+ * means: a mail draft goes to a person, a Notion page gets comments, an agent
+ * gets the review.
+ */
+function sendRowLabel(state: State): string {
+  const total = state.deck?.points.length ?? 0;
+  const changes = state.notes.length;
+  const ok = Math.max(0, total - changes);
+  const app = reviewAppOf(state);
+  if (app === "gmail") {
+    const name = recipientFor(state.reviewTitle || state.deck?.title || "");
+    const base = name ? `Send to ${name}` : "Send";
+    return changes > 0 ? `${base}${DOT}${changeWords(changes)}` : base;
+  }
+  if (app === "notion") {
+    if (changes === 0) return "Approve";
+    return `Post ${changes} comment${changes === 1 ? "" : "s"}`;
+  }
+  return changes > 0
+    ? `Send${DOT}${changeWords(changes)}, ${ok} OK`
+    : `Send${DOT}${ok} OK`;
 }
 
 function previewLines(counts: { objections: number; answers: number; notes: number; agreed: number }): string {
@@ -353,25 +417,22 @@ export function pageFor(state: State, now: number): PageModel {
           : "All clear.\nYour agents are working.",
       };
     }
+    const tagged = mixedApps(state.inbox);
     return {
       ...base,
-      list: state.inbox.map(inboxRow),
+      list: state.inbox.map((item) => inboxRow(item, tagged)),
       listFocus: state.inboxFocus,
     };
   }
 
   if (state.screen === "review") {
-    const deck = state.deck;
     const slots = reviewSlots(state);
     return {
       kind: "review",
       title: reviewHeader(state),
       rows: slots.map((slot) => slot.kind === "send"
         ? {
-          text: cursorRow(
-            sendLabel(slot.count, deck?.points.length ?? slot.count),
-            slot.focused,
-          ),
+          text: cursorRow(sendRowLabel(state), slot.focused),
           brightness: slot.focused ? 4 : 2,
         }
         : {
@@ -399,8 +460,35 @@ export function pageFor(state: State, now: number): PageModel {
       kind: "options",
       title: fitTitle(state.deck?.title ?? "Question", `${DOT}choose`),
       rows,
-      footer: `Tap: choose${DOT}Double-tap: back`,
+      footer: `Tap: choose${DOT}Double-tap: list`,
       menu: reviewMenu(state),
+    };
+  }
+
+  if (state.screen === "countdown") {
+    const left = countdownLeft(state, now);
+    const title = state.deck?.title ?? state.pendingSend?.title ?? "Send";
+    return {
+      kind: "countdown",
+      title: fitTitle(title, `${DOT}sending`),
+      rows: [],
+      pane: state.sending ? "Sending..." : `Sending in ${left}${DOT}Tap to undo`,
+      footer: state.sending ? "Sending..." : "Tap: undo",
+      menu: [],
+    };
+  }
+
+  if (state.screen === "receipt") {
+    const lines = state.receiptLines
+      .slice(0, 3)
+      .map((line) => asciiTruncate(line, PANE_WIDTH, PANE_MAX_PX));
+    return {
+      kind: "receipt",
+      title: "Sent",
+      rows: [],
+      pane: lines.join("\n") || "Sent to the agent.",
+      footer: "Tap: inbox",
+      menu: [],
     };
   }
 

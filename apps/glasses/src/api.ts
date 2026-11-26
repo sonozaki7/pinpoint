@@ -2,6 +2,7 @@ import {
   CLOUD_URL,
   DEVICE_HEADER,
   type Deck,
+  type EditResult,
   type Health,
   type InboxItem,
   type PreviewResult,
@@ -18,7 +19,12 @@ export interface PinpointApi {
   putReview(draft: ReviewDraft): Promise<ReviewDraft>;
   preview(threadId: string, draft?: ReviewDraft): Promise<PreviewResult>;
   send(threadId: string): Promise<SendResult>;
-  voice(pcm: Uint8Array): Promise<{ text: string; verdict?: "object" | "note" }>;
+  /** Apply one spoken note to a 'draft' sentence; the reply carries the new sentence. */
+  edit(threadId: string, pointId: string, text: string): Promise<EditResult>;
+  voice(
+    pcm: Uint8Array,
+    context?: { threadId: string; pointId: string },
+  ): Promise<{ text: string; verdict?: "object" | "note" }>;
   phone(threadId: string, pointId: string): Promise<{ ok: boolean; link?: string }>;
   resetSample(): Promise<void>;
 }
@@ -202,6 +208,14 @@ export class HttpPinpointApi implements PinpointApi {
       headers: { "Content-Type": "application/json" },
       body: "{}",
     }, TIMEOUTS.send);
+  }
+
+  edit(threadId: string, pointId: string, text: string) {
+    return this.json<EditResult>(`/api/edit/${encodeURIComponent(threadId)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pointId, text }),
+    }, TIMEOUTS.review);
   }
 
   async voice(pcm: Uint8Array) {

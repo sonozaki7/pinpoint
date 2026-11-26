@@ -1,7 +1,7 @@
 import type {
-  Deck, Health, InboxItem, Note, Point, PreviewResult, ReviewDraft,
+  AppId, Deck, EditResult, Health, InboxItem, Note, Point, PreviewResult, ReviewDraft, SendResult,
 } from "../../../shared/contract";
-export type ScreenName = "inbox" | "review" | "options" | "preview";
+export type ScreenName = "inbox" | "review" | "options" | "preview" | "countdown" | "receipt";
 
 export interface Flash {
   text: string;
@@ -11,6 +11,27 @@ export interface Flash {
 export interface SavedDraft {
   notes: Note[];
   seen: string[];
+}
+
+/** A countdown that will send a thread from the inbox without opening its deck. */
+export interface PendingSend {
+  threadId: string;
+  title: string;
+  app: AppId;
+}
+
+/** A draft sentence edit that still has to reach POST /api/edit/:threadId. */
+export interface PendingEdit {
+  threadId: string;
+  pointId: string;
+  text: string;
+}
+
+/** What the last draft edit returned, shown in the pane next to the sentence. */
+export interface EditNotice {
+  pointId: string;
+  after?: string;
+  error?: string;
 }
 
 export interface State {
@@ -30,6 +51,8 @@ export interface State {
   loadingThreadId: string | null;
   reviewThreadId: string | null;
   reviewTitle: string;
+  /** Source app of the open thread, so the send row can name the destination. */
+  reviewApp: AppId | null;
   deckError: string | null;
   focus: number;
   notes: Note[];
@@ -41,6 +64,15 @@ export interface State {
   optionsFocus: number;
   preview: PreviewResult | null;
   previewLoading: boolean;
+  /** Undo countdown: the send happens by itself when this elapsed time is over. */
+  countdownStartedAt: number | null;
+  /** Set when the countdown came from an inbox row ("Agree & send"), not a deck. */
+  pendingSend: PendingSend | null;
+  /** Receipt lines shown for ~2 s after a send, then the inbox returns by itself. */
+  receiptLines: string[];
+  receiptAt: number | null;
+  pendingEdit: PendingEdit | null;
+  editResult: EditNotice | null;
   sending: boolean;
   sent: boolean;
   sentAt: number | null;
@@ -63,14 +95,26 @@ export type Effect =
   | { type: "retry-deck" };
 
 export const REVIEW_ROWS = 4;
-export const VOICE_MAX_MS = 20_000;
+export const VOICE_MAX_MS = 30_000;
 export const SENT_HOLD_MS = 1_500;
+/** "Sending in 5 · Tap to undo": the only send confirmation the glasses ask for. */
+export const COUNTDOWN_SECONDS = 5;
+export const COUNTDOWN_MS = COUNTDOWN_SECONDS * 1_000;
+/** How long the receipt stays up before the inbox returns by itself. */
+export const RECEIPT_HOLD_MS = 2_000;
 /** One swipe per 250 ms: the ring and touch surfaces both repeat fast. */
 export const SWIPE_DEBOUNCE_MS = 250;
 
 export function initialState(options: { demo: boolean; loading: boolean; cloud?: boolean }): State {
   return {
     screen: "inbox",
+    reviewApp: null,
+    countdownStartedAt: null,
+    pendingSend: null,
+    receiptLines: [],
+    receiptAt: null,
+    pendingEdit: null,
+    editResult: null,
     demo: options.demo,
     loading: options.loading,
     offline: false,
@@ -131,6 +175,26 @@ export function countNotes(notes: readonly Note[]) {
     answers: notes.filter((note) => note.verdict === "answer").length,
     notes: notes.filter((note) => note.verdict === "note").length,
   };
+}
+
+/** A point needs the user's eyes when Pinpoint flagged it or marked it high risk. */
+export function isFlagged(point: Point): boolean {
+  return Boolean(point.flag) || point.risk === "high";
+}
+
+/** Opening a deck starts on the first line that needs a check, else line 1. */
+export function startFocus(deck: Deck): number {
+  const index = deck.points.findIndex(isFlagged);
+  return index >= 0 ? index : 0;
+}
+
+/** The next flagged point after `from`, or the Send row when there is none. */
+export function nextFlaggedFocus(deck: Deck, from: number): number {
+  for (let index = from + 1; index < deck.points.length; index++) {
+    const point = deck.points[index];
+    if (point && isFlagged(point)) return index;
+  }
+  return deck.points.length;
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -225,7 +289,10 @@ export function moveFocus(state: State, delta: number): State {
     const max = state.deck.points.length;
     const focus = clamp(state.focus + delta, 0, max);
     if (focus === state.focus) return state;
-    return withSeen({ ...state, focus, flash: null }, state.deck.points[focus]);
+    return withSeen(
+      { ...state, focus, flash: null, editResult: null },
+      state.deck.points[focus],
+    );
   }
   return state;
 }
@@ -239,6 +306,7 @@ export function startReview(state: State, item: InboxItem): State {
     loadingThreadId: item.threadId,
     reviewThreadId: item.threadId,
     reviewTitle: item.title,
+    reviewApp: item.app ?? "t3",
     deckError: null,
     focus: 0,
     notes: saved?.notes ?? [],
@@ -247,6 +315,12 @@ export function startReview(state: State, item: InboxItem): State {
     optionsFocus: 0,
     preview: null,
     previewLoading: false,
+    countdownStartedAt: null,
+    pendingSend: null,
+    receiptLines: [],
+    receiptAt: null,
+    pendingEdit: null,
+    editResult: null,
     sending: false,
     sent: false,
     sentAt: null,
@@ -259,27 +333,43 @@ export function openDeck(state: State, deck: Deck): State {
   const saved = state.drafts[deck.threadId];
   const notes = saved?.notes ?? [];
   const seen = saved?.seen ?? [];
+  // The literal first point wins when it is a question: a question deck opens
+  // straight on its answers even if a later point carries a risk flag.
+  const focus = deck.points[0]?.kind === "question" ? 0 : startFocus(deck);
+  const point = deck.points[focus];
+  const inboxItem = state.inbox.find((item) => item.threadId === deck.threadId);
   const next: State = {
     ...state,
-    screen: "review",
+    // A question opens straight on its answer options; any other point opens
+    // in the list. This is the "start where it matters" rule.
+    screen: point?.kind === "question" ? "options" : "review",
     deck,
     loadingThreadId: null,
     reviewThreadId: deck.threadId,
     reviewTitle: deck.title,
+    reviewApp: inboxItem?.app
+      ?? (state.reviewThreadId === deck.threadId ? state.reviewApp : null)
+      ?? "t3",
     deckError: null,
-    focus: 0,
-    notes: notes.filter((note) => deck.points.some((point) => point.id === note.pointId)),
-    seen: seen.filter((id) => deck.points.some((point) => point.id === id)),
+    focus,
+    notes: notes.filter((note) => deck.points.some((entry) => entry.id === note.pointId)),
+    seen: seen.filter((id) => deck.points.some((entry) => entry.id === id)),
     recordingStartedAt: null,
     optionsFocus: 0,
     preview: null,
     previewLoading: false,
+    countdownStartedAt: null,
+    pendingSend: null,
+    receiptLines: [],
+    receiptAt: null,
+    pendingEdit: null,
+    editResult: null,
     sending: false,
     sent: false,
     sentAt: null,
     flash: null,
   };
-  return withSeen(next, deck.points[0]);
+  return withSeen(next, point);
 }
 
 export function mergeDeck(state: State, deck: Deck): State {
@@ -318,6 +408,7 @@ export function backToInbox(state: State): State {
     deck: null,
     loadingThreadId: null,
     reviewThreadId: null,
+    reviewApp: null,
     deckError: null,
     inbox: items,
     inboxFocus: 0,
@@ -326,6 +417,12 @@ export function backToInbox(state: State): State {
     optionsFocus: 0,
     preview: null,
     previewLoading: false,
+    countdownStartedAt: null,
+    pendingSend: null,
+    receiptLines: [],
+    receiptAt: null,
+    pendingEdit: null,
+    editResult: null,
     sending: false,
     sent: false,
     sentAt: null,
@@ -340,6 +437,8 @@ export function backToReview(state: State): State {
     optionsFocus: 0,
     preview: null,
     previewLoading: false,
+    countdownStartedAt: null,
+    pendingSend: null,
     sending: false,
     sent: false,
     sentAt: null,
@@ -348,7 +447,7 @@ export function backToReview(state: State): State {
 }
 
 export function beginRecording(state: State, now: number): State {
-  return { ...state, recordingStartedAt: now, flash: null };
+  return { ...state, recordingStartedAt: now, flash: null, editResult: null };
 }
 
 export function endRecording(state: State): State {
@@ -386,9 +485,25 @@ export function isObjection(text: string): boolean {
   return OBJECTION.test(text.trim());
 }
 
-export function applyVoice(state: State, text: string, _now: number, verdict?: "object" | "note"): State {
+/**
+ * Move to the next line that needs a check, or to the Send row. A voice note
+ * leaves the send tap for the user (so a just-edited draft sentence can be
+ * read); choosing the last answer starts the undo countdown instead, because
+ * the answer is the whole decision and the countdown is its confirmation.
+ */
+function advanceAfterNote(state: State, autoSend: boolean, now: number): State {
+  const deck = state.deck;
+  if (!deck) return state;
+  const focus = nextFlaggedFocus(deck, state.focus);
+  const advanced = withSeen({ ...state, focus, flash: null }, deck.points[focus]);
+  if (autoSend && focus >= deck.points.length) return startCountdown(advanced, now);
+  return advanced;
+}
+
+export function applyVoice(state: State, text: string, now: number, verdict?: "object" | "note"): State {
   const point = focusedPoint(state);
-  if (!point) return state;
+  const deck = state.deck;
+  if (!point || !deck) return state;
   const decided: Note["verdict"] = point.kind === "question"
     ? "answer"
     : verdict === "object" || verdict === "note"
@@ -396,16 +511,134 @@ export function applyVoice(state: State, text: string, _now: number, verdict?: "
       : isObjection(text) ? "object" : "note";
   const note: Note = { pointId: point.id, verdict: decided, text };
   const notes = [...state.notes.filter((item) => item.pointId !== point.id), note];
-  return remember({ ...state, notes, recordingStartedAt: null, flash: null });
+  const pendingEdit: PendingEdit | null = point.kind === "draft" && text.trim().length > 0
+    ? { threadId: deck.threadId, pointId: point.id, text }
+    : null;
+  const next = remember({
+    ...state,
+    notes,
+    recordingStartedAt: null,
+    flash: null,
+    editResult: null,
+    pendingEdit,
+  });
+  return advanceAfterNote(next, false, now);
 }
 
-export function chooseOption(state: State, index: number, _now: number): State {
+export function chooseOption(state: State, index: number, now: number): State {
   const point = focusedPoint(state);
   const option = point?.options?.[index];
   if (!point || option === undefined) return state;
   const note: Note = { pointId: point.id, verdict: "answer", option };
   const notes = [...state.notes.filter((item) => item.pointId !== point.id), note];
-  return remember({ ...state, screen: "review", notes, optionsFocus: 0, flash: null });
+  const next = remember({
+    ...state,
+    screen: "review",
+    notes,
+    optionsFocus: 0,
+    flash: null,
+    editResult: null,
+    pendingEdit: null,
+  });
+  return advanceAfterNote(next, true, now);
+}
+
+/** Start the 5 s "Sending… tap to undo" countdown for the open deck. */
+export function startCountdown(state: State, now: number): State {
+  if (!state.deck || state.sending) return state;
+  return {
+    ...state,
+    screen: "countdown",
+    focus: state.deck.points.length,
+    countdownStartedAt: now,
+    pendingSend: null,
+    flash: null,
+  };
+}
+
+/** "Agree & send" from an inbox row: send without opening the deck. */
+export function startInboxCountdown(state: State, item: InboxItem, now: number): State {
+  if (state.sending) return state;
+  return {
+    ...state,
+    screen: "countdown",
+    countdownStartedAt: now,
+    pendingSend: { threadId: item.threadId, title: item.title, app: item.app ?? "t3" },
+    focus: 0,
+    optionsFocus: 0,
+    pendingEdit: null,
+    editResult: null,
+    flash: null,
+  };
+}
+
+/** Seconds left in the countdown, 5 at the start and 0 when it is due. */
+export function countdownLeft(state: State, now: number): number {
+  if (state.countdownStartedAt === null) return 0;
+  const left = COUNTDOWN_MS - (now - state.countdownStartedAt);
+  return Math.max(0, Math.ceil(left / 1_000));
+}
+
+export function countdownDue(state: State, now: number): boolean {
+  return state.screen === "countdown" && state.countdownStartedAt !== null
+    && now - state.countdownStartedAt >= COUNTDOWN_MS;
+}
+
+/** Tap during the countdown cancels it: back to the review (or the inbox). */
+export function cancelCountdown(state: State): State {
+  if (state.screen !== "countdown") return state;
+  return {
+    ...state,
+    screen: state.deck ? "review" : "inbox",
+    countdownStartedAt: null,
+    pendingSend: null,
+    sending: false,
+    flash: null,
+  };
+}
+
+/** The receipt stage: lines from SendResult.receipt, or one calm sentence. */
+export function showReceipt(state: State, result: SendResult, now: number): State {
+  const lines = result.receipt?.lines.map((line) => line.text) ?? [];
+  return {
+    ...state,
+    screen: "receipt",
+    sending: false,
+    sent: true,
+    sentAt: now,
+    receiptLines: lines.length > 0 ? lines : ["Sent to the agent."],
+    receiptAt: now,
+    countdownStartedAt: null,
+    pendingEdit: null,
+  };
+}
+
+export function receiptDue(state: State, now: number): boolean {
+  return state.screen === "receipt" && state.receiptAt !== null
+    && now - state.receiptAt >= RECEIPT_HOLD_MS;
+}
+
+/**
+ * Apply the server's answer for a spoken draft edit. The note itself is never
+ * dropped: a failed edit leaves it in place and shows the short error instead.
+ */
+export function applyEdit(state: State, result: EditResult): State {
+  const notice: EditNotice = result.ok
+    ? { pointId: result.pointId, after: result.after }
+    : { pointId: result.pointId, error: result.error ?? "Couldn't change this line" };
+  // A deleted sentence has no replacement text; the empty string still marks
+  // the row CHANGED and reads as "line removed" in the pane.
+  const notes = result.ok
+    ? state.notes.map((note) => note.pointId === result.pointId
+      ? { ...note, after: result.after ?? "" }
+      : note)
+    : state.notes;
+  return remember({
+    ...state,
+    notes,
+    pendingEdit: null,
+    editResult: notice,
+  });
 }
 
 export function clearNotes(state: State, now: number): State {
@@ -434,11 +667,25 @@ export function markSent(state: State, now: number): State {
 }
 
 export function sendFailed(state: State, message: string, now: number): State {
-  return { ...state, sending: false, flash: { text: message, until: now + 5_000 } };
+  // A failed countdown returns to the review so the send row is one tap away;
+  // never leave the user staring at a finished countdown.
+  const fromCountdown = state.screen === "countdown";
+  return {
+    ...state,
+    screen: fromCountdown ? (state.deck ? "review" : "inbox") : state.screen,
+    countdownStartedAt: fromCountdown ? null : state.countdownStartedAt,
+    pendingSend: fromCountdown ? null : state.pendingSend,
+    sending: false,
+    flash: { text: message, until: now + 5_000 },
+  };
 }
 
 export function finishSend(state: State): State {
-  const threadId = state.deck?.threadId;
+  const threadId = state.deck?.threadId ?? state.pendingSend?.threadId ?? null;
+  const removedAt = threadId ? state.inbox.findIndex((item) => item.threadId === threadId) : -1;
+  const inbox = threadId ? state.inbox.filter((item) => item.threadId !== threadId) : state.inbox;
+  // The cursor lands on the next item that needs you, with no extra gesture.
+  const inboxFocus = removedAt >= 0 ? Math.min(removedAt, Math.max(0, inbox.length - 1)) : state.inboxFocus;
   const drafts = { ...state.drafts };
   if (threadId) delete drafts[threadId];
   // The cloud sample workspace is server-authoritative: the sample agent's
@@ -450,11 +697,12 @@ export function finishSend(state: State): State {
   return {
     ...state,
     screen: "inbox",
-    inbox: threadId ? state.inbox.filter((item) => item.threadId !== threadId) : state.inbox,
-    inboxFocus: 0,
+    inbox,
+    inboxFocus,
     deck: null,
     loadingThreadId: null,
     reviewThreadId: null,
+    reviewApp: null,
     deckError: null,
     notes: [],
     seen: [],
@@ -464,6 +712,12 @@ export function finishSend(state: State): State {
     optionsFocus: 0,
     preview: null,
     previewLoading: false,
+    countdownStartedAt: null,
+    pendingSend: null,
+    receiptLines: [],
+    receiptAt: null,
+    pendingEdit: null,
+    editResult: null,
     sending: false,
     sent: false,
     sentAt: null,
@@ -485,6 +739,7 @@ export function resetWorkspace(state: State): State {
     loadingThreadId: null,
     reviewThreadId: null,
     reviewTitle: "",
+    reviewApp: null,
     deckError: null,
     focus: 0,
     notes: [],
@@ -495,6 +750,12 @@ export function resetWorkspace(state: State): State {
     optionsFocus: 0,
     preview: null,
     previewLoading: false,
+    countdownStartedAt: null,
+    pendingSend: null,
+    receiptLines: [],
+    receiptAt: null,
+    pendingEdit: null,
+    editResult: null,
     sending: false,
     sent: false,
     sentAt: null,
@@ -542,7 +803,8 @@ export function press(state: State, now: number, listIndex?: number): PressResul
     }
     const point = deck.points[state.focus];
     if (!point) {
-      return { state: goPreview(state), effect: { type: "preview" } };
+      // The Send row starts the undo countdown, never a preview screen.
+      return { state: startCountdown(state, now) };
     }
     if (point.kind === "question") {
       return { state: { ...state, screen: "options", optionsFocus: 0, flash: null } };
@@ -556,6 +818,13 @@ export function press(state: State, now: number, listIndex?: number): PressResul
       return { state: chooseOption(state, state.optionsFocus, now) };
     }
     return { state: beginRecording({ ...state, screen: "review" }, now), effect: { type: "record-start" } };
+  }
+  if (state.screen === "countdown") {
+    if (state.sending) return { state };
+    return { state: cancelCountdown(state) };
+  }
+  if (state.screen === "receipt") {
+    return { state: finishSend(state) };
   }
   if (state.screen === "preview") {
     if (state.sending || state.sent) return { state };
@@ -572,6 +841,12 @@ export function doubleTap(state: State): PressResult {
   }
   if (state.screen === "review") {
     return { state: backToInbox(state) };
+  }
+  if (state.screen === "countdown") {
+    return { state: cancelCountdown(state) };
+  }
+  if (state.screen === "receipt") {
+    return { state: finishSend(state) };
   }
   if (state.screen === "preview") {
     // Sending is the deliberate action on the preview: a double tap, as the

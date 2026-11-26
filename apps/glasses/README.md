@@ -32,21 +32,23 @@ Lifecycle: the SDK's `FOREGROUND_ENTER`/`FOREGROUND_EXIT` events (and `document.
 | Inbox (root, native list) | Swipe up/down | Move the native list selection |
 | | Tap | Open the focused thread |
 | | Double-tap | **`shutDownPageContainer(1)`** — the required system exit dialog |
-| | Hold menu | `Refresh`, plus `Reset sample` in the cloud sample workspace |
+| | Hold menu | `Agree & send` on a non-question row (send without opening), `Refresh`, plus `Reset sample` in the cloud sample workspace |
 | Review | Swipe up/down | Move the point focus; the four-row window scrolls in place |
-| | Tap a step/claim/draft point | Start a voice note; tap again to stop |
+| | Tap a step/claim/draft point | Start a voice note (it stops after 1.2 s of silence, 30 s maximum); tap again to stop early |
 | | Tap a question | Open Options |
-| | Tap the `> Send review · 1 change, 6 OK` row | Open Preview |
+| | Tap the `> Send · 1 change, 6 OK` row | Start the 5 s undo countdown |
 | | Double-tap | Back to Inbox (draft kept and autosaved) |
-| | Hold menu | `Send review`, `Read on phone`, `Clear notes`, `Refresh`, plus `Reset sample` in the sample workspace |
-| Options | Tap | Choose an option and return to Review, or `Say something else` to record |
+| | Hold menu | `Send review` (same countdown), `Read on phone`, `Clear notes`, `Refresh`, plus `Reset sample` in the sample workspace |
+| Options | Tap | Choose an option; the last answer starts the countdown by itself, or `Say something else` to record |
 | | Double-tap | Back to Review |
-| Preview | Tap | Back to Review without sending |
-| | Double-tap | Send to the agent, then `Sent to the agent.` for 1.5 s and back to Inbox |
+| Countdown | Tap | Undo the send and return to the review |
+| Receipt | Tap | Return to the inbox before the automatic 2 s |
 
-Rows are words, not a legend of symbols. The focused row is the only one with a `>` cursor and is drawn at brightness 4; every other row stays at brightness 2 and keeps a three-space indent aligned with the cursor. A row the user commented on ends with a right-aligned word: `CHANGE` for an objection, `NOTE` for a note, or the chosen option for a question. A row the assistant flagged (high risk or a `flag`) ends with `CHECK` until the user comments. Nothing else is added.
+Opening a deck starts on its first flagged line (or line 1), and a question-first deck opens straight on its options with the recommended first option focused. After a note the cursor moves to the next flagged line or the Send row, so nobody scrolls to find Send. The send row names the destination: `Send to Priya · 1 change` for a mail draft, `Post 1 comment` / `Approve` for a Notion page, and `Send · 1 change, 6 OK` for an agent.
 
-The header reads `login-fix · 4 of 7 · 1 change · 1 note` (counts are omitted while zero and the title is shortened first). The send row reads `Send review · 1 change, 6 OK`. The quote pane shows the focused point's quote, the question's options, or `You said: ...` after a note. Footers stay in words: `Tap: talk · Double-tap: back`, and `Tap: open · Hold: menu` on the inbox. Long strings are fitted with the firmware's own glyph widths (the `@evenrealities/pretext` tables) rather than a fixed character count, so `login-fix` is never cut while a long inbox row still stops before the list edge.
+Rows are words, not a legend of symbols. The focused row is the only one with a `>` cursor and is drawn at brightness 4; every other row stays at brightness 2 and keeps a three-space indent aligned with the cursor. A row the user commented on ends with a right-aligned word: `CHANGE` for an objection, `NOTE` for a note, `CHANGED` for a draft sentence the server rewrote, or the chosen option for a question. A row the assistant flagged (high risk or a `flag`) ends with `CHECK` until the user comments. Nothing else is added.
+
+The header reads `login-fix · 4 of 7 · 1 change · 1 note` (counts are omitted while zero and the title is shortened first). The quote pane shows the focused point's quote, the question's options, `Now: ...` after a draft edit, or `You said: ...` after a note. Footers stay in words: `Tap: talk · Double-tap: back`, `Tap: undo` while counting down, and `Tap: open · Hold: menu` on the inbox. Long strings are fitted with the firmware's own glyph widths (the `@evenrealities/pretext` tables) rather than a fixed character count, so `login-fix` is never cut while a long inbox row still stops before the list edge.
 
 ## Run the browser preview
 
@@ -78,7 +80,7 @@ npm run simulator -- "http://127.0.0.1:4173/" --automation-port 9898 --aid corea
 node scripts/check-simulator.mjs 9898 --server http://127.0.0.1:8788
 ```
 
-The script verifies the demo server has the current fixtures, then runs: inbox → open `login-fix` → point 4 → voice note → Send row → Preview → double-tap Send → inbox with the thread gone → answer the payment question → root double-tap exit. PNGs are written to `demo/shots/glasses-01-inbox.png` … `glasses-13-exit.png`.
+The script verifies the demo server has the current fixtures, then runs: inbox → open `login-fix` (lands on flagged point 4) → voice note → the cursor moves to Send → tap Send → 5 s undo countdown → receipt → inbox with the thread gone → open the payment question (lands on its options) → choose an answer → countdown → root double-tap exit. PNGs are written to `demo/shots/glasses-01-inbox.png` … `glasses-13-exit.png`. (The live-server script still describes the older preview flow; the mock flow above is exercised by `npm run test:ui`.)
 
 The voice note is real audio: the script makes the phrase with macOS `say`, plays it through the speakers while the simulator records from the MacBook microphone selected with `--aid`, and the server transcribes the captured PCM through its own `/api/voice` route. Keep the Mac's output audible and the microphone unmuted for this check; it is a real room recording, not injected bytes. The script also decodes each review screenshot and proves the focused row's peak alpha is 255 against 197 for the dim rows, so the brightness difference is in the saved PNG, not only in the DOM.
 

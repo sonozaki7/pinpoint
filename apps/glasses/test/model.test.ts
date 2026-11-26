@@ -5,8 +5,9 @@ import {
   createDemoInbox, createInboxMorningDeck, createLoginDeck, createPaymentDeck, MockPinpointApi,
 } from "../src/mock";
 import {
-  adoptInbox, applyVoice, chooseOption, clearNotes, doubleTap, finishSend, initialState, moveFocus,
-  openDeck, press, previewFailed, recordingOnSurface, recordingTickDelay, setFlash, setPreview, startReview,
+  adoptInbox, applyVoice, cancelCountdown, chooseOption, clearNotes, countdownLeft, doubleTap, finishSend,
+  goPreview, initialState, moveFocus, openDeck, press, previewFailed, recordingOnSurface,
+  recordingTickDelay, setFlash, setPreview, showReceipt, startReview,
   type State,
 } from "../src/model";
 import {
@@ -31,7 +32,9 @@ function reviewState(threadId = "login-fix"): State {
   const item = state.inbox.find((entry) => entry.threadId === threadId);
   assert.ok(item);
   const deck = threadId === "login-fix" ? createLoginDeck() : createPaymentDeck();
-  return openDeck(startReview(state, item), deck);
+  // These tests exercise the list from line 1; the "start where it matters"
+  // focus is covered by budget.test.ts.
+  return { ...openDeck(startReview(state, item), deck), screen: "review", focus: 0 };
 }
 
 function assertPageFits(page: ReturnType<typeof pageFor>): void {
@@ -84,7 +87,7 @@ test("the four-row window scrolls only after the fourth row", () => {
   assert.match(at(6)[0] ?? "", /Sign out every customer once/);
   assert.match(at(6)[3] ?? "", /Release to all/);
   assert.match(at(7)[0] ?? "", /^ {3}5 /, "only the focused row carries the cursor");
-  assert.match(at(7)[3] ?? "", /^> Send review · 7 OK$/);
+  assert.match(at(7)[3] ?? "", /^> Send · 7 OK$/);
 });
 
 test("the inbox header counts every listed thread and the review header reads as words", () => {
@@ -223,16 +226,18 @@ test("voice notes show as the user's words and answers keep the chosen option", 
   assert.equal(markerFor(question.deck!.points[0]!, answered), "=");
   const picked = chooseOption({ ...question, screen: "options", optionsFocus: 2 }, 2, 4_000);
   assert.equal(picked.notes[0]?.option, "Upgrade in a test shop");
-  assert.equal(picked.screen, "review");
-  assert.match(pageFor(picked, 4_000).pane ?? "", /^You chose: Upgrade in a test shop$/);
-  assert.match(pointRow(question.deck!.points[0]!, picked), /Upgrade in a test shop$/);
+  assert.equal(picked.screen, "countdown", "the last answer starts the undo countdown");
+  const pickedReview = cancelCountdown(picked);
+  assert.equal(pickedReview.screen, "review");
+  assert.match(pageFor(pickedReview, 4_000).pane ?? "", /^You chose: Upgrade in a test shop$/);
+  assert.match(pointRow(question.deck!.points[0]!, pickedReview), /Upgrade in a test shop$/);
 
   const cleared = clearNotes(answered, 5_000);
   assert.equal(cleared.notes.length, 0);
   assert.match(cleared.flash?.text ?? "", /Notes cleared/);
 });
 
-test("the screen flow starts a recording, opens options, previews and sends on a double tap", () => {
+test("the screen flow starts a recording, opens options and sends through the undo countdown", () => {
   let state = reviewState();
   state = { ...state, focus: 3 };
   const start = press(state, 1_000);
@@ -250,22 +255,27 @@ test("the screen flow starts a recording, opens options, previews and sends on a
   assert.equal(sayElse.state.screen, "review");
   assert.equal(sayElse.effect?.type, "record-start");
 
-  let send = reviewState();
-  send = { ...send, focus: 7 };
-  const preview = press(send, 1_000);
-  assert.equal(preview.state.screen, "preview");
-  assert.equal(preview.effect?.type, "preview");
-  const loaded = setPreview(preview.state, {
-    message: "m", preview: ["2 objections, 1 note", "Tap to send to login-fix"],
-    counts: { objections: 2, answers: 0, notes: 1, agreed: 4 },
-  });
-  assert.equal(pageFor(loaded, 1_000).pane, "3 changes, 4 agreed\nDouble-tap to send");
-  const back = press(loaded, 2_000);
-  assert.equal(back.state.screen, "review", "a single tap leaves the preview");
-  assert.equal(back.effect, undefined);
-  const sending = doubleTap(loaded);
-  assert.equal(sending.effect?.type, "send");
-  assert.equal(sending.state.sending, true);
+  const send = press({ ...reviewState(), focus: 7 }, 1_000);
+  assert.equal(send.state.screen, "countdown");
+  assert.equal(send.state.countdownStartedAt, 1_000);
+  assert.equal(pageFor(send.state, 1_000).pane, "Sending in 5 · Tap to undo");
+  assert.equal(pageFor(send.state, 1_500).pane, "Sending in 5 · Tap to undo", "one update per second");
+  assert.equal(pageFor(send.state, 4_000).pane, "Sending in 2 · Tap to undo");
+  assert.equal(countdownLeft(send.state, 5_999), 1);
+  assert.equal(countdownLeft(send.state, 6_000), 0);
+  const cancelled = press(send.state, 2_000);
+  assert.equal(cancelled.state.screen, "review", "tap undoes the send");
+  assert.equal(pageFor(cancelled.state, 2_000).footer, "Tap: send · Double-tap: back");
+
+  const receipt = showReceipt(send.state, {
+    ok: true,
+    delivered: "demo-log",
+    receipt: { lines: [{ app: "t3", text: "Review delivered to login-fix", ok: true }] },
+  }, 2_000);
+  assert.equal(receipt.screen, "receipt");
+  assert.equal(pageFor(receipt, 2_000).pane, "Review delivered to login-fix");
+  assert.equal(pageFor(receipt, 2_000).footer, "Tap: inbox");
+  assert.equal(doubleTap(receipt).state.screen, "inbox");
 });
 
 test("the in-memory API serves the plain-language sample threads and composes a review", async () => {
@@ -306,10 +316,11 @@ test("every page fits the 576x288 frame with exactly one capture target and a me
   const offline = { ...inboxState(), offline: true, offlineMessage: "Can't reach Pinpoint Cloud." };
   const recording = { ...reviewState(), recordingStartedAt: 500 };
   const sendRow = press({ ...reviewState(), focus: 7 }, 1_000).state;
-  const loadedPreview = setPreview(sendRow, {
+  const loadedPreview = setPreview(goPreview(reviewState()), {
     message: "m", preview: ["1 change, 6 agreed", "Double-tap to send"],
     counts: { objections: 0, answers: 0, notes: 1, agreed: 6 },
   });
+  const receipt = showReceipt(sendRow, { ok: true, delivered: "demo-log" }, 1_000);
   const pages = [
     pageFor(inboxState(), 1_000),
     pageFor(sample, 1_000),
@@ -322,6 +333,7 @@ test("every page fits the 576x288 frame with exactly one capture target and a me
     pageFor({ ...reviewState(), focus: 3 }, 1_000),
     pageFor(press(reviewState("payment-upgrade"), 1_000).state, 1_000),
     pageFor(sendRow, 1_000),
+    pageFor(receipt, 1_000),
     pageFor(loadedPreview, 1_000),
     pageFor({ ...loadedPreview, sent: true }, 1_000),
     pageFor({ ...loadedPreview, sent: true, workspace: "sample" }, 1_000),
@@ -341,7 +353,11 @@ test("every page fits the 576x288 frame with exactly one capture target and a me
       assert.ok((box.xPosition ?? 0) + (box.width ?? 0) <= 576, page.kind);
       assert.ok((box.yPosition ?? 0) + (box.height ?? 0) <= 288, page.kind);
     }
-    assert.ok((layout.menuObject?.menuItems?.length ?? 0) > 0, `${page.kind} carries its menu`);
+    if (page.kind === "countdown" || page.kind === "receipt") {
+      assert.equal(page.menu.length, 0, `${page.kind} hands the whole screen to one action`);
+    } else {
+      assert.ok((layout.menuObject?.menuItems?.length ?? 0) > 0, `${page.kind} carries its menu`);
+    }
     assertPageFits(page);
   }
   const pane = layoutFor(pageFor(reviewState(), 1_000)).text.find((box) => box.name === "pane");
@@ -373,8 +389,8 @@ test("a foreground change cancels a recording and the clock ticks once a second"
   assert.equal(recordingTickDelay(1_000, 1_000), 1_030);
   assert.equal(recordingTickDelay(1_500, 1_000), 530);
   assert.equal(recordingTickDelay(2_000, 1_000), 1_030);
-  assert.equal(recordingTickDelay(20_900, 1_000), 100);
-  assert.equal(recordingTickDelay(21_000, 1_000), 0);
+  assert.equal(recordingTickDelay(30_900, 1_000), 100);
+  assert.equal(recordingTickDelay(31_000, 1_000), 0);
 
   const paneAt = (now: number) => pageFor(recording, now).pane;
   assert.equal(paneAt(1_000), "Recording 0s · tap to stop");
