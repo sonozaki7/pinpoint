@@ -4,6 +4,7 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import type { ThreadAttention } from '../../../../shared/contract.js';
+import type { AppId } from '../../../../shared/contract.js';
 import type { TopicStatus } from './format.js';
 
 export interface StoredPart {
@@ -19,6 +20,12 @@ export interface TopicRecord {
   title: string;
   /** Display-only; copied from the thread so the agree-all hook can receive the whole ref. */
   project?: string;
+  /** Which review surface the topic belongs to; absent means an agent thread. */
+  app?: AppId;
+  /** First name a Gmail draft is addressed to, for the send confirmation. */
+  recipient?: string;
+  /** Deep link to the source item (Notion page, Gmail draft). */
+  targetLink?: string;
   attention: ThreadAttention;
   /** Topic icon/name state: needs you, done, failed. */
   status?: TopicStatus;
@@ -39,6 +46,10 @@ export interface TopicRecord {
   parts: StoredPart[];
   reviewMessageId?: number;
   summaryMessageId?: number;
+  /** Where-the-send-landed receipt message, when the source returned one. */
+  receiptMessageId?: number;
+  /** The Gmail "Send as written?" confirmation message, while it waits. */
+  confirmMessageId?: number;
   reviewedAt?: string;
   agreedAt?: string;
   updatedAt: string;

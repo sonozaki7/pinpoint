@@ -83,6 +83,18 @@ async function main(): Promise<void> {
       if (!thread) throw new Error(`Unknown thread ${threadOrId}`);
       await service.agreeAll(thread);
     },
+    onAnswer: async (threadId, pointId, option) => {
+      if (!service) throw new Error('Server is still starting');
+      await service.answer(threadId, pointId, option);
+    },
+    onApprove: async (threadId) => {
+      if (!service) throw new Error('Server is still starting');
+      await service.approve(threadId);
+    },
+    onSend: async (threadId) => {
+      if (!service) throw new Error('Server is still starting');
+      await service.sendFromTelegram(threadId);
+    },
   });
   if (!telegramLoaded.live && telegramLoaded.reason) {
     console.warn(`[pinpoint] Telegram notifier unavailable: ${redactSecrets(telegramLoaded.reason)}`);

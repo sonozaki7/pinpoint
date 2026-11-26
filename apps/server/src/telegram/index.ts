@@ -11,9 +11,15 @@
 // written as one JSON line to .data/telegram-dryrun.log and fake links are returned.
 import { fileURLToPath } from 'node:url';
 import { Bot } from 'grammy';
-import type { Deck, Point, ReviewDraft } from '../../../../shared/contract.js';
+import type { AppId, Deck, Point, Receipt, ReviewDraft } from '../../../../shared/contract.js';
 import { errorMessage } from '../core/errors.js';
-import { AGREE_PREFIX, ANSWER_PREFIX, handleCallbackQuery } from './callbacks.js';
+import {
+  AGREE_PREFIX,
+  ANSWER_PREFIX,
+  APPROVE_PREFIX,
+  MAIL_PREFIX,
+  handleCallbackQuery,
+} from './callbacks.js';
 import {
   AGREED_FIRST_LINE,
   LEGEND_TEXT,
@@ -24,11 +30,13 @@ import {
   noteBody,
   noteReplyText,
   readOnPhoneText,
+  receiptFirstLine,
   renderCard,
-  reviewCounts,
+  reviewCountsFor,
   reviewedFirstLine,
   summaryText,
   topicStatusForAttention,
+  type CardContext,
   type TopicStatus,
 } from './format.js';
 import {
@@ -88,6 +96,10 @@ export interface NotifierOptions {
    * same answer path the glasses use. Without it, question cards show no option buttons.
    */
   onAnswer?(threadId: string, pointId: string, option: string): Promise<void>;
+  /** Called when "✅ Approve" is tapped on a Notion card. */
+  onApprove?(threadId: string): Promise<void>;
+  /** Called when the phone confirms "Send" on a Gmail draft. */
+  onSend?(threadId: string): Promise<void>;
   /** Called when Telegram refuses a quote and the note is posted as a plain reply. */
   onQuoteFallback?(info: { quote: string; text: string; reason: string }): void;
   /** Override for tests; defaults to apps/server/.data. */
@@ -100,7 +112,7 @@ export interface NotifierOptions {
 }
 
 export interface SentMessageRef {
-  kind: 'card' | 'full-text' | 'note' | 'summary' | 'read-on-phone';
+  kind: 'card' | 'full-text' | 'note' | 'summary' | 'receipt' | 'read-on-phone';
   messageId: number;
   link: string;
   pointId?: string;
@@ -109,6 +121,8 @@ export interface SentMessageRef {
 export interface ReviewSentResult {
   link?: string;
   messages?: SentMessageRef[];
+  /** First line now shown on the card, when a receipt produced it. */
+  firstLine?: string;
 }
 
 export interface ReadOnPhoneResult {
@@ -124,7 +138,19 @@ export interface TelegramNotifier {
     deck: Deck,
     draft: ReviewDraft,
     composedMessage: string,
+    receipt?: Receipt,
+    options?: { via?: 'g2' | 'telegram' },
   ): Promise<ReviewSentResult>;
+  /**
+   * The live inbox polling saw a new agent message on a thread that was already
+   * reviewed. Posts it silently and returns true when it was handled, so the
+   * caller does not post a fresh card for the same message.
+   */
+  onAgentReply(
+    thread: ThreadRef,
+    source: SourceRef,
+    options?: { needsYou?: boolean },
+  ): Promise<boolean>;
   readOnPhone(thread: ThreadRef, deck: Deck, point: Point): Promise<ReadOnPhoneResult>;
   start(): Promise<void>;
   stop(): Promise<void>;
@@ -217,12 +243,51 @@ export function createTelegramNotifier(env: TelegramEnv, opts: NotifierOptions):
     }
   }
 
+  function contextFor(thread: ThreadRef, source?: SourceRef): CardContext {
+    const app = source?.app ?? thread.app ?? 't3';
+    return {
+      app,
+      ...(source?.target ? { target: source.target } : {}),
+    };
+  }
+
   function cardKeyboard(
     thread: ThreadRef,
     deck: Deck,
+    source?: SourceRef,
     link?: string,
-  ): { keyboard: InlineKeyboard; answerPointId?: string; answerOptions?: string[] } {
+  ): {
+    keyboard: InlineKeyboard;
+    answerPointId?: string;
+    answerOptions?: string[];
+  } {
     const rows: InlineButton[][] = [];
+    const app = source?.app ?? thread.app ?? 't3';
+
+    if (app === 'notion') {
+      const row: InlineButton[] = [];
+      if (opts.onApprove) {
+        const data = `${APPROVE_PREFIX}${thread.threadId}`;
+        assertCallbackData(data);
+        row.push({ text: '✅ Approve', callback_data: data });
+      }
+      if (source?.target?.link) row.push({ text: '📄 Read page', url: source.target.link });
+      if (row.length > 0) rows.push(row);
+      return { keyboard: { inline_keyboard: rows } };
+    }
+
+    if (app === 'gmail') {
+      const row: InlineButton[] = [];
+      if (source?.target?.link) row.push({ text: '📄 Read draft', url: source.target.link });
+      if (opts.onSend) {
+        const data = `${MAIL_PREFIX}${thread.threadId}`;
+        assertCallbackData(data);
+        row.push({ text: '✉️ Send as written', callback_data: data });
+      }
+      if (row.length > 0) rows.push(row);
+      return { keyboard: { inline_keyboard: rows } };
+    }
+
     const question = opts.onAnswer
       ? deck.points.find((point) => point.kind === 'question' && (point.options?.length ?? 0) > 0)
       : undefined;
@@ -388,6 +453,7 @@ export function createTelegramNotifier(env: TelegramEnv, opts: NotifierOptions):
       topicId,
       title: thread.title,
       project: thread.project ?? '',
+      app: thread.app ?? 't3',
       attention: thread.attention,
       status: target,
       pointCount: 0,
@@ -401,17 +467,30 @@ export function createTelegramNotifier(env: TelegramEnv, opts: NotifierOptions):
     return record;
   }
 
-  async function ensureCard(thread: ThreadRef, deck: Deck, current: TopicRecord): Promise<TopicRecord> {
-    const parts = needsCard(thread, deck);
+  async function ensureCard(
+    thread: ThreadRef,
+    deck: Deck,
+    current: TopicRecord,
+    source?: SourceRef,
+  ): Promise<TopicRecord> {
+    const context = contextFor(thread, source);
+    const parts = needsCard(thread, deck, context);
     const text = renderCard(parts);
-    const { keyboard, answerPointId, answerOptions } = cardKeyboard(thread, deck);
+    const { keyboard, answerPointId, answerOptions } = cardKeyboard(thread, deck, source);
+    const markup =
+      keyboard.inline_keyboard.length > 0
+        ? ({ reply_markup: keyboard } as { reply_markup: InlineKeyboard })
+        : {};
+    const app = context.app ?? 't3';
+    const recipient = source?.target?.recipient ?? source?.target?.name;
+    const targetLink = source?.target?.link;
 
     if (current.headerMessageId === undefined) {
       const sent = await transport.call<TelegramMessage>('sendMessage', {
         chat_id: chatOf(current),
         message_thread_id: current.topicId,
         text,
-        reply_markup: keyboard,
+        ...markup,
         link_preview_options: { is_disabled: true },
       });
       // Telegram auto-pins the first message in a new topic. The card must not stay
@@ -435,6 +514,9 @@ export function createTelegramNotifier(env: TelegramEnv, opts: NotifierOptions):
           record.headerText = text;
           record.cardTitleLine = parts.titleLine;
           record.cardLines = parts.points;
+          record.app = app;
+          if (recipient) record.recipient = recipient;
+          if (targetLink) record.targetLink = targetLink;
           record.attention = thread.attention;
           record.pointCount = deck.points.length;
           record.answerPointId = answerPointId;
@@ -458,13 +540,16 @@ export function createTelegramNotifier(env: TelegramEnv, opts: NotifierOptions):
         chat_id: chatOf(current),
         message_id: current.headerMessageId,
         text,
-        reply_markup: keyboard,
+        ...markup,
       });
       return (
         (await saveRecord(thread.threadId, (record) => {
           record.headerText = text;
           record.cardTitleLine = parts.titleLine;
           record.cardLines = parts.points;
+          record.app = app;
+          if (recipient) record.recipient = recipient;
+          if (targetLink) record.targetLink = targetLink;
           record.attention = thread.attention;
           record.pointCount = deck.points.length;
           record.answerPointId = answerPointId;
@@ -491,7 +576,7 @@ export function createTelegramNotifier(env: TelegramEnv, opts: NotifierOptions):
     const rendered = renderSourceParts(source.text, undefined, { collapseLong: false });
     const longText = source.text.replace(/\s+/g, ' ').trim().length > LONG_FULL_TEXT_CHARS;
     const body = longText ? wrapExpandable(rendered) : rendered;
-    const label = fullTextLabel(thread.attention);
+    const label = fullTextLabel(thread.attention, source.app ?? thread.app ?? 't3');
     const posted: StoredPart[] = [];
 
     for (let index = 0; index < body.length; index += 1) {
@@ -533,12 +618,13 @@ export function createTelegramNotifier(env: TelegramEnv, opts: NotifierOptions):
     thread: ThreadRef,
     deck: Deck,
     current: TopicRecord,
+    source?: SourceRef,
   ): Promise<TopicRecord> {
     const first = current.parts[0];
     if (current.headerMessageId === undefined || !first) return current;
     const link = messageLink(chatOf(current), first.messageId, current.topicId);
-    const { keyboard, answerPointId, answerOptions } = cardKeyboard(thread, deck, link);
-    const key = `${first.messageId}|${answerOptions?.length ?? 0}`;
+    const { keyboard, answerPointId, answerOptions } = cardKeyboard(thread, deck, source, link);
+    const key = `${first.messageId}|${JSON.stringify(keyboard.inline_keyboard)}`;
     if (current.cardKeyboardKey === key) return current;
 
     await callIgnoringNotModified('editMessageReplyMarkup', {
@@ -650,13 +736,17 @@ export function createTelegramNotifier(env: TelegramEnv, opts: NotifierOptions):
 
   async function onAttention(thread: ThreadRef, source: SourceRef, deck: Deck): Promise<void> {
     await ensureLegend();
+    const app = source.app ?? thread.app ?? 't3';
     const topic = await ensureTopic(thread, topicStatusForAttention(thread.attention));
-    const withCard = await ensureCard(thread, deck, topic);
+    const withCard = await ensureCard(thread, deck, topic, source);
     const withSource = await postSource(thread, withCard, source);
-    await refreshCardKeyboard(thread, deck, withSource);
+    // The agent card's "Read full plan" needs the posted full-text message id; the
+    // Notion/Gmail buttons already carry their own links on the first send.
+    if (app === 't3') await refreshCardKeyboard(thread, deck, withSource, source);
     await saveRecord(thread.threadId, (next) => {
       next.title = thread.title;
       next.project = thread.project ?? '';
+      next.app = app;
       next.attention = thread.attention;
       next.pointCount = deck.points.length;
     });
@@ -667,10 +757,15 @@ export function createTelegramNotifier(env: TelegramEnv, opts: NotifierOptions):
     deck: Deck,
     draft: ReviewDraft,
     _composedMessage: string,
+    receipt?: Receipt,
+    options: { via?: 'g2' | 'telegram' } = {},
   ): Promise<ReviewSentResult> {
     await ensureLegend();
+    const app = thread.app ?? 't3';
+    const via = options.via ?? 'g2';
     const topic = await ensureTopic(thread);
     const record = topic.headerMessageId !== undefined ? topic : await ensureCard(thread, deck, topic);
+    const cardContext: CardContext = { app };
     const chat = chatOf(record);
     const messages: SentMessageRef[] = [];
     if (record.headerMessageId !== undefined) {
@@ -685,7 +780,7 @@ export function createTelegramNotifier(env: TelegramEnv, opts: NotifierOptions):
     for (const note of draft.notes ?? []) {
       const point = deck.points.find((candidate) => candidate.id === note.pointId);
       if (!point || noteBody(note).length === 0) continue;
-      const text = noteReplyText(note);
+      const text = noteReplyText(note, app);
       const match = findQuoteMatch(record.parts, point.quote);
       const target = match ? record.parts[match.partIndex] : undefined;
       let messageId: number;
@@ -717,8 +812,8 @@ export function createTelegramNotifier(env: TelegramEnv, opts: NotifierOptions):
       });
     }
 
-    const counts = reviewCounts(deck, draft.notes);
-    const summary = summaryText(counts);
+    const counts = reviewCountsFor(app, deck, draft.notes);
+    const summary = summaryText(counts, { app, via });
     const sentSummary = await transport.call<TelegramMessage>('sendMessage', {
       chat_id: chat,
       message_thread_id: record.topicId,
@@ -731,21 +826,100 @@ export function createTelegramNotifier(env: TelegramEnv, opts: NotifierOptions):
       link: messageLink(chat, sentSummary.message_id, record.topicId),
     });
 
-    await finishCard(record, reviewedFirstLine(counts));
+    let receiptMessageId: number | undefined;
+    if (receipt && receipt.lines.length > 0) {
+      const sentReceipt = await transport.call<TelegramMessage>('sendMessage', {
+        chat_id: chat,
+        message_thread_id: record.topicId,
+        text: receiptText(receipt),
+        parse_mode: 'HTML',
+        disable_notification: true,
+        link_preview_options: { is_disabled: true },
+      });
+      receiptMessageId = sentReceipt.message_id;
+      messages.push({
+        kind: 'receipt',
+        messageId: sentReceipt.message_id,
+        link: messageLink(chat, sentReceipt.message_id, record.topicId),
+      });
+    }
+
+    const firstLine =
+      receiptFirstLine(receipt, draft, app) ?? reviewedFirstLine(counts, via);
+    await finishCard(record, firstLine);
     await setTopicStatus(record, 'done');
     await saveRecord(thread.threadId, (next) => {
       next.reviewMessageId = sentSummary.message_id;
       next.summaryMessageId = sentSummary.message_id;
+      if (receiptMessageId !== undefined) next.receiptMessageId = receiptMessageId;
       next.reviewedAt = nowIso();
       next.pointCount = deck.points.length;
-      next.cardLines = needsCard(thread, deck).points;
-      next.cardTitleLine = record.cardTitleLine ?? needsCard(thread, deck).titleLine;
+      const card = needsCard(thread, deck, cardContext);
+      next.cardLines = card.points;
+      next.cardTitleLine = record.cardTitleLine ?? card.titleLine;
+      next.app = app;
     });
 
     return {
       link: messageLink(chat, sentSummary.message_id, record.topicId),
       messages,
+      firstLine,
     };
+  }
+
+  /**
+   * A new message on a thread that was already reviewed. The live inbox polling
+   * calls this before posting any fresh card, so the topic shows one calm
+   * "Agent replied" message instead of a second notifying card.
+   */
+  async function onAgentReply(
+    thread: ThreadRef,
+    source: SourceRef,
+    options: { needsYou?: boolean } = {},
+  ): Promise<boolean> {
+    const app = thread.app ?? source.app ?? 't3';
+    if (app !== 't3') return false;
+    const state = await store.get();
+    const record = state.topics[thread.threadId];
+    if (!record || record.headerMessageId === undefined) return false;
+    if (!record.reviewedAt && !record.agreedAt) return false;
+    if (!record.sourceMessageId || record.sourceMessageId === source.sourceMessageId) {
+      return false;
+    }
+
+    const rendered = renderSourceParts(source.text, undefined, { collapseLong: false });
+    const longText = source.text.replace(/\s+/g, ' ').trim().length > LONG_FULL_TEXT_CHARS;
+    const body = longText ? wrapExpandable(rendered) : rendered;
+    const label = '🤖 Agent replied';
+    const posted: StoredPart[] = [];
+    for (let index = 0; index < body.length; index += 1) {
+      const part = body[index] as RenderedPart;
+      const header = index === 0 ? label : undefined;
+      const html = header ? `${escapeHtml(header)}\n\n${part.html}` : part.html;
+      const plain = header ? `${header}\n\n${part.plain}` : part.plain;
+      const sent = await transport.call<TelegramMessage>('sendMessage', {
+        chat_id: chatOf(record),
+        message_thread_id: record.topicId,
+        text: html,
+        parse_mode: 'HTML',
+        disable_notification: true,
+        link_preview_options: { is_disabled: true },
+      });
+      posted.push({ messageId: sent.message_id, plain });
+    }
+
+    const withReply = await saveRecord(thread.threadId, (next) => {
+      next.sourceMessageId = source.sourceMessageId;
+      next.parts = posted;
+      next.sourceMessageIds = posted.map((entry) => entry.messageId);
+      next.attention = thread.attention;
+      next.title = thread.title;
+    });
+    const needsYou = options.needsYou !== false;
+    if (needsYou && withReply) {
+      await setTopicStatus(withReply, 'needs');
+    }
+    return true;
   }
 
   async function readOnPhone(
@@ -806,6 +980,8 @@ export function createTelegramNotifier(env: TelegramEnv, opts: NotifierOptions):
           store,
           onAgreeAll: opts.onAgreeAll,
           ...(opts.onAnswer ? { onAnswer: opts.onAnswer } : {}),
+          ...(opts.onApprove ? { onApprove: opts.onApprove } : {}),
+          ...(opts.onSend ? { onSend: opts.onSend } : {}),
           setTopicStatus,
           nowIso,
         },
@@ -843,10 +1019,28 @@ export function createTelegramNotifier(env: TelegramEnv, opts: NotifierOptions):
     mode: dryRun ? 'dry-run' : 'live',
     onAttention,
     onReviewSent,
+    onAgentReply,
     readOnPhone,
     start,
     stop,
   };
+}
+
+/**
+ * The silent receipt message: one line per place the review landed, linked to
+ * the result (Notion page, Gmail sent message). Failed lines keep a warning.
+ */
+function receiptText(receipt: Receipt): string {
+  const lines = receipt.lines.map((line) => {
+    const mark = line.ok ? '•' : '⚠️';
+    const label = escapeHtml(line.text);
+    if (line.link && /^https?:\/\//i.test(line.link)) {
+      const href = line.link.replace(/&/g, '&amp;').replace(/"/g, '%22');
+      return `${mark} <a href="${href}">${label}</a>`;
+    }
+    return `${mark} ${label}`;
+  });
+  return `📍 Where it landed\n${lines.join('\n')}`;
 }
 
 function pick(...values: Array<string | undefined>): string {

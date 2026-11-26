@@ -1,8 +1,8 @@
 # Telegram setup (5–10 minutes)
 
-Pinpoint uses one private Telegram group with **Topics** on as its "desk". Each agent
-task (a plan, a question, a report, a failed run) gets its own topic named after the
-thread. The topic list shows the state at a glance:
+Pinpoint uses one private Telegram group with **Topics** on as its "desk". Each piece
+of work — an agent task, a Notion page or a Gmail draft — gets its own topic named
+after it. The topic list shows the state at a glance:
 
 - ❗️ **needs you** — the agent is waiting for a review or an answer
 - ✅ **reviewed or agreed** — nothing is waiting
@@ -14,7 +14,7 @@ Telegram's built-in topic-icon list has no yellow circle or warning triangle, so
 
 Inside each topic:
 
-1. **The card**, first message, the only message that notifies when the agent needs you:
+1. **The card**, first message, the only message that notifies when the work needs you:
 
    ```
    🟡 Needs you: plan, 7 steps
@@ -28,30 +28,58 @@ Inside each topic:
    Review it on your G2, or:
    ```
 
-   Buttons: **✅ Agree all** and **📄 Read full plan** (a link to the full text
-   message). A question card also shows its options as buttons when the server wires
-   the answer hook (see the team section).
-2. **The full agent text**, silent (no notification), rendered quote-safe. Texts longer
-   than about 600 characters collapse into one expandable block on the phone.
-3. **When you send a review from the glasses**, everything is silent:
+   The wording follows the source:
+
+   ```
+   🟡 Needs you: Notion page, 6 points     🟡 Needs you: draft to Priya, 6 lines
+   Launch post: Pinpoint 1.0              Re: Acme contract - net-45 terms
+   ...
+   Approve it on your G2, or:             Send it from your G2, or:
+   ```
+
+   Buttons:
+   - agent: **✅ Agree all** and **📄 Read full plan** (a link to the full text
+     message). A question card shows its options as buttons.
+   - Notion: **✅ Approve** (sets the page status to Approved) and **📄 Read page**
+     (opens the page).
+   - Gmail: **📄 Read draft** (opens the draft) and **✉️ Send as written**. Sending
+     always asks on the phone first: `Send to Priya as written?` with **Send** and
+     **Cancel**, because an email cannot be unsent.
+
+   A question option tapped in Telegram takes the same path as answering on the
+   glasses: the answer is saved, sent to the agent, and the card becomes
+   `✅ Answered from Telegram: Wait until Monday`.
+2. **The full source text**, silent (no notification), rendered quote-safe. Texts longer
+   than about 600 characters collapse into one expandable block on the phone. The header
+   says whether it is an agent reply, a Notion page or a draft.
+3. **When you send a review from the glasses or a button**, everything is silent:
    - one quote-reply per note on the exact sentence, body only, for example
      `❌ Your change: Don't sign everyone out. Just fix the broken logins.`,
      `📝 Your note: ...`, `💬 Your answer: ...`;
+   - for a Gmail edit, `✏️ Changed to: We're happy to agree to net-45 payment terms.`;
    - one summary, for example
      `✅ Sent to the agent from your G2: 1 change, 6 agreed`;
-   - the card's first line becomes `✅ Reviewed from G2: 1 change sent`, its buttons
-     are removed, and the topic icon turns ✅.
-4. **Read on phone** from the glasses posts one message that notifies:
+   - a receipt when the source reports where the review landed, for example
+     `📍 Where it landed` with `1 comment on Launch post` (linked) and
+     `Status: Changes requested`, or `Sent to Priya` linked to the sent message;
+   - the card's first line becomes the receipt: `✅ 1 comment on Launch post`,
+     `✅ Sent to Priya: 1 change`, `✅ Approved: Launch post`, or
+     `✅ Reviewed from G2: 1 change sent`; its buttons are removed and the topic icon
+     turns ✅.
+4. **When the agent replies again** to a thread you already reviewed, live polling posts
+   one silent `🤖 Agent replied` message with the new text (collapsed when long), and
+   turns the topic back to ❗️ when that message needs you.
+5. **Read on phone** from the glasses posts one message that notifies:
    `📖 Step 4: you opened this from your glasses`, as a quote-reply on the sentence,
    followed by the whole paragraph that contains that sentence.
 
 The first topic in the group is **General**. It holds one pinned legend:
 
 ```
-How Pinpoint Desk works: each agent task gets a topic.
+How Pinpoint Desk works: each task, page or draft gets a topic.
 ❗️ needs you · ✅ reviewed · ‼️ failed.
-Review on your G2 (scroll with the ring, tap to talk, double-tap to send) or tap ✅ Agree all here.
-Your notes appear attached to the exact sentences.
+Review on your G2 (scroll with the ring, tap to talk, double-tap to send), or tap a button here.
+Notes appear attached to the exact sentences; a receipt shows where they landed.
 ```
 
 Without a token the server runs in **dry-run**: it writes every intended Telegram call to
@@ -150,15 +178,20 @@ TELEGRAM_CHAT_ID=-1001234567890123
    is empty, and `error` if a call fails).
 3. On the first start the bot posts and pins the legend in **General**.
 4. Trigger a thread so it enters the inbox. In Telegram you should see:
-   - a new topic named after the thread, with the ❗️ icon;
+   - a new topic named after the thread (or page/draft), with the ❗️ icon;
    - the card `🟡 Needs you: plan, 7 steps` with **✅ Agree all** and
-     **📄 Read full plan**;
-   - the full agent text below it, silent and collapsed when long.
+     **📄 Read full plan**; a Notion card says `🟡 Needs you: Notion page, 6 points`
+     with **✅ Approve** and **📄 Read page**; a Gmail card says
+     `🟡 Needs you: draft to Priya, 6 lines` with **📄 Read draft** and
+     **✉️ Send as written**;
+   - the full source text below it, silent and collapsed when long.
 5. Tap **✅ Agree all**: the buttons disappear, the card becomes
-   `✅ Agreed from Telegram`, and the review is sent to T3.
+   `✅ Agreed from Telegram`, and the review is sent to T3. Tap a question option: the
+   card becomes `✅ Answered from Telegram: Wait until Monday`. Tap **✉️ Send as written**
+   then **Cancel** once: the topic stays open and no email leaves.
 6. Send a review from the glasses. Each note appears as a silent quote-reply under the
-   sentence it refers to, followed by the summary, and the card becomes
-   `✅ Reviewed from G2: 1 change sent`.
+   sentence it refers to, followed by the summary and a receipt, and the card becomes
+   `✅ Reviewed from G2: 1 change sent` (or the receipt's own line).
 7. Use **Read on phone** in the glasses menu. It posts a notifying
    `📖 Step 4: you opened this from your glasses` reply with the whole step paragraph and
    opens a link like `https://t.me/c/1234567890123/57?thread=42` (42 is the topic, 57 the
@@ -178,13 +211,13 @@ line to `apps/server/.data/telegram-dryrun.log`:
 {"at":"2026-11-24T01:00:00.100Z","method":"pinChatMessage","params":{"chat_id":"-1001234567890","message_id":1000,"disable_notification":true}}
 {"at":"2026-11-24T01:00:00.200Z","method":"getForumTopicIconStickers","params":{}}
 {"at":"2026-11-24T01:00:00.300Z","method":"createForumTopic","params":{"chat_id":"-1001234567890","name":"auth-refresh-fix","icon_custom_emoji_id":"..."}}
-{"at":"2026-11-24T01:00:00.400Z","method":"sendMessage","params":{"chat_id":"-1001234567890","message_thread_id":1001,"text":"🟡 Needs you: plan, 7 points\n...","reply_markup":{"inline_keyboard":[[{"text":"✅ Agree all","callback_data":"agree:thread-abc"}]]}}}
+{"at":"2026-11-24T01:00:00.400Z","method":"sendMessage","params":{"chat_id":"-1001234567890","message_thread_id":1001,"text":"🟡 Needs you: plan, 7 steps\n...","reply_markup":{"inline_keyboard":[[{"text":"✅ Agree all","callback_data":"agree:thread-abc"}]]}}}
 ```
 
 Links returned in dry-run look real (`https://t.me/c/1234567890/1001?thread=1000`) but do
 not open anything. This is also how the automated tests run.
 
-`scripts/telegram-verify.mjs` runs both plain-language fixtures through the real notifier.
+`scripts/telegram-verify.mjs` runs the agent, Notion and Gmail fixtures through the real notifier.
 
 ```bash
 # no network
@@ -195,9 +228,12 @@ npx tsx --env-file=apps/server/.env scripts/telegram-verify.mjs
 ```
 
 The live run first removes the earlier Pinpoint test topics (`auth-refresh-fix`,
-`login-fix`, `payment-upgrade`) from the group, posts the legend once, then rebuilds both
-topics and prints a link for every message. `--data-dir <path>` uses a separate store and
-builds nothing on top of the server's real one.
+`login-fix`, `payment-upgrade`, `launch-post`, `draft-priya`) from the group, posts the
+legend once, then rebuilds all five topics and prints a link for every message. The
+Notion run adds one comment on the rollout line; the Gmail run applies
+`Net-45, not net-60.` and sends. `--data-dir <path>` uses a separate store. A dry run
+keeps its own store under `apps/server/.data/telegram-verify-dry`, so it never touches
+the live topic ids.
 
 ---
 
@@ -213,6 +249,9 @@ builds nothing on top of the server's real one.
 | `400 Bad Request: QUOTE_TEXT_INVALID` | The quote is no longer an exact substring of the source message | Handled automatically by falling back to a plain reply; if frequent, the deck's quotes drifted from the source (splitter quote check) |
 | Topic names start with 🟡 / ✅ / ⚠️ | Telegram refused a custom topic icon | Expected fallback; the module stopped trying icons for this process. Restart to retry |
 | No "Agree all" buttons | The card was already reviewed, or the message was edited by hand | Send a new attention message; the card is rebuilt on the next agent message |
+| Notion card has no Approve button | The server did not pass `onApprove` to the notifier | Start the current server; the hook is wired in `src/index.ts` |
+| Gmail card has no Send button | The server did not pass `onSend` | Start the current server; the hook is wired in `src/index.ts` |
+| Confirmation asks again after Cancel | The card itself was tapped again | Cancel only edits the confirmation; tap the card's **✉️ Send as written** again to restart |
 | Button spins forever | The server is not polling callbacks, or the review could not be sent to T3 | Confirm the server started the notifier (`start()`); check the server log for `onAgreeAll failed` |
 | Nothing appears in Telegram | Token empty (dry-run), or bot not restarted after editing `.env` | Check `/api/health`; restart the server |
 
@@ -228,7 +267,8 @@ builds nothing on top of the server's real one.
   contains it and falls back to a plain reply when Telegram refuses. The fallback is
   reported through the `onQuoteFallback` hook (and a server warning).
 - **Notifications.** Only the card and the read-on-phone message notify. The full text,
-  every review note, the summary and the legend are silent (`disable_notification`).
+  every review note, the summary, the receipt, the Gmail confirmation and the
+  `🤖 Agent replied` message are silent (`disable_notification`).
 - **Threads live in memory of the group.** The bot cannot read older chats or messages it
   did not receive; everything it needs is in the topics it created and in
   `.data/telegram.json`.
@@ -241,29 +281,42 @@ builds nothing on top of the server's real one.
 
 ## For the team (how the server uses it)
 
-`apps/server/src/telegram/index.ts` exports `createTelegramNotifier(env, { onAgreeAll })`,
-which returns `{ mode, onAttention, onReviewSent, readOnPhone, start, stop }`:
+`apps/server/src/telegram/index.ts` exports
+`createTelegramNotifier(env, { onAgreeAll, onAnswer, onApprove, onSend })`,
+which returns `{ mode, onAttention, onReviewSent, onAgentReply, readOnPhone, start, stop }`:
 
 ```ts
 const telegram = createTelegramNotifier(env, {
-  onAgreeAll: (threadId) => t3.sendReview(threadId, '✓ Reviewed on phone: all points agreed. Continue.'),
-  // Optional: makes question cards show option buttons. Wire it to the same path the
-  // glasses use: save an answer note, then send the review.
-  onAnswer: async (threadId, pointId, option) => {
-    // Persist the answer through the review store, then service.send(threadId).
-    console.log(`answer ${threadId}/${pointId}: ${option}`);
-  },
+  onAgreeAll: (threadId) => service.agreeAll(threadId),
+  // Question buttons: the same saved-answer path the glasses use, then send.
+  onAnswer: (threadId, pointId, option) => service.answer(threadId, pointId, option),
+  // Notion: clear notes and send, so the page status becomes Approved.
+  onApprove: (threadId) => service.approve(threadId),
+  // Gmail: only called after the phone's Send confirmation.
+  onSend: (threadId) => service.sendFromTelegram(threadId),
 });
 
 await telegram.start(); // posts/pins the legend once, then long-polls the buttons
-await telegram.onAttention(thread, { sourceMessageId, text }, deck);
-const { link, messages } = await telegram.onReviewSent(thread, deck, draft, composedMessage);
-// messages: one entry per card/note/summary with its deep link
+await telegram.onAttention(thread, source, deck);
+const { link, messages, firstLine } = await telegram.onReviewSent(
+  thread,
+  deck,
+  draft,
+  composedMessage,
+  receipt, // where the source says the review landed; posted silently
+  { via: 'g2' }, // 'telegram' for a button tap, so the summary says where it came from
+);
+// messages: one entry per card/note/summary/receipt with its deep link
+// Live inbox polling calls this before posting a fresh card:
+const handled = await telegram.onAgentReply(thread, newSource, { needsYou: true });
 await telegram.readOnPhone(thread, deck, point);
 ```
 
-- `onReviewSent` returns `{ link, messages }`: `link` points at the summary; `messages`
-  lists the card, one entry per note (with `pointId`) and the summary.
+- `onReviewSent` returns `{ link, messages, firstLine }`: `link` points at the summary;
+  `messages` lists the card, one entry per note (with `pointId`), the summary and the
+  receipt; `firstLine` is what the card now shows.
+- `onAgentReply` returns `true` when it posted the silent `🤖 Agent replied` message, so
+  the inbox does not also post a fresh notifying card for that message.
 - `readOnPhone` returns `{ link, messageId }`.
 - `onQuoteFallback` receives `{ quote, text, reason }` whenever Telegram refuses a quote.
 - Everything is escaped before it reaches Telegram's HTML parser; long text collapses into
@@ -275,7 +328,7 @@ await telegram.readOnPhone(thread, deck, point);
 
 **Wiring.** The agree-all hook receives the **thread id string**
 (`onAgreeAll(threadId)`). The server's `AgreeAllHook` accepts either the id or the thread
-object and resolves the id itself, so the existing wiring needs no adapter:
+object and resolves the id itself. The other three hooks take the bare thread id:
 
 ```ts
 const { notifier } = await loadTelegramNotifier(env, {
@@ -284,5 +337,8 @@ const { notifier } = await loadTelegramNotifier(env, {
       typeof threadOrId === 'string' ? await inbox.lookupThread(threadOrId) : threadOrId;
     if (thread) await service.agreeAll(thread);
   },
+  onAnswer: (threadId, pointId, option) => service.answer(threadId, pointId, option),
+  onApprove: (threadId) => service.approve(threadId),
+  onSend: (threadId) => service.sendFromTelegram(threadId),
 });
 ```

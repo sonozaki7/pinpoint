@@ -350,22 +350,21 @@ export class InboxService {
 
     const task = (async () => {
       try {
-        await this.telegram.onAttention(thread, source, deck);
-        this.notified.add(id);
-        this.notifyFailures.delete(failureKey);
-        if (this.telegram.mode === 'live') {
-          this.notifiedSave = this.notifiedSave
-            .then(() =>
-              fs.promises.writeFile(
-                this.notifiedFile,
-                JSON.stringify([...this.notified], null, 2),
-                'utf8',
-              ),
-            )
-            .catch((error: unknown) => {
-              console.warn(`[inbox] could not persist notifications: ${errorMessage(error)}`);
-            });
+        // A thread that was already reviewed gets one calm "Agent replied" message
+        // instead of a second notifying card. Only live polling calls this hook.
+        if (
+          this.env.mode === 'live' &&
+          this.telegram.mode === 'live' &&
+          typeof this.telegram.onAgentReply === 'function'
+        ) {
+          const handled = await this.telegram.onAgentReply(thread, source, { needsYou: true });
+          if (handled) {
+            this.markNotified(id, failureKey);
+            return;
+          }
         }
+        await this.telegram.onAttention(thread, source, deck);
+        this.markNotified(id, failureKey);
       } catch (error) {
         this.notifyFailures.set(failureKey, Date.now());
         console.warn(
@@ -376,6 +375,25 @@ export class InboxService {
     this.notifyTasks.add(task);
     void task.finally(() => this.notifyTasks.delete(task));
     return task;
+  }
+
+  /** Remember a delivered source id and persist it (live only: dry-run posts are not real). */
+  private markNotified(id: string, failureKey: string): void {
+    this.notified.add(id);
+    this.notifyFailures.delete(failureKey);
+    if (this.telegram.mode === 'live') {
+      this.notifiedSave = this.notifiedSave
+        .then(() =>
+          fs.promises.writeFile(
+            this.notifiedFile,
+            JSON.stringify([...this.notified], null, 2),
+            'utf8',
+          ),
+        )
+        .catch((error: unknown) => {
+          console.warn(`[inbox] could not persist notifications: ${errorMessage(error)}`);
+        });
+    }
   }
 
   private summary(thread: AttentionThread, deck: Deck | undefined): string {

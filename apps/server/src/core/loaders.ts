@@ -54,10 +54,21 @@ export async function loadT3Client(
   }
 }
 
+/** Buttons that reach back into the server; all optional except agree-all. */
+export interface TelegramHooks {
+  onAgreeAll: AgreeAllHook;
+  /** Same path the glasses use to answer a question: save the answer, then send. */
+  onAnswer?(threadId: string, pointId: string, option: string): Promise<void>;
+  /** Notion "✅ Approve": clear notes and send, so the page status becomes Approved. */
+  onApprove?(threadId: string): Promise<void>;
+  /** Gmail "Send" on the phone confirmation. */
+  onSend?(threadId: string): Promise<void>;
+}
+
 /** Prefer src/telegram; otherwise a dry-run fake. */
 export async function loadTelegramNotifier(
   env: Env,
-  hooks: { onAgreeAll: AgreeAllHook },
+  hooks: TelegramHooks,
 ): Promise<{ notifier: TelegramNotifier; live: boolean; reason?: string }> {
   const url = new URL('../telegram/index.js', import.meta.url).href;
   const module = await importModule(url);
@@ -71,7 +82,7 @@ export async function loadTelegramNotifier(
   }
   try {
     const notifier = (await Promise.resolve(
-      (factory as (env: Env, hooks: { onAgreeAll: AgreeAllHook }) => unknown)(env, hooks),
+      (factory as (env: Env, hooks: TelegramHooks) => unknown)(env, hooks),
     )) as TelegramNotifier;
     if (
       !hasMethods(notifier, ['onAttention', 'onReviewSent', 'readOnPhone', 'start', 'stop']) ||

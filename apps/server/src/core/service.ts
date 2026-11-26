@@ -239,7 +239,10 @@ export class PinpointService {
     return composeReview(deck, draft);
   }
 
-  async send(threadId: string): Promise<SendResult> {
+  async send(
+    threadId: string,
+    options: { via?: 'g2' | 'telegram' } = {},
+  ): Promise<SendResult> {
     // Register before the first await: two requests that arrive together must
     // not both compose and deliver the same draft.
     if (this.sends.has(threadId)) {
@@ -247,13 +250,13 @@ export class PinpointService {
     }
     this.sends.add(threadId);
     try {
-      return await this.sendOnce(threadId);
+      return await this.sendOnce(threadId, options.via ?? 'g2');
     } finally {
       this.sends.delete(threadId);
     }
   }
 
-  private async sendOnce(threadId: string): Promise<SendResult> {
+  private async sendOnce(threadId: string, via: 'g2' | 'telegram'): Promise<SendResult> {
     const thread = await this.requireThread(threadId);
     const deck = await this.requireDeck(threadId);
     const draft = await this.draftFor(threadId, deck);
@@ -288,7 +291,14 @@ export class PinpointService {
     let telegramLink: string | undefined;
     let telegramError: string | undefined;
     try {
-      const result = await this.telegram.onReviewSent(thread, deck, draft, preview.message);
+      const result = await this.telegram.onReviewSent(
+        thread,
+        deck,
+        draft,
+        preview.message,
+        delivery.receipt,
+        { via },
+      );
       telegramLink = result.link;
     } catch (error) {
       telegramError = errorMessage(error);
@@ -404,6 +414,57 @@ export class PinpointService {
     await this.t3.sendMessage(thread.threadId, PHONE_AGREE_MESSAGE);
     await this.reviews.clear(thread.threadId);
     console.info(`[service] agree-all from phone for ${thread.title}`);
+  }
+
+  /**
+   * Telegram question button: exactly the glasses answer path. Save one answer
+   * note on the draft, then send it through the same source delivery.
+   */
+  async answer(threadId: string, pointId: string, option: string): Promise<void> {
+    const deck = await this.requireDeck(threadId);
+    const point = deck.points.find((candidate) => candidate.id === pointId);
+    if (!point || point.kind !== 'question') {
+      throw new HttpError(404, `Unknown question ${pointId}`, 'not_found');
+    }
+    if (point.options && !point.options.includes(option)) {
+      throw new HttpError(400, `Unknown option for ${pointId}`, 'bad_request');
+    }
+    const draft = await this.draftFor(threadId, deck);
+    const notes: Note[] = draft.notes.filter((note) => note.pointId !== pointId);
+    notes.push({ pointId, verdict: 'answer', option });
+    await this.reviews.put(mergeDraft(draft, threadId, { notes }));
+    const result = await this.send(threadId, { via: 'telegram' });
+    if (!result.ok) {
+      throw new HttpError(502, result.error ?? 'Could not send the answer', 'send_error');
+    }
+  }
+
+  /**
+   * Telegram "✅ Approve" on a Notion card: no notes, so the source sets the page
+   * status to Approved. Any notes saved on the phone are deliberately cleared.
+   */
+  async approve(threadId: string): Promise<void> {
+    const thread = await this.requireThread(threadId);
+    if (thread.app !== 'notion') {
+      throw new HttpError(400, 'Only a Notion page can be approved here', 'bad_request');
+    }
+    const deck = await this.requireDeck(threadId);
+    const existing = await this.draftFor(threadId, deck);
+    await this.reviews.put(emptyDraft(threadId, deck.sourceMessageId));
+    const result = await this.send(threadId, { via: 'telegram' });
+    if (!result.ok) {
+      // Approval clears the notes; put them back when the page update failed.
+      if (existing.notes.length > 0) await this.reviews.put(existing);
+      throw new HttpError(502, result.error ?? 'Could not approve the page', 'send_error');
+    }
+  }
+
+  /** Telegram "Send" after the phone confirmation on a Gmail draft. */
+  async sendFromTelegram(threadId: string): Promise<void> {
+    const result = await this.send(threadId, { via: 'telegram' });
+    if (!result.ok) {
+      throw new HttpError(502, result.error ?? 'Could not send the draft', 'send_error');
+    }
   }
 
   async transcribe(audio: Buffer, hint?: VoiceHint): Promise<{ text: string; verdict: 'object' | 'note' }> {

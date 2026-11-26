@@ -2,6 +2,7 @@ import type {
   AppId,
   Deck,
   Point,
+  Receipt,
   ReviewDraft,
   ThreadAttention,
 } from '../../../../shared/contract.js';
@@ -91,7 +92,20 @@ export interface TelegramNotifier {
     deck: Deck,
     draft: ReviewDraft,
     composedMessage: string,
+    /** Where the source says the review landed; posted as a silent receipt. */
+    receipt?: Receipt,
+    /** 'telegram' for a button tap, so the summary says where it came from. */
+    options?: { via?: 'g2' | 'telegram' },
   ): Promise<{ link?: string }>;
+  /**
+   * Called by live inbox polling when a reviewed thread has a new agent message.
+   * Returns true when the notifier posted it, so no fresh card is posted too.
+   */
+  onAgentReply?(
+    thread: AttentionThread,
+    source: AttentionSource,
+    options?: { needsYou?: boolean },
+  ): Promise<boolean>;
   readOnPhone(thread: AttentionThread, deck: Deck, point: Point): Promise<{ link?: string }>;
   start(): Promise<void>;
   stop(): Promise<void>;

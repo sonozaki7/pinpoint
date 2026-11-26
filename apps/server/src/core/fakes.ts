@@ -1,4 +1,4 @@
-import type { Deck, Point, ReviewDraft } from '../../../../shared/contract.js';
+import type { Deck, Point, Receipt, ReviewDraft } from '../../../../shared/contract.js';
 import type { Fixture } from './builtinFixtures.js';
 import { cloneFixtures } from './builtinFixtures.js';
 import type {
@@ -62,6 +62,7 @@ export class FakeTelegramNotifier implements TelegramNotifier {
   readonly attentionCalls: { threadId: string; sourceMessageId: string; pointCount: number }[] = [];
   readonly reviewCalls: { threadId: string; message: string }[] = [];
   readonly phoneCalls: { threadId: string; pointId: string }[] = [];
+  readonly agentReplyCalls: { threadId: string; sourceMessageId: string }[] = [];
   started = false;
 
   async start(): Promise<void> {
@@ -92,12 +93,26 @@ export class FakeTelegramNotifier implements TelegramNotifier {
     _deck: Deck,
     draft: ReviewDraft,
     composedMessage: string,
+    _receipt?: Receipt,
+    _options?: { via?: 'g2' | 'telegram' },
   ): Promise<{ link?: string }> {
     this.reviewCalls.push({ threadId: thread.threadId, message: composedMessage });
     console.info(
       `[telegram dry-run] review for "${thread.title}" (${draft.notes.length} notes)`,
     );
     return {};
+  }
+
+  async onAgentReply(
+    thread: AttentionThread,
+    source: AttentionSource,
+    _options?: { needsYou?: boolean },
+  ): Promise<boolean> {
+    this.agentReplyCalls.push({
+      threadId: thread.threadId,
+      sourceMessageId: source.sourceMessageId,
+    });
+    return false;
   }
 
   async readOnPhone(thread: AttentionThread, _deck: Deck, point: Point): Promise<{ link?: string }> {
