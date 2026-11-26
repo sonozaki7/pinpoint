@@ -63,6 +63,23 @@ export interface Note {
   text?: string; // transcript or typed text
   option?: string; // chosen option for questions
   audioMs?: number;
+  after?: string; // 'draft' points (e.g. a Gmail draft sentence): the sentence after your note was applied
+}
+
+/**
+ * POST /api/edit/:threadId { pointId, text } — apply a spoken note to one 'draft' sentence, in place.
+ * Deterministic first: "<new>, not <old>" replaces old with new inside that sentence; "delete" /
+ * "remove this" drops it; "say …" / "instead …" / "change it to …" replaces it with your words.
+ * Only otherwise an LLM rewrites that one sentence, and the server checks nothing else changed.
+ * The glasses show `after` right away ("Now: …"), so the draft never needs a second review pass.
+ */
+export interface EditResult {
+  ok: boolean;
+  pointId: string;
+  before: string;
+  after?: string; // absent when the line was deleted or the edit failed
+  method?: 'replace' | 'delete' | 'say' | 'rewrite';
+  error?: string; // short, shown on the glasses, e.g. "Couldn't change this line"
 }
 
 export interface ReviewDraft {
