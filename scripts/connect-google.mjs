@@ -127,7 +127,9 @@ function waitForCallback({ server, client, redirectUri, verifier, state, tokenPa
     timer.unref?.();
 
     server.on('request', async (request, response) => {
-      const url = new URL(request.url ?? '/', `http://127.0.0.1:${server.address().port}`);
+      // Base host is irrelevant here (only path and query are read); server.address() is null once
+      // the server closes, and browsers send a late /favicon.ico right after the callback.
+      const url = new URL(request.url ?? '/', 'http://127.0.0.1');
       if (url.pathname !== '/oauth2callback') {
         response.writeHead(404, { 'content-type': 'text/plain' });
         response.end('Not found');
