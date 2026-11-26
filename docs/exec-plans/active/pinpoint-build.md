@@ -33,6 +33,17 @@ Spec: `docs/SPEC.md` · Host advice: `docs/host-qa-notes.md` · Device risks: `d
 | D1 | README, SUBMISSION, FEATURE_REQUESTS, business model, privacy page, 24×24 icon | DeepSeek + Opus | Sat |
 | X1 | Real end-to-end run with owner's Google/Notion (demo label/calendar) + footage | DeepSeek | Sat |
 
+## Final push (2026-11-27 03:30 JST, owner: "ready for submission by today"; this time Claude Sonnet 5.5 agents, not DeepSeek)
+
+| ID | Task | Status |
+|---|---|---|
+| F1 | Server: DeepSeek-API sorting/evidence/Ask, changed, glance status, catch-up, new task by voice, everyday + persona samples, cloud secrets | running |
+| F2 | Glasses: needs-you collapse + Why, Ask, status line, catch-up, New task, sample persona, budgets | running (lead commits as "Glasses final: …") |
+| F3 | Website: minimal 3D hero + POV outdoors, animated hand controller, Developer/Everyday switch, privacy page, /app/ + QR | running |
+| F4 | Video: attention-layer story, developer walk + everyday parent, real Codex runs, real Notion/Gmail/Telegram proof | running |
+| F5 | README, SUBMISSION, FEATURE_REQUESTS, privacy, stale docs, submit checklist | running |
+| F6 | Lead: integrate, deploy cloud (+DeepSeek key on server), release (ehpk + video), site deploy, sandbox thread cleanup, QA | after F1–F5 |
+
 ## Decisions
 
 - New repo `pinpoint`; first commit imports Agent Relay pieces unchanged (disclosure, see `PRIOR_WORK.md`).
