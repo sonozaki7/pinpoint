@@ -1,22 +1,20 @@
 // Shared types between apps/glasses and apps/server. Owner: Opus. Request changes in docs/requests.md.
 
 export type ThreadAttention = 'question' | 'plan' | 'failed' | 'report';
-// Planned: 'actions' = things your assistants prepared across your apps (the "Morning brief"): email
-// replies, meeting moves, tasks, chat replies; each point carries an Action the server runs on send.
-// Added once the glasses app is ready for it (it switches exhaustively on attention).
 
-/** Apps Pinpoint can act in. Shown on G2 as a short tag before the glance (APP_TAG). */
-export type AppId = 'gmail' | 'calendar' | 'notion' | 'telegram' | 'slack' | 'discord' | 't3';
+/**
+ * Where a piece of AI work comes from, and where your feedback lands. Pinpoint does one job: review
+ * work your AIs already did, point by point, and put your words exactly where they belong.
+ *   t3     coding agents (Claude Code, Codex) in T3 Code: the review goes back to the agent
+ *   notion a Notion page waiting for review: each note becomes a comment on the exact block
+ *   gmail  a Gmail draft an agent wrote: your notes are applied to the draft, shown once, then sent
+ *   telegram/slack/discord: companions (alerts, full text, receipts), not review sources
+ * Shown on G2 as a short tag before the inbox row (APP_TAG).
+ */
+export type AppId = 't3' | 'notion' | 'gmail' | 'telegram' | 'slack' | 'discord';
 export const APP_TAG: Record<AppId, string> = {
-  gmail: 'Mail', calendar: 'Cal', notion: 'Task', telegram: 'TG', slack: 'Slack', discord: 'Disc', t3: 'Agent',
+  t3: 'Agent', notion: 'Notion', gmail: 'Mail', telegram: 'TG', slack: 'Slack', discord: 'Discord',
 };
-
-/** What happens when a point is agreed (silence) and sent. A point with a note is revised first. */
-export type Action =
-  | { type: 'email.reply'; app: 'gmail'; threadId: string; messageId: string; to: string; subject: string; body: string }
-  | { type: 'calendar.move'; app: 'calendar'; calendarId: string; eventId: string; title: string; fromStart: string; toStart: string; durationMin: number }
-  | { type: 'task.create'; app: 'notion'; title: string; due?: string; details?: string }
-  | { type: 'chat.reply'; app: 'telegram' | 'slack' | 'discord'; chatId: string; chatName: string; replyToId?: string; text: string };
 
 export interface InboxItem {
   threadId: string;
@@ -28,6 +26,7 @@ export interface InboxItem {
   deckReady: boolean;
   pointCount: number;
   draftNotes: number; // notes already saved for this thread
+  app?: AppId; // source of the work; absent = 't3'
 }
 
 export type PointKind = 'step' | 'claim' | 'question' | 'risk' | 'draft';
@@ -41,9 +40,8 @@ export interface Point {
   options?: string[]; // kind === 'question': 2-4 options, <= 24 chars, recommended first
   questionId?: string; // T3 user_input question id, when the point maps to one
   risk?: 'low' | 'high';
-  app?: AppId; // set on 'actions' decks (and optionally elsewhere) for the G2 tag
-  flag?: string; // <= 24 ASCII chars: why the assistant wants you to look, e.g. "busy Tue 10-12"
-  action?: Action; // 'actions' decks only; server-side source of truth, the glasses only display it
+  flag?: string; // <= 24 ASCII chars: why this line is worth checking, e.g. "signs out everyone"
+  anchor?: string; // where feedback lands in the source app, e.g. a Notion block id; server-side only
 }
 
 export interface Deck {
@@ -83,26 +81,24 @@ export interface PreviewResult {
 
 export interface SendResult {
   ok: boolean;
-  delivered: 't3' | 'demo-log' | 'sample'; // 'sample': Pinpoint Cloud sample workspace (no real agent)
+  delivered: 't3' | 'notion' | 'gmail' | 'demo-log' | 'sample'; // 'sample': Pinpoint Cloud sample workspace (no real agent)
   telegramLink?: string;
   error?: string;
-  receipt?: Receipt; // 'actions' decks: what actually happened in each app
+  receipt?: Receipt; // where your feedback landed
 }
 
-/** Result of sending an 'actions' deck. Agreed points run at once; points with a note are revised
- * (LLM on the desk, template in the sample workspace) and come back as a follow-up 'actions' deck
- * titled "Revised" so nothing you corrected goes out unseen. */
+/** Where each part of a sent review landed. A Gmail draft you corrected comes back once as a
+ * follow-up item ("Revised draft") so nothing you changed goes out unseen. */
 export interface Receipt {
-  lines: ReceiptLine[]; // one per executed action, in deck order
-  revised: number; // how many points went to the follow-up deck
-  followUpThreadId?: string; // inbox item holding the revised points
+  lines: ReceiptLine[];
+  followUpThreadId?: string;
 }
 
 export interface ReceiptLine {
   app: AppId;
-  text: string; // <= 44 ASCII chars, e.g. "Sent reply to Priya"
+  text: string; // <= 44 ASCII chars, e.g. "2 comments on Pricing page v2"
   ok: boolean;
-  link?: string; // https link to the result (Gmail thread, Calendar event, Notion page, chat message)
+  link?: string; // https link to the result (agent thread, Notion block, Gmail draft, chat message)
 }
 
 export interface Health {
