@@ -8,7 +8,9 @@ import { fileURLToPath } from "node:url";
 import { compositeGlassesPng, maxAlphaIn } from "./png.mjs";
 
 const VOICE_TEXT = "No, keep the existing sessions and migrate them instead.";
-const SHOTS = fileURLToPath(new URL("../../../demo/shots/", import.meta.url));
+const SHOTS = process.env.PINPOINT_SHOTS
+  ? `${process.env.PINPOINT_SHOTS.replace(/\/+$/, "")}/`
+  : fileURLToPath(new URL("../../../demo/shots/", import.meta.url));
 
 function parseArgs(argv) {
   let port = 9898;
@@ -128,7 +130,7 @@ async function screenshot(name, options = {}) {
   const green = lit.reduce((sum, byte, index) => index % 3 === 1 && byte > 12 ? sum + 1 : sum, 0);
   assert.ok(green >= minLit, `${name} has visible glyphs (${green} lit pixels)`);
   await writeFile(`${SHOTS}${name}`, lit);
-  console.log(`saved demo/shots/${name} (${green} lit pixels)`);
+  console.log(`saved ${name} (${green} lit pixels)`);
 }
 
 // The app must be pointed at the real demo server, not its in-memory fallback.
@@ -136,11 +138,14 @@ const health = await json(`${server}/api/health`);
 assert.equal(health.ok, true, "server health");
 assert.equal(health.mode, "demo", "server runs in demo mode");
 const serverInbox = await json(`${server}/api/inbox`);
-assert.equal(serverInbox.items.length, 4, "four demo threads on the server");
-for (const threadId of ["deps-upgrade", "auth-refresh-fix", "flaky-e2e", "inbox-morning"]) {
+assert.ok(serverInbox.items.length >= 3, "the demo threads are on the server");
+for (const threadId of ["login-fix", "payment-upgrade", "inbox-morning"]) {
   assert.ok(serverInbox.items.some((item) => item.threadId === threadId), `server lists ${threadId}`);
 }
-console.log(`server ${server} mode=demo threads=${serverInbox.items.length}`);
+const inboxCount = serverInbox.items.length;
+const targetIndex = serverInbox.items.findIndex((item) => item.threadId === "login-fix");
+assert.ok(targetIndex >= 0, "login-fix is in the server inbox");
+console.log(`server ${server} mode=demo threads=${inboxCount} login-fix at ${targetIndex}`);
 
 // Generate a real spoken objection; the simulator reads the MacBook microphone.
 const audioDir = path.join(tmpdir(), `pinpoint-sim-${process.pid}`);
@@ -169,16 +174,18 @@ function playVoice() {
 await pollConsole();
 await waitForLog(new RegExp(`\\[pinpoint\\] server=${server.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`), "the server URL");
 await waitForLog(/\[pinpoint\] ready/, "the SDK startup");
-await waitForLog(/mode=live screen=inbox items=4/, "the real server inbox");
-await waitForLog(/inbox-header="PINPOINT \| 4 need you"/, "a four-thread inbox header");
+await waitForLog(new RegExp(`mode=live screen=inbox items=${inboxCount}`), "the real server inbox");
+await waitForLog(new RegExp(`inbox-header="PINPOINT \\| ${inboxCount} need you"`), "the inbox header");
 await delay(500);
 await screenshot("glasses-01-inbox.png");
 
-await input("down");
-await delay(250);
+for (let index = 0; index < targetIndex; index++) {
+  await input("down");
+  await delay(300);
+}
 await input("click");
-await waitForLog(/screen=review thread=auth-refresh-fix/, "the auth review");
-await waitForLog(/review-header="auth-refresh-fix \| 1\/7"/, "the review header");
+await waitForLog(/screen=review thread=login-fix/, "the login-fix review");
+await waitForLog(/review-header="login-fix \| 1\/7"/, "the review header");
 await delay(500);
 await screenshot("glasses-02-review.png", { focusRow: 0 });
 
@@ -211,7 +218,7 @@ assert.ok(pcmBytes >= 32_000, `microphone captured real audio (${pcmBytes} bytes
 const noteLog = await waitForLog(/note=p4 verdict=object text=".+"/, "the transcribed objection", 45_000);
 const transcript = noteLog.match(/text="(.+)"/)?.[1] ?? "";
 console.log(`real microphone note (${pcmBytes} bytes): "${transcript}"`);
-await waitForLog(/review-header="auth-refresh-fix \| 4\/7 \| 1 objection"/, "the objection header");
+await waitForLog(/review-header="login-fix \| 4\/7 \| 1 objection"/, "the objection header");
 await delay(350);
 await screenshot("glasses-06-note.png");
 
@@ -230,14 +237,21 @@ await screenshot("glasses-08-preview.png");
 await input("click");
 await delay(380);
 await screenshot("glasses-09-sent.png");
-await waitForLog(/screen=inbox items=3/, "the post-send inbox");
-await waitForLog(/inbox-ids=(?!.*auth-refresh-fix)/, "an inbox without the sent thread");
-await waitForLog(/inbox-header="PINPOINT \| 3 need you"/, "a three-thread inbox header");
+await waitForLog(new RegExp(`screen=inbox items=${inboxCount - 1}`), "the post-send inbox");
+await waitForLog(/inbox-ids=(?!.*login-fix)/, "an inbox without the sent thread");
+await waitForLog(new RegExp(`inbox-header="PINPOINT \\| ${inboxCount - 1} need you"`), "the post-send inbox header");
 await delay(500);
 await screenshot("glasses-10-inbox-after.png");
 
+const afterSend = serverInbox.items.filter((item) => item.threadId !== "login-fix");
+const questionIndex = afterSend.findIndex((item) => item.threadId === "payment-upgrade");
+assert.ok(questionIndex >= 0, "payment-upgrade stays in the post-send inbox");
+for (let index = 0; index < questionIndex; index++) {
+  await input("down");
+  await delay(300);
+}
 await input("click");
-await waitForLog(/screen=review thread=deps-upgrade/, "the question review");
+await waitForLog(/screen=review thread=payment-upgrade/, "the question review");
 await delay(450);
 await input("click");
 await waitForLog(/screen review->options/, "the options screen");

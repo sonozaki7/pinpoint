@@ -1,7 +1,9 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
 import { validateEvenHubPageContainer } from "@evenrealities/even_hub_sdk";
-import { createAuthDeck, createDemoInbox, createDepsDeck, MockPinpointApi } from "../src/mock";
+import {
+  createDemoInbox, createLoginDeck, createPaymentDeck, MockPinpointApi,
+} from "../src/mock";
 import {
   adoptInbox, applyVoice, chooseOption, clearNotes, finishSend, initialState, moveFocus, openDeck,
   press, setPreview, startReview, type State,
@@ -18,11 +20,11 @@ function inboxState(): State {
   });
 }
 
-function reviewState(threadId = "auth-refresh-fix"): State {
+function reviewState(threadId = "login-fix"): State {
   const state = inboxState();
   const item = state.inbox.find((entry) => entry.threadId === threadId);
   assert.ok(item);
-  const deck = threadId === "auth-refresh-fix" ? createAuthDeck() : createDepsDeck();
+  const deck = threadId === "login-fix" ? createLoginDeck() : createPaymentDeck();
   return openDeck(startReview(state, item), deck);
 }
 
@@ -44,13 +46,13 @@ test("the four-row window scrolls only after the fourth row", () => {
     return pageFor(state, 1_000).rows.map((row) => row.text);
   };
   assert.deepEqual(at(0).map((row) => row.slice(0, 3)), ["> +", "  o", "  o", "  !"]);
-  assert.match(at(0)[3] ?? "", /Force-logout all users/);
-  assert.match(at(3)[3] ?? "", /Force-logout all users/, "focus 4 keeps the first window");
+  assert.match(at(0)[3] ?? "", /Sign out every customer once/);
+  assert.match(at(3)[3] ?? "", /Sign out every customer once/, "focus 4 keeps the first window");
   assert.match(at(3)[3] ?? "", /^> !o 4 /, "the focused row carries the brightness cursor");
-  assert.match(at(4)[0] ?? "", /Move signing/, "focus 5 scrolls one row");
-  assert.match(at(4)[3] ?? "", /Backfill sessions/, "four visible rows end at point 5");
-  assert.match(at(6)[0] ?? "", /Force-logout all users/);
-  assert.match(at(6)[3] ?? "", /concurrent refresh/);
+  assert.match(at(4)[0] ?? "", /Add a test/, "focus 5 scrolls one row");
+  assert.match(at(4)[3] ?? "", /Keep the 30-day/, "four visible rows end at point 5");
+  assert.match(at(6)[0] ?? "", /Sign out every customer once/);
+  assert.match(at(6)[3] ?? "", /Release to all/);
   assert.deepEqual(
     at(7).slice(0, 3).map((row) => row.slice(0, 3)),
     ["  o", "  o", "  o"],
@@ -61,18 +63,18 @@ test("the four-row window scrolls only after the fourth row", () => {
 
 test("the inbox header counts every listed thread and review counters read as words", () => {
   const inbox = inboxState();
-  assert.equal(pageFor(inbox, 1_000).title, "PINPOINT | 4 need you");
+  assert.equal(pageFor(inbox, 1_000).title, "PINPOINT | 3 need you");
   let review = reviewState();
-  assert.equal(reviewHeader(review), "auth-refresh-fix | 1/7");
+  assert.equal(reviewHeader(review), "login-fix | 1/7");
   review = { ...review, focus: 3, notes: [{ pointId: "p4", verdict: "object", text: "No" }] };
-  assert.equal(reviewHeader(review), "auth-refresh-fix | 4/7 | 1 objection");
+  assert.equal(reviewHeader(review), "login-fix | 4/7 | 1 objection");
   review = {
     ...review,
     notes: [...review.notes, { pointId: "p6", verdict: "note", text: "Queue it" }],
   };
   const header = reviewHeader(review);
   assert.ok(header.length <= 44, header);
-  assert.match(header, /^auth-refresh-fix \| 4\/7 \| 1 objection, 1 note$/);
+  assert.match(header, /^login-fix \| 4\/7 \| 1 objection, 1 note$/);
   const longTitle = {
     ...review,
     deck: { ...review.deck!, title: "a-very-long-thread-title-that-does-not-fit" },
@@ -97,16 +99,16 @@ test("the focused row is brighter and carries the only cursor", () => {
 test("a sent thread stays gone when the demo server still lists it", async () => {
   const api = new MockPinpointApi();
   let state = inboxState();
-  const item = state.inbox.find((entry) => entry.threadId === "auth-refresh-fix");
+  const item = state.inbox.find((entry) => entry.threadId === "login-fix");
   assert.ok(item);
-  state = openDeck(startReview(state, item), createAuthDeck());
+  state = openDeck(startReview(state, item), createLoginDeck());
   state = finishSend({ ...state, focus: 7 });
-  assert.equal(state.inbox.some((entry) => entry.threadId === "auth-refresh-fix"), false);
-  assert.equal(pageFor(state, 1_000).title, "PINPOINT | 3 need you");
+  assert.equal(state.inbox.some((entry) => entry.threadId === "login-fix"), false);
+  assert.equal(pageFor(state, 1_000).title, "PINPOINT | 2 need you");
   const { items } = await api.inbox();
   state = adoptInbox(state, items, { demo: false, offline: false });
-  assert.equal(state.inbox.length, 3);
-  assert.equal(state.inbox.some((entry) => entry.threadId === "auth-refresh-fix"), false);
+  assert.equal(state.inbox.length, 2);
+  assert.equal(state.inbox.some((entry) => entry.threadId === "login-fix"), false);
 });
 
 test("markers cover unseen, seen, objection, note, question, answer and high risk", () => {
@@ -125,11 +127,11 @@ test("markers cover unseen, seen, objection, note, question, answer and high ris
   assert.match(pageFor(state, 1_000).rows[3]?.text ?? "", /^  !x 4 /);
   state = { ...state, notes: [{ pointId: "p6", verdict: "note", text: "Queue it" }] };
   assert.equal(markerFor(p6, state), "*");
-  const question = reviewState("deps-upgrade");
+  const question = reviewState("payment-upgrade");
   const questionPoint = question.deck?.points[0];
   assert.ok(questionPoint);
   assert.equal(markerFor(questionPoint, question), "?");
-  assert.equal(markerFor(questionPoint, { ...question, notes: [{ pointId: "p1", verdict: "answer", option: "Stay on 6 for now" }] }), "=");
+  assert.equal(markerFor(questionPoint, { ...question, notes: [{ pointId: "p1", verdict: "answer", option: "Wait until Monday" }] }), "=");
   assert.equal(nodeLength(createLayout(pageFor(reviewState(), 1_000))), 8);
 });
 
@@ -157,20 +159,20 @@ test("voice notes follow the no/stop/instead heuristic and answers use the = mar
   assert.equal(objection.notes[0]?.verdict, "object");
   assert.equal(objection.notes[0]?.pointId, "p4");
   assert.match(pageFor(objection, 1_000).pane ?? "", /Heard: No, keep existing sessions/);
-  assert.equal(objection.drafts["auth-refresh-fix"]?.notes.length, 1);
+  assert.equal(objection.drafts["login-fix"]?.notes.length, 1);
 
   const note = applyVoice(state, "Add a request queue please.", 2_000);
   assert.equal(note.notes[0]?.verdict, "note");
   const serverObjection = applyVoice(state, "Please add tests.", 2_500, "object");
   assert.equal(serverObjection.notes[0]?.verdict, "object", "a server verdict wins over the prefix");
 
-  const question = reviewState("deps-upgrade");
-  const answered = applyVoice(question, "Upgrade in a branch.", 3_000);
+  const question = reviewState("payment-upgrade");
+  const answered = applyVoice(question, "Upgrade in a test shop.", 3_000);
   assert.equal(answered.notes[0]?.verdict, "answer");
   assert.equal(markerFor(question.deck!.points[0]!, answered), "=");
 
   const picked = chooseOption({ ...question, screen: "options", optionsFocus: 2 }, 2, 4_000);
-  assert.equal(picked.notes[0]?.option, "Upgrade in a branch");
+  assert.equal(picked.notes[0]?.option, "Upgrade in a test shop");
   assert.equal(picked.screen, "review");
 
   const cleared = clearNotes(answered, 5_000);
@@ -188,7 +190,7 @@ test("the screen flow starts a recording, opens options, previews and sends", ()
   assert.equal(stop.effect?.type, "record-stop");
   assert.equal(stop.state.recordingStartedAt, 1_000, "the recorder stays open until the transcript arrives");
 
-  const options = press(reviewState("deps-upgrade"), 1_000);
+  const options = press(reviewState("payment-upgrade"), 1_000);
   assert.equal(options.state.screen, "options");
   assert.equal(options.effect, undefined);
   assert.equal(pageFor(options.state, 1_000).rows.length, 4);
@@ -202,45 +204,54 @@ test("the screen flow starts a recording, opens options, previews and sends", ()
   assert.equal(preview.state.screen, "preview");
   assert.equal(preview.effect?.type, "preview");
   const loaded = setPreview(preview.state, {
-    message: "m", preview: ["2 objections, 1 note", "Tap to send to auth-refresh-fix"],
+    message: "m", preview: ["2 objections, 1 note", "Tap to send to login-fix"],
     counts: { objections: 2, answers: 0, notes: 1, agreed: 4 },
   });
-  assert.equal(pageFor(loaded, 1_000).pane, "2 objections, 1 note\nTap to send to auth-refresh-fix");
+  assert.equal(pageFor(loaded, 1_000).pane, "2 objections, 1 note\nTap to send to login-fix");
   const sending = press(loaded, 2_000);
   assert.equal(sending.effect?.type, "send");
   assert.equal(sending.state.sending, true);
 });
 
-test("the in-memory API serves the four SPEC threads and composes a review", async () => {
+test("the in-memory API serves the plain-language sample threads and composes a review", async () => {
   const api = new MockPinpointApi();
   const { items } = await api.inbox();
   assert.deepEqual(items.map((item) => item.threadId), [
-    "deps-upgrade", "auth-refresh-fix", "flaky-e2e", "inbox-morning",
+    "payment-upgrade", "login-fix", "inbox-morning",
   ]);
-  const deck = await api.deck("auth-refresh-fix");
+  const deck = await api.deck("login-fix");
   assert.equal(deck.points.length, 7);
   assert.equal(deck.points[3]?.risk, "high");
-  assert.match(deck.points[5]?.glance ?? "", /mutex/);
-  const result = await api.preview("auth-refresh-fix", {
-    threadId: "auth-refresh-fix", sourceMessageId: deck.sourceMessageId, updatedAt: "",
+  assert.match(deck.points[5]?.glance ?? "", /Release to 5%/);
+  const result = await api.preview("login-fix", {
+    threadId: "login-fix", sourceMessageId: deck.sourceMessageId, updatedAt: "",
     seen: ["p1"],
     notes: [
       { pointId: "p4", verdict: "object", text: "No. Migrate existing sessions." },
       { pointId: "p6", verdict: "object", text: "Use a request queue." },
     ],
   });
-  assert.deepEqual(result.preview, ["2 objections, 5 agreed", "Tap to send to auth-refresh-fix"]);
+  assert.deepEqual(result.preview, ["2 objections, 5 agreed", "Tap to send to login-fix"]);
   assert.match(result.message, /Go ahead with the rest of the plan/);
   assert.equal((await api.voice(new Uint8Array(0))).text.length > 0, true);
+  const health = await api.health();
+  assert.equal(health.mode, "demo");
+  await api.send("login-fix");
+  assert.equal((await api.inbox()).items.length, 2);
+  await api.resetSample();
+  assert.equal((await api.inbox()).items.length, 3);
 });
 
 test("every page fits the 576x288 frame with exactly one capture target and a menu", () => {
   const pages = [
     pageFor(inboxState(), 1_000),
     pageFor(reviewState(), 1_000),
-    pageFor(press(reviewState("deps-upgrade"), 1_000).state, 1_000),
+    pageFor(press(reviewState("payment-upgrade"), 1_000).state, 1_000),
     pageFor(press({ ...reviewState(), focus: 7 }, 1_000).state, 1_000),
     pageFor(adoptInbox(initialState({ demo: true, loading: false }), [], { demo: true, offline: false }), 1_000),
+    pageFor({ ...inboxState(), workspace: "sample" }, 1_000),
+    pageFor({ ...reviewState(), workspace: "sample" }, 1_000),
+    pageFor(adoptInbox({ ...inboxState(), workspace: "sample" }, [], { demo: false, offline: false }), 1_000),
   ];
   for (const page of pages) {
     const layout = createLayout(page);

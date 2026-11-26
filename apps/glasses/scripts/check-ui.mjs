@@ -19,10 +19,10 @@ try {
   for (const width of [320, 390, 768, 1024, 1440]) {
     await phone.setViewportSize({ width, height: 900 });
     await phone.goto(`${base}?mock=1`);
-    await phone.waitForFunction(() => document.querySelector("#glasses-list")?.children.length === 4);
+    await phone.waitForFunction(() => document.querySelector("#glasses-list")?.children.length === 3);
     const overflow = await phone.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
     assert.equal(overflow, false, `page overflow at ${width}px`);
-    for (const selector of [".controls", ".glasses", ".console"]) {
+    for (const selector of [".actions", ".gestures", ".console"]) {
       const clipped = await phone.evaluate((selector) => {
         const node = document.querySelector(selector);
         return node ? node.scrollWidth > node.clientWidth + 1 : false;
@@ -30,7 +30,12 @@ try {
       assert.equal(clipped, false, `${selector} clipped at ${width}px`);
     }
   }
-  assert.match(await phone.locator("#glasses-head").innerText(), /PINPOINT \| 4 need you[\s\S]*demo data/);
+  assert.match(await phone.locator("#glasses-head").textContent(), /PINPOINT \| 3 need you[\s\S]*demo data/);
+  assert.equal(await phone.locator("#btn-reset-sample").isDisabled(), true);
+  assert.match(await phone.locator("#phone-status").innerText(), /Demo data/);
+  assert.match(await phone.locator(".gestures").innerText(), /Scroll[\s\S]*Tap[\s\S]*Double-tap[\s\S]*Hold/);
+  assert.match(await phone.locator(".privacy").innerText(), /transcribed, then discarded/);
+  assert.equal(await phone.locator("#developer-controls").evaluate((node) => node.open), false);
   await phone.close();
 
   // No server must show the offline screen, never silently substitute demo data.
@@ -38,8 +43,9 @@ try {
   await offline.route("http://127.0.0.1:8787/**", (route) => route.abort());
   await offline.goto(base);
   await offline.waitForFunction(() =>
-    document.querySelector("#glasses-pane")?.textContent?.includes("Server unreachable"));
-  assert.match(await offline.locator("#glasses-pane").innerText(), /Server unreachable/);
+    document.querySelector("#glasses-pane")?.textContent?.includes("Can't reach the local server"));
+  assert.match(await offline.locator("#glasses-pane").textContent(), /Start it, then tap to retry/);
+  assert.match(await offline.locator("#phone-status").innerText(), /offline/);
   await offline.close();
 
   // Mock only the Flutter host transport and drive the real pinned SDK.
@@ -59,10 +65,11 @@ try {
   await page.goto(`${base}?mock=1`);
   await page.waitForFunction(() => typeof window._listenEvenAppMessage === "function");
   await page.waitForFunction(() => document.querySelector("#host-status")?.textContent?.includes("Glasses connected"));
-  await page.waitForFunction(() => document.querySelector("#glasses-list")?.children.length === 4);
+  await page.waitForFunction(() => document.querySelector("#glasses-list")?.children.length === 3);
   await page.waitForFunction(() => window.__bridgeCalls.some((call) =>
     call.method === "rebuildPageContainer" && (call.data.listObject?.length ?? 0) > 0));
-  assert.match(await page.locator("#glasses-head").innerText(), /PINPOINT \| 4 need you/);
+  assert.match(await page.locator("#glasses-head").textContent(), /PINPOINT \| 3 need you/);
+  await page.locator("#developer-controls").evaluate((node) => { node.open = true; });
 
   const emit = (type, jsonData) => page.evaluate(({ type, jsonData }) => window._listenEvenAppMessage({
     type: "listen_even_app_data", method: "evenHubEvent", data: { type, jsonData },
@@ -85,10 +92,10 @@ try {
   assert.equal(listRebuild.data.menuObject.menuItems.length, 1);
 
   await page.locator("#glasses-list li").nth(1).click();
-  await waitText("#glasses-head", "auth-refresh-fix");
-  await waitText("#glasses-rows", "Force-logout all users");
+  await waitText("#glasses-head", "login-fix");
+  await waitText("#glasses-rows", "Sign out every customer once");
   assert.equal(await page.locator("#glasses-rows .row").count(), 4);
-  assert.match(await page.locator("#glasses-head").innerText(), /auth-refresh-fix \| 1\/7/);
+  assert.match(await page.locator("#glasses-head").innerText(), /login-fix \| 1\/7/);
   assert.doesNotMatch(await page.locator("#glasses-head").innerText(), /x0|\*0/);
 
   const review = (await calls()).filter(({ method }) => method === "rebuildPageContainer").at(-1);
@@ -109,7 +116,7 @@ try {
     await delay(280); // swipes are debounced to one per 250 ms
   }
   await waitText("#glasses-head", "4/7");
-  assert.match(await page.locator("#glasses-rows .row").nth(3).innerText(), /Force-logout all users/);
+  assert.match(await page.locator("#glasses-rows .row").nth(3).innerText(), /Sign out every customer once/);
   const upgrades = (await calls()).filter(({ method }) => method === "textContainerUpgrade");
   const focusedRow = upgrades.filter(({ data }) => data.containerName === "row4").at(-1);
   assert.equal(focusedRow?.data.textColor, 4, "row 4 is bright after focus moves");
@@ -124,7 +131,7 @@ try {
   await emit("sysEvent", { eventSource: 1 });
   await waitText("#glasses-pane", "Heard: No, keep the existing sessions");
   assert.match(await page.locator("#glasses-rows .row").nth(3).innerText(), /^> !x 4 /);
-  assert.match(await page.locator("#glasses-head").innerText(), /auth-refresh-fix \| 4\/7 \| 1 objection/);
+  assert.match(await page.locator("#glasses-head").innerText(), /login-fix \| 4\/7 \| 1 objection/);
   const audio = (await calls()).filter(({ method }) => method === "audioControl");
   assert.equal(audio.at(-2)?.data.isOpen, true);
   assert.equal(audio.at(-2)?.data.source, "glasses");
@@ -140,8 +147,8 @@ try {
   await emit("sysEvent", { eventSource: 1 });
   await waitText("#glasses-pane", "Sent to agent");
   await delay(1_800);
-  await page.waitForFunction(() => document.querySelector("#glasses-list")?.children.length === 3);
-  assert.match(await page.locator("#glasses-head").innerText(), /3 need you/);
+  await page.waitForFunction(() => document.querySelector("#glasses-list")?.children.length === 2);
+  assert.match(await page.locator("#glasses-head").innerText(), /2 need you/);
 
   // Root double-tap must ask the host for the system exit dialog, mode 1.
   await emit("sysEvent", { eventType: 3, eventSource: 1 });

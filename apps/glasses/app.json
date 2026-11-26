@@ -2,18 +2,22 @@
   "package_id": "com.sonozaki7.pinpoint",
   "edition": "202601",
   "name": "Pinpoint",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "min_sdk_version": "0.0.16",
   "entrypoint": "index.html",
   "permissions": [
     {
       "name": "network",
-      "desc": "Loads agent threads and sends your review to the Pinpoint server on your computer.",
-      "whitelist": ["http://127.0.0.1:8787", "http://127.0.0.1:8788"]
+      "desc": "Loads your agents' threads and sends your review through Pinpoint Cloud (pinpoint-api.qolso.com).",
+      "whitelist": [
+        "https://pinpoint-api.qolso.com",
+        "http://127.0.0.1:8787",
+        "http://127.0.0.1:8788"
+      ]
     },
     {
       "name": "g2-microphone",
-      "desc": "Records a short voice note about the point you are looking at."
+      "desc": "Records a short voice note about the line you're looking at. Audio is transcribed, then discarded."
     }
   ],
   "supported_languages": ["en"]

@@ -2,7 +2,28 @@
 
 Review your AI agents' replies and plans on Even G2, point by point. **Ring for where, voice for what.** Built for the Heads Up hackathon (Even Realities × TVM Ventures), simulator-first.
 
-The app talks only to the Pinpoint server (`apps/server`). With no server it falls back to a deterministic in-memory demo, so the whole flow works standalone. This folder started from the MIT-licensed Agent Relay scaffold (see `PRIOR_WORK.md`); its SDK wrapper, event normalization and simulator patterns were reused.
+A packaged device build talks to **Pinpoint Cloud** (`https://pinpoint-api.qolso.com`) out of the box, so the glasses work on a phone with no laptop nearby. Browser and simulator builds still talk to the local demo/live server. If the server cannot be reached, the glasses show a short offline screen with tap-to-retry instead of silently switching to sample data. `?mock=1` forces the in-memory demo. This folder started from the MIT-licensed Agent Relay scaffold (see `PRIOR_WORK.md`); its SDK wrapper, event normalization and simulator patterns were reused.
+
+## Cloud and local servers
+
+The server choice lives in `src/api.ts`:
+
+| Build | Default server |
+| --- | --- |
+| Device (`MODE=evenhub`, used by `npm run pack`) | `CLOUD_URL` from `shared/contract.ts` |
+| Browser / simulator (`npm run dev`) | `http://127.0.0.1:8787` |
+| Either, with `VITE_PINPOINT_SERVER` set | that URL (local cloud mode, LAN preview, staging) |
+
+Every request carries `X-Pinpoint-Device` on the cloud. On first run the app makes a UUID v4, stores it with the SDK's `setLocalStorage` (mirrored to `window.localStorage` as a fast cache), and reuses it on later runs. A missing or slow host storage wait is capped at 450 ms, so the first screen is never held.
+
+Local demo servers installed before the cloud contract do not allow that header in CORS. The app tries it once, then continues without it for that session; the cloud always requires it.
+
+When `GET /api/health` reports `mode: 'cloud'` and `workspace: 'sample'`, the inbox header becomes `Sample - N need you`, the hold menu gains `Reset sample`, an empty inbox says `All clear. Hold for menu: Reset sample`, and after a send the app polls the inbox every 2 s for 14 s so the sample agent's `report` reply appears by itself.
+
+The phone page shown by the Even app is a production page: app name and purpose, connection and server version, plain-language gestures, `Reset sample workspace`, `Retry connection`, the privacy note, and the version. The old preview buttons and `?mock=1` switch live in the collapsed **Developer controls** section. It follows the phone's light/dark scheme and uses no external fonts or CDNs.
+
+Lifecycle: the SDK's `FOREGROUND_ENTER`/`FOREGROUND_EXIT` events (and `document.visibilitychange` as a fallback) refresh the inbox on return and stop an in-flight recording cleanly, including the microphone.
+
 
 ## Screens and gestures
 
@@ -11,13 +32,13 @@ The app talks only to the Pinpoint server (`apps/server`). With no server it fal
 | Inbox (root, native list) | Swipe up/down | Move the native list selection |
 | | Tap | Open the focused thread |
 | | Double-tap | **`shutDownPageContainer(1)`** — the required system exit dialog |
-| | Hold menu | `Refresh` |
+| | Hold menu | `Refresh`, plus `Reset sample` in the cloud sample workspace |
 | Review | Swipe up/down | Move the point focus; the four-row window scrolls in place |
 | | Tap a step/claim/draft point | Start a voice note; tap again to stop |
 | | Tap a question | Open Options |
 | | Tap the `> Send review (N notes)` row | Open Preview |
 | | Double-tap | Back to Inbox (draft kept and autosaved) |
-| | Hold menu | `Send review`, `Read on phone`, `Clear notes`, `Refresh` |
+| | Hold menu | `Send review`, `Read on phone`, `Clear notes`, `Refresh`, plus `Reset sample` in the sample workspace |
 | Options | Tap | Choose an option and return to Review, or `Say something else` to record |
 | | Double-tap | Back to Review |
 | Preview | Tap | Send to the agent, then `Sent to agent` for 1.5 s and back to Inbox |
@@ -63,9 +84,11 @@ The voice note is real audio: the script makes the phrase with macOS `say`, play
 
 ## Data and voice
 
-- `VITE_PINPOINT_SERVER` sets the server origin (default `http://127.0.0.1:8787`). `?mock=1` forces the in-memory demo.
-- Demo mode implements the SPEC §5 API in memory with the four §12 threads: `auth-refresh-fix` (plan, 7 steps, risky step 4, mutex step 6), `deps-upgrade` (question with three options), `inbox-morning` (4 drafts) and `flaky-e2e` (failed run).
-- After a successful send the app hides that thread locally. The demo server keeps its static fixtures, so without this filter the thread would come back on the next inbox refresh; the filter is cleared by a page reload.
+- `VITE_PINPOINT_SERVER` sets the server origin. Without it, a device build uses Pinpoint Cloud and a dev/simulator build uses `http://127.0.0.1:8787`. `?mock=1` forces the in-memory demo.
+- Device builds send `X-Pinpoint-Device`, a per-install UUID v4 kept in SDK storage; the cloud uses it to keep a private sample workspace per device.
+- `?mock=1` and the demo server use the plain-language fixtures in `demo/fixtures`: `login-fix` (plan, 7 steps, risky step 4), `payment-upgrade` (question with three options) and `inbox-morning` (report, 6 points). They are imported at build time, not fetched.
+- In the cloud sample workspace a send triggers a sample-agent `report` reply after about 5 s; the app polls for it and shows it without a manual refresh.
+- After a successful send the app hides that thread locally. The demo server keeps its static fixtures, so without this filter the thread would come back on the next inbox refresh; the filter is cleared by a page reload, and it is not used in the cloud sample workspace (the sample agent may reuse the thread).
 - Voice: tap starts `audioControl(true, AudioInputSource.Glasses)`, PCM frames are buffered, and a second tap (or 20 s) stops the mic and POSTs the raw s16le 16 kHz mono bytes to `/api/voice`. The `no / don't / not / wrong / instead / stop / never` heuristic picks `x` versus `*`; a question answer uses `=`. The simulator check feeds real speech through the host microphone; the demo-mode server transcribes it for real (T3's transcription endpoint in the check run).
 - Every change to notes or seen points is autosaved with `PUT /api/review/:threadId`.
 
@@ -73,8 +96,8 @@ The voice note is real audio: the script makes the phrase with macOS `say`, play
 
 `app.json` requests:
 
-- **network** — whitelists the server origins (`http://127.0.0.1:8787` and `:8788`). For a LAN device preview, add the Mac's LAN origin and set `VITE_PINPOINT_SERVER` to it.
-- **g2-microphone** — records the short voice note about the focused point.
+- **network** — whitelists Pinpoint Cloud first (`https://pinpoint-api.qolso.com`), plus `http://127.0.0.1:8787` and `:8788` for simulator development. For a LAN device preview, add the Mac's LAN origin and set `VITE_PINPOINT_SERVER` to it.
+- **g2-microphone** — records the short voice note about the focused point; the audio is transcribed, then discarded.
 
 ```sh
 npm run pack   # writes pinpoint.ehpk (SDK 0.0.16)
@@ -83,7 +106,7 @@ npm run pack   # writes pinpoint.ehpk (SDK 0.0.16)
 ## Checks
 
 ```sh
-npm test          # tsx --test: focus, four-row window, markers, ASCII 44, notes, API
+npm test          # tsx --test: focus, four-row window, markers, ASCII 44, notes, cloud API, device id
 npm run build     # tsc --noEmit + vite build
 npm run test:ui   # 320–1440 px preview + mocked SDK transport, exit mode 1
 ```
@@ -93,5 +116,6 @@ The UI check needs Google Chrome or Playwright Chromium (`npx playwright install
 ## Known limits
 
 - Simulator-only: no BLE timing/flicker, no ring-vs-temple distinction, brightness levels are indicative, and the system exit dialog is not drawn (see caveat above).
+- Real-hardware risks: the simulator cannot prove the phone's network reachability, cloud CORS, SDK storage behaviour across app restarts, or that the Even app keeps the WebView alive while the phone is locked. The packaged build is bounded by the `app.json` network whitelist and SDK `0.0.16`.
 - The simulator check exercises the real server in demo mode on port 8788, including `/api/voice`; live T3 threads and real Telegram delivery belong to the server-side checks.
 - One fixed firmware font; strings are normalised to printable ASCII and capped before sending.

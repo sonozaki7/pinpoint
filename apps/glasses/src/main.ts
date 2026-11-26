@@ -1,12 +1,16 @@
 import "./style.css";
-import type { InboxItem } from "../../../shared/contract";
-import { DEFAULT_SERVER, HttpPinpointApi, type PinpointApi } from "./api";
+import type { InboxItem, ThreadAttention } from "../../../shared/contract";
+import {
+  APP_VERSION, DEVICE_BUILD, HttpPinpointApi, isNetworkFailure, SERVER_IS_CLOUD, SERVER_URL,
+  type PinpointApi,
+} from "./api";
 import { MockPinpointApi } from "./mock";
 import {
-  adoptInbox, applyVoice, clearFlash, clearNotes, deckFailed, doubleTap, draftFor, endRecording,
-  finishSend, focusedPoint, goPreview, initialState, markLoading, markOffline, markSending, markSent, mergeDeck,
-  moveFocus, noteFor, openDeck, press, previewFailed, sendFailed, setFlash, setInboxFocus, setPreview,
-  shouldAcceptSwipe, startReview, VOICE_MAX_MS, SENT_HOLD_MS, type Effect, type State,
+  adoptInbox, applyHealth, applyVoice, clearFlash, clearNotes, deckFailed, doubleTap, draftFor, endRecording,
+  finishSend, focusedPoint, goPreview, initialState, markLoading, markOffline, markSending, markSent,
+  mergeDeck, moveFocus, noteFor, openDeck, press, previewFailed, resetWorkspace, sendFailed, setFlash,
+  setInboxFocus, setPreview, shouldAcceptSwipe, startReview, VOICE_MAX_MS, SENT_HOLD_MS,
+  type Effect, type State,
 } from "./model";
 import { pageFor, type PageModel } from "./display";
 import { connectEven } from "./even";
@@ -15,11 +19,10 @@ import { PcmRecorder } from "./voice";
 
 const params = new URLSearchParams(location.search);
 const forceMock = params.get("mock") === "1";
-const deviceBuild = import.meta.env.MODE === "evenhub";
-const serverUrl = (import.meta.env.VITE_PINPOINT_SERVER as string | undefined) ?? DEFAULT_SERVER;
+const bootedAt = Date.now();
 
 let api: PinpointApi = new MockPinpointApi();
-let state = initialState({ demo: forceMock, loading: true });
+let state = initialState({ demo: forceMock, loading: true, cloud: SERVER_IS_CLOUD });
 const recorder = new PcmRecorder();
 let hardware: Awaited<ReturnType<typeof connectEven>> | undefined;
 let clockTimer: ReturnType<typeof setTimeout> | undefined;
@@ -28,11 +31,16 @@ let saveTimer: ReturnType<typeof setTimeout> | undefined;
 let lastMenuAt = 0;
 let lastDoubleAt = 0;
 let lastSwipeAt = Number.NEGATIVE_INFINITY;
+let lastForegroundRefresh = 0;
 let sendInFlight = false;
 let previewInFlight = false;
 let inboxInFlight = false;
-/** A cold live deck can take ~45 s; give it a minute before offering retry. */
-const DECK_WAIT_MS = 60_000;
+let resetInFlight = false;
+let samplePoll = 0;
+/** A cold live deck can take ~45 s; give it 70 s before offering retry. */
+const DECK_WAIT_MS = 70_000;
+const SAMPLE_POLL_MS = 2_000;
+const SAMPLE_POLL_ATTEMPTS = 7;
 
 const el = {
   head: document.getElementById("glasses-head")!,
@@ -51,6 +59,13 @@ const el = {
   double: document.querySelector<HTMLButtonElement>("#btn-double")!,
   menuButton: document.querySelector<HTMLButtonElement>("#btn-menu")!,
   modeLink: document.querySelector<HTMLAnchorElement>("#mode-link")!,
+  phoneStatus: document.getElementById("phone-status")!,
+  phoneServer: document.getElementById("phone-server")!,
+  phoneVersion: document.getElementById("phone-version")!,
+  statusDot: document.getElementById("status-dot")!,
+  resetSample: document.querySelector<HTMLButtonElement>("#btn-reset-sample")!,
+  retry: document.querySelector<HTMLButtonElement>("#btn-retry")!,
+  resetNote: document.getElementById("reset-note")!,
 };
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -65,11 +80,12 @@ function render() {
   void hardware?.render(page);
   updateButtons();
   updateMode();
+  updatePhone();
   scheduleClock();
 }
 
 function renderBrowser(page: PageModel) {
-  setText(el.badge, state.demo ? "Demo data" : "Live server");
+  setText(el.badge, state.demo ? "Demo data" : state.cloud ? "Pinpoint Cloud" : "Live server");
   setText(el.head, page.subtitle ? `${page.title}\n${page.subtitle}` : page.title);
   setText(el.pane, page.pane ?? page.message ?? "");
   setText(el.footer, page.footer);
@@ -122,9 +138,45 @@ function updateButtons() {
   el.down.disabled = ifInboxEmpty();
   el.note.textContent = state.demo
     ? "Demo data runs entirely in this browser. Use ?mock=1 to force it."
-    : `Live mode: posting to ${serverUrl}`;
+    : `${state.cloud ? "Cloud" : "Local"} mode: posting to ${SERVER_URL}`;
   el.modeLink.textContent = state.demo ? "Try the live server" : "Force demo data";
   el.modeLink.href = state.demo ? location.pathname : `${location.pathname}?mock=1`;
+}
+
+function updatePhone() {
+  const cloud = state.cloud;
+  const serverName = cloud ? "Pinpoint Cloud" : "Local server";
+  const workspace = state.workspace === "sample"
+    ? "Sample workspace"
+    : state.workspace === "desk"
+      ? "Desk workspace"
+      : null;
+  const status = state.demo
+    ? "Demo data · offline preview"
+    : [serverName, workspace, state.offline ? "offline" : state.loading ? "connecting..." : "online"]
+      .filter(Boolean)
+      .join(" · ");
+  setText(el.phoneStatus, status);
+  el.statusDot.dataset.state = state.demo
+    ? "demo"
+    : state.offline
+      ? "offline"
+      : state.loading
+        ? "connecting"
+        : "online";
+  setText(
+    el.phoneServer,
+    state.serverVersion
+      ? `Server version ${state.serverVersion}`
+      : state.offline
+        ? "Server not reachable"
+        : "Server version unknown",
+  );
+  setText(el.phoneVersion, `App ${APP_VERSION}`);
+  const sample = state.workspace === "sample";
+  el.resetSample.disabled = !sample || resetInFlight || state.sending;
+  setText(el.resetSample, resetInFlight ? "Resetting..." : "Reset sample workspace");
+  el.resetNote.hidden = sample;
 }
 
 function ifInboxEmpty() {
@@ -182,6 +234,8 @@ function handleInput(input: Input) {
     return;
   }
   if (input.kind === "surface") {
+    if (input.enter) onForeground();
+    else stopRecordingForBackground();
     render();
     return;
   }
@@ -279,6 +333,18 @@ async function runEffect(effect: Effect) {
   }
 }
 
+function unreachableText(): string {
+  return state.cloud
+    ? "Can't reach Pinpoint Cloud.\nCheck your phone's internet.\nTap to retry."
+    : "Can't reach the local server.\nStart it, then tap to retry.";
+}
+
+function shortUnreachable(): string {
+  return state.cloud
+    ? "Can't reach Pinpoint Cloud. Tap to retry."
+    : "Can't reach the local server. Tap to retry.";
+}
+
 async function loadInbox(silent: boolean) {
   if (inboxInFlight) return;
   inboxInFlight = true;
@@ -287,12 +353,14 @@ async function loadInbox(silent: boolean) {
       state = markLoading(state);
       render();
     }
-    try {
-      const result = await api.inbox();
-      state = adoptInbox(state, result.items, { demo: api.mode === "demo", offline: false });
-    } catch (error) {
-      console.warn("[pinpoint] inbox", error);
-      if (!silent) state = markOffline(state);
+    const [inboxResult, healthResult] = await Promise.allSettled([api.inbox(), api.health()]);
+    if (inboxResult.status === "fulfilled") {
+      state = adoptInbox(state, inboxResult.value.items, { demo: api.mode === "demo", offline: false });
+      if (healthResult.status === "fulfilled") state = applyHealth(state, healthResult.value);
+    } else {
+      console.warn("[pinpoint] inbox", inboxResult.reason);
+      if (healthResult.status === "fulfilled") state = applyHealth(state, healthResult.value);
+      if (!silent || state.screen === "inbox") state = markOffline(state, unreachableText());
     }
     render();
   } finally {
@@ -306,24 +374,16 @@ async function loadInbox(silent: boolean) {
 }
 
 async function boot() {
-  console.info(`[pinpoint] server=${forceMock ? "mock" : serverUrl}`);
+  console.info(`[pinpoint] server=${forceMock ? "mock" : SERVER_URL}`);
   if (!forceMock) {
-    const live = new HttpPinpointApi(serverUrl);
-    api = live;
-    try {
-      const result = await live.inbox();
-      state = adoptInbox(state, result.items, { demo: false, offline: false });
-    } catch (error) {
-      // Do not silently substitute sample data for the user's agents. The
-      // offline screen says the server is unreachable and offers a tap-retry.
-      console.info("[pinpoint] live server unavailable", error);
-      state = markOffline(state);
-    }
+    api = new HttpPinpointApi(SERVER_URL);
+    await loadInbox(false);
   } else {
-    const result = await api.inbox();
+    const [result, health] = await Promise.all([api.inbox(), api.health()]);
     state = adoptInbox(state, result.items, { demo: true, offline: false });
+    state = applyHealth(state, health);
+    render();
   }
-  render();
   console.info(`[pinpoint] mode=${state.demo ? "demo" : "live"} screen=inbox items=${state.inbox.length}`);
   console.info(`[pinpoint] inbox-ids=${state.inbox.map((item) => item.threadId).join(",")}`);
   console.info(`[pinpoint] inbox-header="${pageFor(state, Date.now()).title}"`);
@@ -375,7 +435,11 @@ async function openThreadItem(item: InboxItem) {
     } catch (error) {
       console.warn("[pinpoint] deck", error);
       if (state.loadingThreadId !== item.threadId) return;
-      state = deckFailed(state, "Could not load points. Tap to retry.", Date.now());
+      state = deckFailed(
+        state,
+        isNetworkFailure(error) ? shortUnreachable() : "Could not load points. Tap to retry.",
+        Date.now(),
+      );
       render();
       return;
     }
@@ -422,7 +486,11 @@ async function stopRecording() {
     console.info(`[pinpoint] review-header="${pageFor(state, Date.now()).title}"`);
   } catch (error) {
     console.warn("[pinpoint] voice", error);
-    state = setFlash(state, "Voice failed. Try again.", Date.now());
+    state = setFlash(
+      state,
+      isNetworkFailure(error) ? (state.cloud ? "Can't reach Pinpoint Cloud. Try again." : "Can't reach the local server. Try again.") : "Voice failed. Try again.",
+      Date.now(),
+    );
   }
   render();
 }
@@ -450,7 +518,11 @@ async function openPreview() {
     } catch (error) {
       console.warn("[pinpoint] preview", error);
       if (state.screen !== "preview") return;
-      state = previewFailed(state, "Preview failed. Tap to retry.", Date.now());
+      state = previewFailed(
+        state,
+        isNetworkFailure(error) ? shortUnreachable() : "Preview failed. Tap to retry.",
+        Date.now(),
+      );
     }
     maybePersist(before, state);
     render();
@@ -466,6 +538,10 @@ async function sendReview() {
   // recreate it with the notes that were just delivered.
   clearTimeout(saveTimer);
   saveTimer = undefined;
+  const known = new Map<string, ThreadAttention>(
+    state.inbox.map((item) => [item.threadId, item.attention]),
+  );
+  known.set(deck.threadId, deck.attention);
   state = markSending(state);
   render();
   sendInFlight = true;
@@ -474,19 +550,48 @@ async function sendReview() {
     if (draft) await api.putReview(draft);
     const result = await api.send(deck.threadId);
     if (!result.ok) {
-      state = sendFailed(state, result.error ?? "Send failed. Try again.", Date.now());
+      console.warn("[pinpoint] send rejected", result.error);
+      state = sendFailed(state, "Send failed. Try again.", Date.now());
       render();
       return;
     }
     console.info(`[pinpoint] sent ${result.delivered}`);
     state = markSent(state, Date.now());
     render();
+    if (state.workspace === "sample") void pollSampleReply(known);
   } catch (error) {
     console.warn("[pinpoint] send", error);
-    state = sendFailed(state, "Send failed. Try again.", Date.now());
+    state = sendFailed(
+      state,
+      isNetworkFailure(error) ? shortUnreachable() : "Send failed. Try again.",
+      Date.now(),
+    );
     render();
   } finally {
     sendInFlight = false;
+  }
+}
+
+/** The sample agent replies about 5 s after a send; refresh quietly until it lands. */
+async function pollSampleReply(known: Map<string, ThreadAttention>) {
+  const run = ++samplePoll;
+  for (let attempt = 0; attempt < SAMPLE_POLL_ATTEMPTS; attempt++) {
+    await sleep(SAMPLE_POLL_MS);
+    if (run !== samplePoll || state.workspace !== "sample") return;
+    await loadInbox(true);
+    if (run !== samplePoll) return;
+    const reply = state.inbox.find((item) => {
+      const before = known.get(item.threadId);
+      return item.attention === "report" && before !== "report";
+    });
+    if (reply) {
+      console.info(`[pinpoint] sample-reply=${reply.threadId}`);
+      if (state.screen === "inbox") {
+        state = setFlash(state, "Agent replied", Date.now(), 3_000);
+        render();
+      }
+      return;
+    }
   }
 }
 
@@ -530,6 +635,11 @@ async function readOnPhone() {
   const deck = state.deck;
   const point = focusedPoint(state) ?? deck?.points[deck.points.length - 1];
   if (!deck || !point) return;
+  if (state.workspace === "sample") {
+    state = setFlash(state, "No phone link in sample workspace", Date.now(), 4_000);
+    render();
+    return;
+  }
   try {
     const result = await api.phone(deck.threadId, point.id);
     if (result.link) console.info(`[pinpoint] phone-link=${result.link}`);
@@ -545,6 +655,10 @@ async function handleMenu(id: number) {
   const now = Date.now();
   if (now - lastMenuAt < 300) return;
   lastMenuAt = now;
+  if (id === 5) {
+    await resetSampleWorkspace();
+    return;
+  }
   if (state.screen === "inbox") {
     if (id === 4) await loadInbox(false);
     return;
@@ -570,6 +684,50 @@ async function handleMenu(id: number) {
   }
 }
 
+async function resetSampleWorkspace() {
+  if (state.workspace !== "sample" || resetInFlight || sendInFlight || state.sending) return;
+  samplePoll++;
+  resetInFlight = true;
+  updatePhone();
+  try {
+    await api.resetSample();
+    state = resetWorkspace(state);
+    render();
+    await loadInbox(false);
+    state = setFlash(state, "Sample reset", Date.now(), 3_000);
+    console.info("[pinpoint] sample-reset");
+    render();
+  } catch (error) {
+    console.warn("[pinpoint] reset sample", error);
+    state = setFlash(
+      state,
+      isNetworkFailure(error) ? shortUnreachable() : "Reset failed. Try again.",
+      Date.now(),
+    );
+    render();
+  } finally {
+    resetInFlight = false;
+    updatePhone();
+  }
+}
+
+function stopRecordingForBackground() {
+  if (state.recordingStartedAt === null) return;
+  discardRecording();
+  state = endRecording(state);
+  state = setFlash(state, "Recording stopped", Date.now(), 3_000);
+  render();
+  console.info("[pinpoint] recording stopped by background");
+}
+
+function onForeground() {
+  const now = Date.now();
+  if (now - bootedAt < 2_500) return;
+  if (now - lastForegroundRefresh < 1_500) return;
+  lastForegroundRefresh = now;
+  void loadInbox(state.offline ? false : true);
+}
+
 function emit(kind: "up" | "down" | "tap" | "double") {
   if (kind === "up" || kind === "down") handleInput({ kind });
   else if (kind === "tap") handleInput({ kind: "tap" });
@@ -583,6 +741,14 @@ el.double.addEventListener("click", () => emit("double"));
 el.menuButton.addEventListener("click", () => {
   el.menu.hidden = !el.menu.hidden;
   if (!el.menu.hidden) renderMenu();
+});
+el.resetSample.addEventListener("click", () => { void resetSampleWorkspace(); });
+el.retry.addEventListener("click", () => { void loadInbox(false); });
+
+// SDK hosts report FOREGROUND_ENTER/EXIT; browsers and other hosts get this.
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") stopRecordingForBackground();
+  else onForeground();
 });
 
 function renderMenu() {
@@ -617,7 +783,7 @@ window.addEventListener("keydown", (event) => {
 
 render();
 
-if (deviceBuild) el.modeLink.hidden = true;
+if (DEVICE_BUILD) el.modeLink.hidden = true;
 
 void connectEven(
   () => pageFor(state, Date.now()),

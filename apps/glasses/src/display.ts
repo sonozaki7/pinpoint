@@ -236,32 +236,60 @@ const REVIEW_MENU: MenuEntry[] = [
   { id: 4, label: "Refresh" },
 ];
 
-const INBOX_MENU: MenuEntry[] = [{ id: 4, label: "Refresh" }];
+function inboxMenu(state: State): MenuEntry[] {
+  return state.workspace === "sample"
+    ? [{ id: 4, label: "Refresh" }, { id: 5, label: "Reset sample" }]
+    : [{ id: 4, label: "Refresh" }];
+}
+
+function reviewMenu(state: State): MenuEntry[] {
+  return state.workspace === "sample"
+    ? [...REVIEW_MENU, { id: 5, label: "Reset sample" }]
+    : REVIEW_MENU;
+}
 
 export function pageFor(state: State, now: number): PageModel {
   if (state.screen === "inbox") {
-    const title = state.loading
-      ? "PINPOINT"
-      : state.inbox.length === 0
-        ? "PINPOINT"
-        : `PINPOINT${DOT}${state.inbox.length} ${state.inbox.length === 1 ? "needs" : "need"} you`;
+    const sample = state.workspace === "sample";
+    const name = sample ? "Sample" : "PINPOINT";
+    const count = state.inbox.length;
+    const title = state.loading || count === 0
+      ? name
+      : sample
+        ? `${name} - ${count} ${count === 1 ? "needs" : "need"} you`
+        : `${name}${DOT}${count} ${count === 1 ? "needs" : "need"} you`;
     const subtitle = state.demo ? "demo data" : state.offline ? "offline" : undefined;
+    const emptyFooter = sample
+      ? `hold: menu${DOT}2x: exit`
+      : `swipe: move${DOT}tap: open${DOT}2x: exit`;
+    const flash = state.flash && state.flash.until > now ? state.flash.text : null;
     const base: PageModel = {
       kind: "inbox",
       title,
       subtitle,
       rows: [],
-      footer: state.loading ? "Connecting..." : `swipe: move${DOT}tap: open${DOT}2x: exit`,
-      menu: INBOX_MENU,
+      footer: state.loading
+        ? "Connecting..."
+        : flash ?? (count === 0 ? emptyFooter : `swipe: move${DOT}tap: open${DOT}2x: exit`),
+      menu: inboxMenu(state),
     };
     if (state.offline) {
-      return { ...base, message: "Server unreachable | tap to retry", footer: `tap: retry${DOT}2x: exit` };
+      return {
+        ...base,
+        message: state.offlineMessage ?? "Server unreachable | tap to retry",
+        footer: `tap: retry${DOT}2x: exit`,
+      };
     }
     if (state.loading) {
       return { ...base, message: "Checking your agents..." };
     }
-    if (state.inbox.length === 0) {
-      return { ...base, message: "All clear.\nYour agents are working." };
+    if (count === 0) {
+      return {
+        ...base,
+        message: sample
+          ? "All clear. Hold for menu: Reset sample"
+          : "All clear.\nYour agents are working.",
+      };
     }
     return {
       ...base,
@@ -289,7 +317,7 @@ export function pageFor(state: State, now: number): PageModel {
         }),
       pane: reviewPane(state, now),
       footer: reviewFooter(state),
-      menu: REVIEW_MENU,
+      menu: reviewMenu(state),
     };
   }
 
@@ -309,7 +337,7 @@ export function pageFor(state: State, now: number): PageModel {
       title: fitTitle(state.deck?.title ?? "Question", `${DOT}answer`),
       rows,
       footer: `tap: choose${DOT}2x: back`,
-      menu: REVIEW_MENU,
+      menu: reviewMenu(state),
     };
   }
 
@@ -337,6 +365,6 @@ export function pageFor(state: State, now: number): PageModel {
         : state.previewLoading
           ? "Building preview..."
           : `tap: send${DOT}2x: back`,
-    menu: REVIEW_MENU,
+    menu: reviewMenu(state),
   };
 }

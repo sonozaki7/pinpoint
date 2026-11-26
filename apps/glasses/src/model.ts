@@ -1,4 +1,6 @@
-import type { Deck, InboxItem, Note, Point, PreviewResult, ReviewDraft } from "../../../shared/contract";
+import type {
+  Deck, Health, InboxItem, Note, Point, PreviewResult, ReviewDraft,
+} from "../../../shared/contract";
 export type ScreenName = "inbox" | "review" | "options" | "preview";
 
 export interface Flash {
@@ -16,6 +18,12 @@ export interface State {
   demo: boolean;
   loading: boolean;
   offline: boolean;
+  /** Why the last inbox load failed; kept in plain language for the glasses. */
+  offlineMessage: string | null;
+  /** Cloud builds talk to Pinpoint Cloud; local builds talk to the desktop server. */
+  cloud: boolean;
+  workspace: "sample" | "desk" | null;
+  serverVersion: string | null;
   inbox: InboxItem[];
   inboxFocus: number;
   deck: Deck | null;
@@ -60,12 +68,16 @@ export const SENT_HOLD_MS = 1_500;
 /** One swipe per 250 ms: the ring and touch surfaces both repeat fast. */
 export const SWIPE_DEBOUNCE_MS = 250;
 
-export function initialState(options: { demo: boolean; loading: boolean }): State {
+export function initialState(options: { demo: boolean; loading: boolean; cloud?: boolean }): State {
   return {
     screen: "inbox",
     demo: options.demo,
     loading: options.loading,
     offline: false,
+    offlineMessage: null,
+    cloud: options.cloud ?? false,
+    workspace: null,
+    serverVersion: null,
     inbox: [],
     inboxFocus: 0,
     deck: null,
@@ -165,16 +177,33 @@ export function adoptInbox(
     inboxFocus: existing ? state.inboxFocus : 0,
     demo: options.demo,
     offline: options.offline,
+    offlineMessage: options.offline ? state.offlineMessage : null,
     loading: false,
   };
 }
 
-export function markOffline(state: State): State {
-  return { ...state, loading: false, offline: true };
+/** Cloud health names the workspace this device is looking at. */
+export function applyHealth(state: State, health: Health | undefined): State {
+  if (!health) return state;
+  return {
+    ...state,
+    cloud: health.mode === "cloud" ? true : state.cloud,
+    workspace: health.workspace ?? null,
+    serverVersion: health.version ?? null,
+  };
+}
+
+export function markOffline(state: State, message?: string): State {
+  return {
+    ...state,
+    loading: false,
+    offline: true,
+    offlineMessage: message ?? state.offlineMessage,
+  };
 }
 
 export function markLoading(state: State): State {
-  return { ...state, loading: true, offline: false };
+  return { ...state, loading: true, offline: false, offlineMessage: null };
 }
 
 export function setInboxFocus(state: State, index: number): State {
@@ -395,7 +424,10 @@ export function finishSend(state: State): State {
   const threadId = state.deck?.threadId;
   const drafts = { ...state.drafts };
   if (threadId) delete drafts[threadId];
-  const resolved = threadId && !state.resolved.includes(threadId)
+  // The cloud sample workspace is server-authoritative: the sample agent's
+  // reply may reuse the thread id, so never hide it locally there.
+  const remember = state.workspace !== "sample";
+  const resolved = remember && threadId && !state.resolved.includes(threadId)
     ? [...state.resolved, threadId]
     : state.resolved;
   return {
@@ -412,6 +444,37 @@ export function finishSend(state: State): State {
     drafts,
     resolved,
     focus: 0,
+    optionsFocus: 0,
+    preview: null,
+    previewLoading: false,
+    sending: false,
+    sent: false,
+    sentAt: null,
+    flash: null,
+  };
+}
+
+/** Clear the local view before reloading a freshly reset sample workspace. */
+export function resetWorkspace(state: State): State {
+  return {
+    ...state,
+    screen: "inbox",
+    loading: true,
+    offline: false,
+    offlineMessage: null,
+    inbox: [],
+    inboxFocus: 0,
+    deck: null,
+    loadingThreadId: null,
+    reviewThreadId: null,
+    reviewTitle: "",
+    deckError: null,
+    focus: 0,
+    notes: [],
+    seen: [],
+    drafts: {},
+    resolved: [],
+    recordingStartedAt: null,
     optionsFocus: 0,
     preview: null,
     previewLoading: false,

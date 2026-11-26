@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
-import { createAuthDeck, createDemoInbox, createDepsDeck } from "../src/mock";
+import { createDemoInbox, createLoginDeck, createPaymentDeck } from "../src/mock";
 import {
   adoptInbox, canSend, deckFailed, doubleTap, initialState, markOffline, press, shouldAcceptSwipe,
   startReview, type State,
@@ -15,13 +15,13 @@ function inboxState(): State {
   });
 }
 
-function reviewState(threadId = "auth-refresh-fix"): State {
+function reviewState(threadId = "login-fix"): State {
   const state = inboxState();
   const item = state.inbox.find((entry) => entry.threadId === threadId);
   assert.ok(item);
   return {
     ...startReview(state, item),
-    deck: threadId === "auth-refresh-fix" ? createAuthDeck() : createDepsDeck(),
+    deck: threadId === "login-fix" ? createLoginDeck() : createPaymentDeck(),
     loadingThreadId: null,
     reviewThreadId: item.threadId,
   };
@@ -33,7 +33,7 @@ test("root double tap opens the exit dialog; other screens go back", () => {
   const review = reviewState();
   assert.equal(doubleTap(review).state.screen, "inbox");
 
-  const options = press(reviewState("deps-upgrade"), 1_000).state;
+  const options = press(reviewState("payment-upgrade"), 1_000).state;
   assert.equal(options.screen, "options");
   assert.equal(doubleTap(options).state.screen, "review");
 
@@ -63,7 +63,7 @@ test("offline, empty inbox and a failed deck all offer a way forward", () => {
   assert.equal(pageFor(failed, 1_000).footer, "tap: retry | 2x: back");
   assert.deepEqual(press(failed, 1_000).effect, { type: "retry-deck" });
 
-  const item = inboxState().inbox.find((entry) => entry.threadId === "auth-refresh-fix");
+  const item = inboxState().inbox.find((entry) => entry.threadId === "login-fix");
   assert.ok(item);
   const pending = startReview(inboxState(), item);
   assert.equal(press(pending, 1_000).effect, undefined, "a 202 still in flight is not retried");
@@ -73,7 +73,7 @@ test("send requires a loaded preview, not just the preview screen", () => {
   const previewState = press({ ...reviewState(), focus: 7 }, 1_000).state;
   const preview = {
     message: "m",
-    preview: ["All 7 points agreed", "Tap to send to auth-refresh-fix"] as [string, string],
+    preview: ["All 7 points agreed", "Tap to send to login-fix"] as [string, string],
     counts: { objections: 0, answers: 0, notes: 0, agreed: 7 },
   };
   assert.equal(canSend(previewState), false, "an empty preview screen cannot send");
@@ -128,7 +128,7 @@ test("every rebuild re-declares the hold menu", () => {
   const pages = [
     pageFor(inboxState(), 1_000),
     pageFor(reviewState(), 1_000),
-    pageFor(press(reviewState("deps-upgrade"), 1_000).state, 1_000),
+    pageFor(press(reviewState("payment-upgrade"), 1_000).state, 1_000),
     pageFor(press({ ...reviewState(), focus: 7 }, 1_000).state, 1_000),
     pageFor(adoptInbox(initialState({ demo: true, loading: false }), [], { demo: true, offline: false }), 1_000),
   ];
