@@ -35,7 +35,7 @@ Spec: `docs/SPEC.md` · Demo/pitch: `docs/DEMO.md` · Acceptance rows: SPEC §13
 
 1. Create the Telegram bot (@BotFather) and a private group with Topics; add the bot as admin (5 minutes, guided).
 2. Approve making the GitHub repo public (needed for submission).
-3. Approve the site URL/domain choice from `docs/hosting-options.md`.
+3. Approve the site URL/domain choice.
 4. Record the narration (script in `docs/DEMO.md`), or accept the TTS draft.
 5. Post the eligibility question on the Even Discord (draft in `docs/SUBMISSION.md`).
 
