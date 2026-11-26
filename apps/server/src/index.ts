@@ -1,4 +1,8 @@
 import { serve } from '@hono/node-server';
+import type { Server } from 'node:http';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { attachDeskSocket } from './cloud/deskSocketServer.js';
 import { CLOUD_MAX_DEVICES } from './cloud/limits.js';
 import { loadSampleWorkspace } from './cloud/sample.js';
 import { CloudService } from './cloud/service.js';
@@ -17,6 +21,13 @@ import { createSources } from './sources/index.js';
 import { createVoiceService } from './voice/service.js';
 import type { AttentionThread } from './core/types.js';
 
+export interface LocalRuntime {
+  app: ReturnType<typeof createApp>;
+  service: PinpointService;
+  server: ReturnType<typeof serve>;
+  close: () => Promise<void>;
+}
+
 async function runCloud(env: Env): Promise<void> {
   // Cloud never loads T3, Telegram or a splitter. The sample workspace comes
   // straight from demo fixtures, so a device opens its deck instantly.
@@ -25,10 +36,13 @@ async function runCloud(env: Env): Promise<void> {
   const cloud = new CloudService({ env, sample, voice });
   const app = createCloudApp({ cloud });
   const server = serve({ fetch: app.fetch, port: env.port, hostname: env.host });
+  // Desk WebSockets share the HTTP server; nginx/Cloudflare pass the upgrade.
+  const detachDeskSocket = attachDeskSocket(server as unknown as Server, cloud.desk);
 
   console.info(
     `[pinpoint] listening on http://${env.host}:${env.port} mode=cloud version=${env.serverVersion} ` +
-      `workspace=sample devices<=${CLOUD_MAX_DEVICES} state=memory (restart wipes it) splitter=fixture voice=whisper`,
+      `workspace=sample devices<=${CLOUD_MAX_DEVICES} state=memory (restart wipes it) splitter=fixture ` +
+      `voice=whisper pairing=desk`,
   );
 
   let closing = false;
@@ -39,20 +53,20 @@ async function runCloud(env: Env): Promise<void> {
     const force = setTimeout(() => process.exit(0), 4_000);
     force.unref();
     cloud.stop();
+    detachDeskSocket();
     server.close(() => process.exit(0));
   };
   process.on('SIGINT', () => shutdown('SIGINT'));
   process.on('SIGTERM', () => shutdown('SIGTERM'));
 }
 
-async function main(): Promise<void> {
-  const env = readEnv();
-  // Privacy gate: a live server without an allowlist must not start (SPEC §6).
+/**
+ * Start the normal demo/live server and return it without installing signal
+ * handlers. `npm run desk` uses the same app in-process to answer relayed
+ * requests; the standalone entry below keeps the old CLI behaviour.
+ */
+export async function startLocal(env: Env): Promise<LocalRuntime> {
   assertLivePrivacy(env);
-  if (env.mode === 'cloud') {
-    await runCloud(env);
-    return;
-  }
   const demo = env.mode === 'demo' ? loadDemoData(env.fixturesDir) : undefined;
   const deckFixture = env.deckFixture ? loadDeckFixture(env.deckFixture) : undefined;
   if (deckFixture) console.info(`[pinpoint] deck fixture for ${[...deckFixture.keys()].join(', ')}`);
@@ -140,6 +154,31 @@ async function main(): Promise<void> {
 
   void service.preload();
 
+  let closed = false;
+  const close = async (): Promise<void> => {
+    if (closed) return;
+    closed = true;
+    try {
+      await service.stop();
+    } catch (error) {
+      console.warn(`[pinpoint] shutdown error: ${redactSecrets((error as Error).message)}`);
+    }
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  };
+
+  return { app, service, server, close };
+}
+
+async function main(): Promise<void> {
+  const env = readEnv();
+  // Privacy gate: a live server without an allowlist must not start (SPEC §6).
+  assertLivePrivacy(env);
+  if (env.mode === 'cloud') {
+    await runCloud(env);
+    return;
+  }
+
+  const runtime = await startLocal(env);
   let closing = false;
   const shutdown = async (signal: string): Promise<void> => {
     if (closing) return;
@@ -147,18 +186,22 @@ async function main(): Promise<void> {
     console.info(`[pinpoint] shutting down (${signal})`);
     const force = setTimeout(() => process.exit(0), 4_000);
     force.unref();
-    try {
-      await service?.stop();
-    } catch (error) {
-      console.warn(`[pinpoint] shutdown error: ${redactSecrets((error as Error).message)}`);
-    }
-    server.close(() => process.exit(0));
+    await runtime.close();
+    process.exit(0);
   };
   process.on('SIGINT', () => void shutdown('SIGINT'));
   process.on('SIGTERM', () => void shutdown('SIGTERM'));
 }
 
-main().catch((error: unknown) => {
-  console.error(`[pinpoint] failed to start: ${redactSecrets((error as Error).message)}`);
-  process.exit(1);
-});
+const invokedDirectly = (() => {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  return path.resolve(entry) === fileURLToPath(import.meta.url);
+})();
+
+if (invokedDirectly) {
+  main().catch((error: unknown) => {
+    console.error(`[pinpoint] failed to start: ${redactSecrets((error as Error).message)}`);
+    process.exit(1);
+  });
+}

@@ -1,15 +1,17 @@
 import {
   CLOUD_URL,
   DEVICE_HEADER,
+  TOKEN_HEADER,
   type Deck,
   type EditResult,
   type Health,
   type InboxItem,
+  type PairResult,
   type PreviewResult,
   type ReviewDraft,
   type SendResult,
 } from "../../../shared/contract";
-import { getDeviceId } from "./device";
+import { getDeskToken, getDeviceId } from "./device";
 
 export interface PinpointApi {
   readonly mode: "live" | "demo";
@@ -27,6 +29,10 @@ export interface PinpointApi {
   ): Promise<{ text: string; verdict?: "object" | "note" }>;
   phone(threadId: string, pointId: string): Promise<{ ok: boolean; link?: string }>;
   resetSample(): Promise<void>;
+  /** Cloud only: pair with the desk behind a one-time code. Optional for mock/local builds. */
+  pair?(code: string): Promise<PairResult>;
+  /** Cloud only: forget this device's desk token. */
+  unpair?(): Promise<{ ok: boolean; error?: string }>;
 }
 
 export const LOCAL_SERVER = "http://127.0.0.1:8787";
@@ -55,15 +61,50 @@ export const TIMEOUTS = {
   send: 15_000,
   voice: 30_000,
   phone: 10_000,
+  pair: 15_000,
 } as const;
+
+/**
+ * Same unambiguous alphabet as the cloud: no 0/O or 1/I/L. The user may type
+ * "K7Q4-2MXP", "k7q4 2mxp" or "K7Q42MXP".
+ */
+const PAIR_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+
+export function normalizePairCode(raw: string): string | null {
+  const compact = raw.replace(/[\s-]+/g, "").toUpperCase();
+  if (compact.length !== 8) return null;
+  for (const char of compact) {
+    if (!PAIR_ALPHABET.includes(char)) return null;
+  }
+  return compact;
+}
+
+export function formatPairCode(raw: string): string | null {
+  const compact = normalizePairCode(raw);
+  return compact ? `${compact.slice(0, 4)}-${compact.slice(4)}` : null;
+}
+
+/** One line for the phone page: "Connected to Mac · online" / "Not connected". */
+export function pairingStatusText(input: {
+  paired: boolean;
+  deskName?: string | null;
+  online?: boolean;
+}): string {
+  if (!input.paired) return "Not connected";
+  const name = input.deskName?.trim() || "your computer";
+  return `Connected to ${name} · ${input.online ? "online" : "offline"}`;
+}
 
 export class ApiFailure extends Error {
   readonly kind: "network" | "http";
+  /** HTTP status when known; 503 means a paired desk is offline. */
+  readonly status?: number;
 
-  constructor(kind: "network" | "http", message: string) {
+  constructor(kind: "network" | "http", message: string, status?: number) {
     super(message);
     this.name = "ApiFailure";
     this.kind = kind;
+    this.status = status;
   }
 }
 
@@ -75,6 +116,8 @@ export function isNetworkFailure(error: unknown): boolean {
 export interface HttpApiOptions {
   /** Injectable for tests; production uses the persisted device id. */
   device?: () => Promise<string>;
+  /** Injectable for tests; production reads the stored desk token. */
+  token?: () => Promise<string | null>;
   /** Force the header on or off; by default every request tries it. */
   deviceHeader?: boolean;
 }
@@ -83,11 +126,14 @@ export class HttpPinpointApi implements PinpointApi {
   readonly mode = "live" as const;
   private base: string;
   private device: () => Promise<string>;
+  private token: () => Promise<string | null>;
   private deviceHeader: boolean;
 
   constructor(base: string, options: HttpApiOptions = {}) {
     this.base = base.replace(/\/+$/, "");
     this.device = options.device ?? getDeviceId;
+    // The desk token is a cloud credential; local simulator builds never read it.
+    this.token = options.token ?? (this.base === CLOUD_URL ? getDeskToken : async () => null);
     this.deviceHeader = options.deviceHeader ?? true;
   }
 
@@ -100,6 +146,8 @@ export class HttpPinpointApi implements PinpointApi {
     const headers = new Headers(init.headers);
     headers.set("Accept", "application/json");
     if (withDeviceHeader) headers.set(DEVICE_HEADER, await this.device());
+    const token = await this.token();
+    if (token) headers.set(TOKEN_HEADER, token);
     let response: Response;
     try {
       response = await fetch(this.base + path, {
@@ -115,7 +163,11 @@ export class HttpPinpointApi implements PinpointApi {
     }
     if (response.status === 202) return response;
     if (!response.ok) {
-      throw new ApiFailure("http", `${init.method ?? "GET"} ${path}: HTTP ${response.status}`);
+      throw new ApiFailure(
+        "http",
+        `${init.method ?? "GET"} ${path}: HTTP ${response.status}`,
+        response.status,
+      );
     }
     return response;
   }
@@ -236,5 +288,63 @@ export class HttpPinpointApi implements PinpointApi {
 
   async resetSample(): Promise<void> {
     await this.request("/api/sample/reset", { method: "POST" }, TIMEOUTS.review, false);
+  }
+
+  /**
+   * Pair with a desk. A 400/429 answer still carries a PairResult with the
+   * reason, so return it instead of throwing; only transport failures throw.
+   */
+  async pair(code: string): Promise<PairResult> {
+    const headers = new Headers({
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    });
+    headers.set(DEVICE_HEADER, await this.device());
+    const token = await this.token();
+    if (token) headers.set(TOKEN_HEADER, token);
+    let response: Response;
+    try {
+      response = await fetch(`${this.base}/api/pair`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ code }),
+        cache: "no-store",
+        redirect: "error",
+        credentials: "omit",
+        signal: AbortSignal.timeout(TIMEOUTS.pair),
+      });
+    } catch {
+      throw new ApiFailure("network", "POST /api/pair: network error");
+    }
+    let body: unknown;
+    try {
+      body = await response.json();
+    } catch {
+      body = undefined;
+    }
+    if (body && typeof body === "object" && typeof (body as PairResult).ok === "boolean") {
+      return body as PairResult;
+    }
+    if (!response.ok) {
+      throw new ApiFailure("http", `POST /api/pair: HTTP ${response.status}`, response.status);
+    }
+    return { ok: false, error: "Pinpoint Cloud did not answer with a pairing result." };
+  }
+
+  async unpair(): Promise<{ ok: boolean; error?: string }> {
+    try {
+      await this.request("/api/pair", { method: "DELETE" }, TIMEOUTS.review, false);
+      return { ok: true };
+    } catch (error) {
+      // Already-unpaired answers are success for the caller.
+      if (
+        error instanceof ApiFailure &&
+        error.kind === "http" &&
+        (error.status === 401 || error.status === 404)
+      ) {
+        return { ok: true };
+      }
+      throw error;
+    }
   }
 }

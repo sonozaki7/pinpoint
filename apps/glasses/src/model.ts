@@ -44,6 +44,8 @@ export interface State {
   /** Cloud builds talk to Pinpoint Cloud; local builds talk to the desktop server. */
   cloud: boolean;
   workspace: "sample" | "desk" | null;
+  /** The paired computer, when the inbox is coming from a desk. */
+  desk: { name: string; online: boolean } | null;
   serverVersion: string | null;
   inbox: InboxItem[];
   inboxFocus: number;
@@ -121,6 +123,7 @@ export function initialState(options: { demo: boolean; loading: boolean; cloud?:
     offlineMessage: null,
     cloud: options.cloud ?? false,
     workspace: null,
+    desk: null,
     serverVersion: null,
     inbox: [],
     inboxFocus: 0,
@@ -249,10 +252,14 @@ export function adoptInbox(
 /** Cloud health names the workspace this device is looking at. */
 export function applyHealth(state: State, health: Health | undefined): State {
   if (!health) return state;
+  const desk = health.workspace === "desk" && health.desk
+    ? { name: health.desk.name, online: health.desk.online }
+    : null;
   return {
     ...state,
     cloud: health.mode === "cloud" ? true : state.cloud,
     workspace: health.workspace ?? null,
+    desk,
     serverVersion: health.version ?? null,
   };
 }

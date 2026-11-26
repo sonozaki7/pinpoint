@@ -379,12 +379,22 @@ function previewLines(counts: { objections: number; answers: number; notes: numb
 export function pageFor(state: State, now: number): PageModel {
   if (state.screen === "inbox") {
     const sample = state.workspace === "sample";
-    const name = sample ? "Sample" : "Pinpoint";
+    const name = sample
+      ? "Sample"
+      : state.workspace === "desk"
+        ? asciiTruncate(state.desk?.name || "Desk", 24, HEADER_MAX_PX)
+        : "Pinpoint";
     const count = state.inbox.length;
     const title = state.loading || count === 0
       ? name
       : `${name}${DOT}${count} ${count === 1 ? "needs" : "need"} you`;
-    const subtitle = state.demo ? "demo data" : state.offline ? "offline" : undefined;
+    const subtitle = state.demo
+      ? "demo data"
+      : state.offline
+        ? "offline"
+        : state.workspace === "desk" && state.desk && !state.desk.online
+          ? "computer offline"
+          : undefined;
     const flash = state.flash && state.flash.until > now ? state.flash.text : null;
     const emptyFooter = sample ? "Hold: menu" : `Tap: retry${DOT}Hold: menu`;
     const base: PageModel = {

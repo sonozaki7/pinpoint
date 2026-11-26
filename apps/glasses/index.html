@@ -28,6 +28,34 @@
         </div>
       </section>
 
+      <section class="card desk-card" id="desk-section" aria-labelledby="desk-title">
+        <h2 id="desk-title">Connect your computer</h2>
+        <p class="hint">
+          Run <code>npm run desk</code> on your computer, then type the code it shows.
+        </p>
+        <p class="desk-line" id="desk-status" data-state="off" role="status">Not connected</p>
+        <form class="desk-form" id="desk-form" novalidate>
+          <label class="sr-only" for="desk-code">Pairing code</label>
+          <input
+            id="desk-code"
+            name="code"
+            type="text"
+            inputmode="text"
+            autocomplete="one-time-code"
+            autocapitalize="characters"
+            spellcheck="false"
+            maxlength="12"
+            placeholder="K7Q4-2MXP"
+            aria-describedby="desk-note"
+          />
+          <button type="submit" class="primary" id="btn-pair-desk">Connect</button>
+        </form>
+        <div class="actions desk-actions">
+          <button type="button" id="btn-unpair-desk" hidden>Disconnect</button>
+        </div>
+        <p class="hint" id="desk-note" role="status">The code is shown in the desk terminal.</p>
+      </section>
+
       <section class="card" aria-labelledby="how-title">
         <h2 id="how-title">How to use</h2>
         <ul class="gestures">
@@ -51,8 +79,9 @@
         <h2 id="privacy-title">Privacy</h2>
         <p>
           Pinpoint sends your review notes and short voice clips to the Pinpoint server so your agent
-          can act on them. Voice is transcribed, then discarded. The sample workspace is private to
-          this device and deleted after 7 days without use.
+          can act on them. Voice is transcribed, then discarded. A paired computer's requests are
+          relayed through Pinpoint Cloud without being stored. The sample workspace is private to this
+          device and deleted after 7 days without use.
         </p>
       </section>
 

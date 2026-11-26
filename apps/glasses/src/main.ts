@@ -1,7 +1,8 @@
 import "./style.css";
 import type { InboxItem, ThreadAttention } from "../../../shared/contract";
 import {
-  APP_VERSION, DEVICE_BUILD, HttpPinpointApi, isNetworkFailure, SERVER_IS_CLOUD, SERVER_URL,
+  APP_VERSION, DEVICE_BUILD, HttpPinpointApi, formatPairCode, isNetworkFailure,
+  normalizePairCode, pairingStatusText, SERVER_IS_CLOUD, SERVER_URL,
   type PinpointApi,
 } from "./api";
 import { MockPinpointApi } from "./mock";
@@ -14,6 +15,7 @@ import {
   type Effect, type State,
 } from "./model";
 import { pageFor, type PageModel } from "./display";
+import { setDeskToken } from "./device";
 import { connectEven } from "./even";
 import type { Input } from "./events";
 import { PcmRecorder, SilenceGate } from "./voice";
@@ -37,6 +39,9 @@ let lastForegroundRefresh = 0;
 let sendInFlight = false;
 let inboxInFlight = false;
 let resetInFlight = false;
+let pairInFlight = false;
+let unpairInFlight = false;
+let deskMessage = "";
 let samplePoll = 0;
 /** A cold live deck can take ~45 s; give it 70 s before offering retry. */
 const DECK_WAIT_MS = 70_000;
@@ -67,6 +72,12 @@ const el = {
   resetSample: document.querySelector<HTMLButtonElement>("#btn-reset-sample")!,
   retry: document.querySelector<HTMLButtonElement>("#btn-retry")!,
   resetNote: document.getElementById("reset-note")!,
+  deskStatus: document.getElementById("desk-status")!,
+  deskForm: document.querySelector<HTMLFormElement>("#desk-form")!,
+  deskCode: document.querySelector<HTMLInputElement>("#desk-code")!,
+  pairDesk: document.querySelector<HTMLButtonElement>("#btn-pair-desk")!,
+  unpairDesk: document.querySelector<HTMLButtonElement>("#btn-unpair-desk")!,
+  deskNote: document.getElementById("desk-note")!,
 };
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -82,6 +93,7 @@ function render() {
   updateButtons();
   updateMode();
   updatePhone();
+  updateDesk();
   scheduleClock();
 }
 
@@ -164,11 +176,16 @@ function updatePhone() {
   const workspace = state.workspace === "sample"
     ? "Sample workspace"
     : state.workspace === "desk"
-      ? "Desk workspace"
+      ? state.desk?.name ? `Desk: ${state.desk.name}` : "Desk workspace"
       : null;
+  const deskOffline = state.desk && !state.desk.online;
   const status = state.demo
     ? "Demo data · offline preview"
-    : [serverName, workspace, state.offline ? "offline" : state.loading ? "connecting..." : "online"]
+    : [
+        serverName,
+        workspace,
+        deskOffline ? "computer offline" : state.offline ? "offline" : state.loading ? "connecting..." : "online",
+      ]
       .filter(Boolean)
       .join(" · ");
   setText(el.phoneStatus, status);
@@ -192,6 +209,111 @@ function updatePhone() {
   el.resetSample.disabled = !sample || resetInFlight || state.sending;
   setText(el.resetSample, resetInFlight ? "Resetting..." : "Reset sample workspace");
   el.resetNote.hidden = sample;
+}
+
+function deskAvailable(): boolean {
+  return !state.demo && (SERVER_IS_CLOUD || state.cloud);
+}
+
+function setDeskMessage(message: string) {
+  deskMessage = message;
+  updateDesk();
+}
+
+/** The phone card: code entry while unpaired, status + Disconnect while paired. */
+function updateDesk() {
+  const paired = state.desk !== null;
+  const available = deskAvailable();
+  setText(el.deskStatus, pairingStatusText({
+    paired,
+    deskName: state.desk?.name,
+    online: state.desk?.online,
+  }));
+  el.deskStatus.dataset.state = paired ? (state.desk?.online ? "online" : "offline") : "off";
+  el.deskForm.hidden = paired;
+  el.deskCode.disabled = !available || pairInFlight;
+  el.pairDesk.disabled = !available || pairInFlight;
+  setText(el.pairDesk, pairInFlight ? "Connecting..." : "Connect");
+  el.unpairDesk.hidden = !paired;
+  el.unpairDesk.disabled = unpairInFlight;
+  setText(el.unpairDesk, unpairInFlight ? "Disconnecting..." : "Disconnect");
+  const fallback = !available
+    ? "Pairing works in the Pinpoint Cloud build."
+    : paired
+      ? "The glasses now show this computer's inbox."
+      : "The code is shown in the desk terminal.";
+  setText(el.deskNote, deskMessage || fallback);
+  el.deskNote.dataset.state = deskMessage && !paired ? "error" : "hint";
+}
+
+async function connectDesk() {
+  if (pairInFlight || unpairInFlight) return;
+  if (!deskAvailable()) {
+    setDeskMessage("Pairing works in the Pinpoint Cloud build.");
+    return;
+  }
+  const code = normalizePairCode(el.deskCode.value);
+  if (!code) {
+    setDeskMessage("Enter the 8-character code from your computer.");
+    el.deskCode.focus();
+    return;
+  }
+  if (!api.pair) {
+    setDeskMessage("This build cannot pair with a computer.");
+    return;
+  }
+  pairInFlight = true;
+  setDeskMessage("");
+  try {
+    const result = await api.pair(formatPairCode(code) ?? code);
+    if (!result.ok || !result.token) {
+      setDeskMessage(result.error ?? "That code didn't work. Ask your computer for a new one.");
+      return;
+    }
+    await setDeskToken(result.token);
+    el.deskCode.value = "";
+    state = {
+      ...state,
+      desk: result.desk ? { name: result.desk.name, online: true } : state.desk,
+      workspace: "desk",
+    };
+    setDeskMessage(`Paired with ${result.desk?.name ?? "your computer"}.`);
+    render();
+    console.info(`[pinpoint] paired desk="${result.desk?.name ?? ""}"`);
+    await loadInbox(false);
+  } catch (error) {
+    console.warn("[pinpoint] pair", error);
+    setDeskMessage(
+      isNetworkFailure(error)
+        ? "Can't reach Pinpoint Cloud. Check your phone's internet."
+        : "Couldn't pair. Try again.",
+    );
+  } finally {
+    pairInFlight = false;
+    render();
+  }
+}
+
+async function disconnectDesk() {
+  if (pairInFlight || unpairInFlight) return;
+  unpairInFlight = true;
+  setDeskMessage("");
+  try {
+    await api.unpair?.();
+    await setDeskToken(null);
+    state = { ...state, desk: null, workspace: "sample" };
+    el.deskCode.value = "";
+    setDeskMessage("Disconnected. The glasses show the sample workspace again.");
+    render();
+    console.info("[pinpoint] unpaired desk");
+    await loadInbox(false);
+  } catch (error) {
+    console.warn("[pinpoint] unpair", error);
+    setDeskMessage("Couldn't disconnect. Try again.");
+  } finally {
+    unpairInFlight = false;
+    render();
+  }
 }
 
 function ifInboxEmpty() {
@@ -389,12 +511,16 @@ async function runEffect(effect: Effect) {
 }
 
 function unreachableText(): string {
+  if (state.desk && !state.desk.online) {
+    return "Your computer is offline.\nStart npm run desk, then tap to retry.";
+  }
   return state.cloud
     ? "Can't reach Pinpoint Cloud.\nCheck your phone's internet.\nTap to retry."
     : "Can't reach the local server.\nStart it, then tap to retry.";
 }
 
 function shortUnreachable(): string {
+  if (state.desk && !state.desk.online) return "Your computer is offline. Tap to retry.";
   return state.cloud
     ? "Can't reach Pinpoint Cloud. Tap to retry."
     : "Can't reach the local server. Tap to retry.";
@@ -817,6 +943,11 @@ el.menuButton.addEventListener("click", () => {
 });
 el.resetSample.addEventListener("click", () => { void resetSampleWorkspace(); });
 el.retry.addEventListener("click", () => { void loadInbox(false); });
+el.deskForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  void connectDesk();
+});
+el.unpairDesk.addEventListener("click", () => { void disconnectDesk(); });
 
 // SDK hosts report FOREGROUND_ENTER/EXIT; browsers and other hosts get this.
 document.addEventListener("visibilitychange", () => {

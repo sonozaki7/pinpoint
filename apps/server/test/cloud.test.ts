@@ -185,7 +185,7 @@ describe('cloud HTTP surface', () => {
         splitter: 'fixture',
         version: SERVER_VERSION,
         workspace: 'sample',
-        pairing: false,
+        pairing: true,
       });
     } finally {
       await cleanup(context);
