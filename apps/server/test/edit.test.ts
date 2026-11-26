@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyDraftEdits, draftPoints, receiptName, sentenceSpans } from '../src/core/draft.js';
 import { editSentence, tidySentence } from '../src/core/edit.js';
+import { applyEdit } from '../../../shared/edit.js';
 import type { Deck, ReviewDraft } from '../../../shared/contract.js';
 
 describe('edit grammar', () => {
@@ -105,6 +106,110 @@ describe('edit grammar', () => {
     const result = await editSentence({ before: sentence, note: 'Net-45, not net-60.' });
     expect(result.ok).toBe(true);
     expect(performance.now() - started).toBeLessThan(300);
+  });
+});
+
+describe('shared edit grammar (applyEdit)', () => {
+  type GrammarCase = [
+    sentence: string,
+    note: string,
+    expected: { method: 'replace' | 'delete' | 'say'; after?: string } | null,
+  ];
+
+  const cases: GrammarCase[] = [
+    // The bug this module exists for: Whisper writes digits, the draft says net-60.
+    ["We're happy to agree to net-60 payment terms.", 'Net 45, not Net 60',
+      { method: 'replace', after: "We're happy to agree to net-45 payment terms." }],
+    ["We're happy to agree to net-60 payment terms.", 'Net forty five, not net sixty',
+      { method: 'replace', after: "We're happy to agree to net-45 payment terms." }],
+    ["We're happy to agree to net-60 payment terms.", 'Net forty-five, not net sixty.',
+      { method: 'replace', after: "We're happy to agree to net-45 payment terms." }],
+    ['We agree to net sixty terms.', 'Net 45, not Net 60',
+      { method: 'replace', after: 'We agree to net forty-five terms.' }],
+    ['We agree to net sixty terms.', 'net 45 not net 60',
+      { method: 'replace', after: 'We agree to net forty-five terms.' }],
+    ['We agree to NET-60 terms.', 'net 45, not net 60',
+      { method: 'replace', after: 'We agree to NET-45 terms.' }],
+    ['Net-60 is too long.', 'Net-45, not net-60.',
+      { method: 'replace', after: 'Net-45 is too long.' }],
+    ['The contract says Net-60.', 'net-45, not NET-60',
+      { method: 'replace', after: 'The contract says Net-45.' }],
+    ['We pay on a net\u201360 schedule.', 'Net 45, not Net 60',
+      { method: 'replace', after: 'We pay on a net\u201345 schedule.' }],
+    ['We can invoice on Tuesday.', 'Thursday not Tuesday',
+      { method: 'replace', after: 'We can invoice on Thursday.' }],
+    ['We can invoice on Tuesday.', 'make it Thursday instead of Tuesday',
+      { method: 'replace', after: 'We can invoice on Thursday.' }],
+    ['We can invoice on Tuesday.', 'not Tuesday, Thursday',
+      { method: 'replace', after: 'We can invoice on Thursday.' }],
+    ['We can invoice on Tuesday.', 'no, not Tuesday, Thursday',
+      { method: 'replace', after: 'We can invoice on Thursday.' }],
+    ['We can invoice on Tuesday.', 'change Tuesday to Thursday',
+      { method: 'replace', after: 'We can invoice on Thursday.' }],
+    ['We can invoice on Tuesday.', 'replace Tuesday with Thursday',
+      { method: 'replace', after: 'We can invoice on Thursday.' }],
+    ['Payment is due in 30 days.', 'change 30 days to 14 days',
+      { method: 'replace', after: 'Payment is due in 14 days.' }],
+    ['Payment is due in 14 days.', '30 days instead of 14 days',
+      { method: 'replace', after: 'Payment is due in 30 days.' }],
+    ['Payment is due in 30 days.', 'should be 14 days, not 30 days',
+      { method: 'replace', after: 'Payment is due in 14 days.' }],
+    ['Net-60 is too long.', 'um, net 45, not net 60 please',
+      { method: 'replace', after: 'Net-45 is too long.' }],
+    ['We ship 100 units.', 'change 100 to fifty',
+      { method: 'replace', after: 'We ship 50 units.' }],
+    ['We ship in 5 days.', 'not five days, ten days',
+      { method: 'replace', after: 'We ship in 10 days.' }],
+    ['We ship in five days.', '10 days rather than five days',
+      { method: 'replace', after: 'We ship in ten days.' }],
+    ["We're happy to agree to net-60 payment terms.", 'delete',
+      { method: 'delete' }],
+    ["We're happy to agree to net-60 payment terms.", 'Remove this.',
+      { method: 'delete' }],
+    ["We're happy to agree to net-60 payment terms.", 'drop it',
+      { method: 'delete' }],
+    ["We're happy to agree to net-60 payment terms.", 'cut this line',
+      { method: 'delete' }],
+    ["We're happy to agree to net-60 payment terms.", 'say Please confirm by Friday',
+      { method: 'say', after: 'Please confirm by Friday.' }],
+    ["We're happy to agree to net-60 payment terms.", 'instead say We can invoice from Tuesday',
+      { method: 'say', after: 'We can invoice from Tuesday.' }],
+    ["We're happy to agree to net-60 payment terms.", 'change it to: the terms are agreed',
+      { method: 'say', after: 'The terms are agreed.' }],
+    ["We're happy to agree to net-60 payment terms.", 'replace with the terms are agreed',
+      { method: 'say', after: 'The terms are agreed.' }],
+    ["We're happy to agree to net-60 payment terms.", 'polish this', null],
+    ["We're happy to agree to net-60 payment terms.", 'not net 60', null],
+    ['The meeting is at 9am.', 'make this shorter', null],
+    ['The meeting is at 9am.', 'explain this better', null],
+  ];
+
+  it.each(cases)('%j <- %j', (sentence, note, expected) => {
+    expect(applyEdit(sentence, note)).toEqual(
+      expected === null
+        ? { ok: false, error: "Couldn't change this line" }
+        : { ok: true, ...expected },
+    );
+  });
+
+  it('treats hyphens, spaces and en dashes as equivalent when matching', () => {
+    const pairs: Array<[sentence: string, after: string]> = [
+      ['We pay net-60 now.', 'We pay net-45 now.'],
+      ['We pay net 60 now.', 'We pay net 45 now.'],
+      ['We pay net\u201360 now.', 'We pay net\u201345 now.'],
+    ];
+    for (const [sentence, after] of pairs) {
+      expect(applyEdit(sentence, 'net 45, not net 60').after).toBe(after);
+    }
+  });
+
+  it('still leaves an unknown note to the server LLM fallback', async () => {
+    const result = await editSentence({
+      before: 'The delivery date in clause 9 works for us.',
+      note: 'Make this shorter.',
+      llm: async () => 'The clause 9 date works.',
+    });
+    expect(result).toEqual({ ok: true, method: 'rewrite', after: 'The clause 9 date works.' });
   });
 });
 
