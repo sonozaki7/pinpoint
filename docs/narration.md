@@ -1,3 +1,5 @@
+> **NOTE (Nov 27 2026):** this narration belongs to the v2 film (2:20, T3-only story). The final film has its own script under `demo/film/`; use this only as a reference for the recording process.
+
 # Pinpoint demo — narration (v2)
 
 The voice track for the 2:20 cut. **29 short lines, ~68 s spoken across 140 s**

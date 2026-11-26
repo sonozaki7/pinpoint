@@ -1,3 +1,5 @@
+> **HISTORICAL (Nov 24 2026).** The recording notes below pre-date the final simulator recordings and the gesture-budget flow. The scripts still exist in `demo/scripts/`; for what was actually recorded see [recording-log.md](recording-log.md). Not a runbook for the final video.
+
 # Demo recording notes (fixtures, simulator script, video handoff)
 
 What this is: the demo side of Pinpoint. `demo/fixtures/` holds four deterministic

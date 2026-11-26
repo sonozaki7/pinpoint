@@ -1,3 +1,5 @@
+> **HISTORICAL RECORD (Nov 24 2026).** A hardening pass on the first version. The test counts below (155 server, 19 glasses) are out of date; run `npm run check` for the current numbers.
+
 # Pinpoint hardening review — 2026-11-24
 
 Independent pass before judges run the demo. No commits were made. No token

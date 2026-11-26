@@ -27,7 +27,7 @@ Gestures: **scroll** (ring swipe), **tap**, **double-tap** (back), **hold** (men
 | Notion page, one comment | ≈ 8 taps + typing | 3 taps + 1 voice |
 | Back to the next item after sending | n/a | 0 (automatic) |
 
-## Where today's app breaks the budget (fixed in the next glasses task)
+## Where the first version broke the budget (all fixed, Nov 27)
 
 - A preview screen asks for a second tap before sending → replaced by the undo countdown.
 - Recording needs a tap to stop → silence detection.

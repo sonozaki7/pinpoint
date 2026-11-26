@@ -1,3 +1,5 @@
+> **OUTDATED (Nov 27 2026): this is the v1 storyboard (T3-only story, "Ring for where. Voice for what.").** The current film is built from `demo/film/` and tells the attention-layer story: [../README.md](../README.md). The proof numbers below (20 s review, agent replied in 7 s) are from the Nov 24 live run and are still true for that run ([recording-log.md](recording-log.md)). Submission copy: [SUBMISSION.md](SUBMISSION.md).
+
 # Pinpoint — demo video and pitch (v1)
 
 Goal: in 2:30–2:50, a judge who has watched 40 "approve from your glasses" demos understands in the first 15 seconds why this one is different, and sees **real** proof (real simulator, real T3 Code thread, real Telegram), not a mock.

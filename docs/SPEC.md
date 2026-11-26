@@ -1,3 +1,21 @@
+> **SUPERSEDED (Nov 27 2026). Kept as the original v1 design record. Do not use it as the current spec.**
+> Pinpoint is now "the attention layer for your AI agents": it shows what needs you, sorts output to decisions, and sends your words where they belong. This file still describes the first idea: reviewing only T3 Code agent replies from a local server.
+>
+> | Section here | What changed | Read instead |
+> |---|---|---|
+> | Title, §1 problem and insight | Positioning, audience and the 5 capabilities | [README.md](../README.md) |
+> | §2 architecture | Pinpoint Cloud + desk relay, sources beyond T3 | [README.md](../README.md#architecture), [desk-pairing.md](desk-pairing.md), [apps/server/CLOUD.md](../apps/server/CLOUD.md) |
+> | §3 repo layout and ownership | Owners and layout changed (`apps/web`, `apps/site`, `deploy`) | [README.md](../README.md#repo-map) |
+> | §4 shared types, §5 API | Many new fields and routes (status, catch-up, Ask, edit, task, pairing) | [shared/contract.ts](../shared/contract.ts) |
+> | §6 T3 client | Still accurate for T3 | [t3-api-notes.md](t3-api-notes.md) |
+> | §7 splitter | Now also sorts to "needs you", with grounded evidence; DeepSeek is the default model | [connectors.md](connectors.md), `apps/server/src/core/` |
+> | §8 composer | Still accurate for agent reviews | `apps/server/src/core/composer.ts` |
+> | §10 glasses UX | Preview screen removed; 5 s undo, auto-advance, voice auto-stop, words not symbols | [ux-budget.md](ux-budget.md), [apps/glasses/README.md](../apps/glasses/README.md) |
+> | §11 Telegram | Status icons, one notifying card, receipts | [telegram-setup.md](telegram-setup.md) |
+> | §13 acceptance | Replaced by tests and the submission checklist | [SUBMIT-CHECKLIST.md](SUBMIT-CHECKLIST.md) |
+>
+> Notion pages and Gmail drafts as review sources are not in this file at all: [connectors.md](connectors.md).
+
 # Pinpoint — product and build spec (v1, 2026-11-24)
 
 **One line:** review your AI agents' replies and plans on Even G2, point by point. *Ring for where, voice for what.*

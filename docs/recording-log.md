@@ -1,3 +1,5 @@
+> **HISTORICAL RECORD (Nov 24 2026).** Measurements here (20.4 s open to send, agent reply 7.3 s) come from the flow *before* the gesture budget ([ux-budget.md](ux-budget.md)) and before Notion, Gmail, Ask and the cloud. They stay true for that run and are cited as such in the README. Do not re-use the steps as a runbook.
+
 # Pinpoint demo recording log — 2026-11-24
 
 Final footage for the storyboard in `docs/DEMO.md`, recorded from the official

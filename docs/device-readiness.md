@@ -1,3 +1,5 @@
+> **SNAPSHOT (Nov 27 2026, 00:30 JST), not current status.** Several items below were being fixed while others edited the app (event defaults, exit-dialog repaint, pixel widths, whitelist, the 24x24 icon, the cloud). Treat each verdict as a checklist to re-verify on the installed beta build, not as today's state. The platform facts (testing modes, event envelopes, container limits) still hold and back [FEATURE_REQUESTS.md](FEATURE_REQUESTS.md).
+
 # Pinpoint on real Even G2 + R1 — device readiness
 
 Written 2026-11-27 00:30 JST by a research sub-agent. Read-only inspection of `apps/**`, plus official docs, the official templates, community notes, and a **pixel measurement of every on-glasses string** with Even's own measurement library.

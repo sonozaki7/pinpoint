@@ -1,3 +1,5 @@
+> **HISTORICAL RECORD (Nov 24 2026).** A T3 Code 0.1.11 live run before Notion, Gmail, the cloud and desk pairing. Still accurate for the T3 allowlist and splitter findings; for the current setup read [connectors.md](connectors.md) and [desk-pairing.md](desk-pairing.md).
+
 # Pinpoint live run — 2026-11-24
 
 Hardened and verified `apps/server` against the real local T3 Code server
