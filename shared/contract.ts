@@ -1,6 +1,22 @@
 // Shared types between apps/glasses and apps/server. Owner: Opus. Request changes in docs/requests.md.
 
 export type ThreadAttention = 'question' | 'plan' | 'failed' | 'report';
+// Planned: 'actions' = things your assistants prepared across your apps (the "Morning brief"): email
+// replies, meeting moves, tasks, chat replies; each point carries an Action the server runs on send.
+// Added once the glasses app is ready for it (it switches exhaustively on attention).
+
+/** Apps Pinpoint can act in. Shown on G2 as a short tag before the glance (APP_TAG). */
+export type AppId = 'gmail' | 'calendar' | 'notion' | 'telegram' | 'slack' | 'discord' | 't3';
+export const APP_TAG: Record<AppId, string> = {
+  gmail: 'Mail', calendar: 'Cal', notion: 'Task', telegram: 'TG', slack: 'Slack', discord: 'Disc', t3: 'Agent',
+};
+
+/** What happens when a point is agreed (silence) and sent. A point with a note is revised first. */
+export type Action =
+  | { type: 'email.reply'; app: 'gmail'; threadId: string; messageId: string; to: string; subject: string; body: string }
+  | { type: 'calendar.move'; app: 'calendar'; calendarId: string; eventId: string; title: string; fromStart: string; toStart: string; durationMin: number }
+  | { type: 'task.create'; app: 'notion'; title: string; due?: string; details?: string }
+  | { type: 'chat.reply'; app: 'telegram' | 'slack' | 'discord'; chatId: string; chatName: string; replyToId?: string; text: string };
 
 export interface InboxItem {
   threadId: string;
@@ -25,6 +41,9 @@ export interface Point {
   options?: string[]; // kind === 'question': 2-4 options, <= 24 chars, recommended first
   questionId?: string; // T3 user_input question id, when the point maps to one
   risk?: 'low' | 'high';
+  app?: AppId; // set on 'actions' decks (and optionally elsewhere) for the G2 tag
+  flag?: string; // <= 24 ASCII chars: why the assistant wants you to look, e.g. "busy Tue 10-12"
+  action?: Action; // 'actions' decks only; server-side source of truth, the glasses only display it
 }
 
 export interface Deck {
@@ -67,6 +86,23 @@ export interface SendResult {
   delivered: 't3' | 'demo-log' | 'sample'; // 'sample': Pinpoint Cloud sample workspace (no real agent)
   telegramLink?: string;
   error?: string;
+  receipt?: Receipt; // 'actions' decks: what actually happened in each app
+}
+
+/** Result of sending an 'actions' deck. Agreed points run at once; points with a note are revised
+ * (LLM on the desk, template in the sample workspace) and come back as a follow-up 'actions' deck
+ * titled "Revised" so nothing you corrected goes out unseen. */
+export interface Receipt {
+  lines: ReceiptLine[]; // one per executed action, in deck order
+  revised: number; // how many points went to the follow-up deck
+  followUpThreadId?: string; // inbox item holding the revised points
+}
+
+export interface ReceiptLine {
+  app: AppId;
+  text: string; // <= 44 ASCII chars, e.g. "Sent reply to Priya"
+  ok: boolean;
+  link?: string; // https link to the result (Gmail thread, Calendar event, Notion page, chat message)
 }
 
 export interface Health {
