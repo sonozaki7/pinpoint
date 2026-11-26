@@ -1,11 +1,22 @@
-import { fileURLToPath } from 'node:url';
+import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 export type SplitterProviderName = 'opencode' | 'anthropic' | 'openrouter' | 'fixture';
 
+/** demo: local fixture showcase · live: this Mac's T3 Code · cloud: public sample workspace per device. */
+export type PinpointMode = 'demo' | 'live' | 'cloud';
+
 export interface Env {
-  mode: 'demo' | 'live';
+  mode: PinpointMode;
+  /** Cloud: bind address. Default 127.0.0.1 so nginx stays in front. */
+  host: string;
   port: number;
+  /**
+   * Cloud: trust the first X-Forwarded-For hop (set behind nginx).
+   * Never trusted unless PINPOINT_TRUST_PROXY=1.
+   */
+  trustProxy: boolean;
   t3Url: string;
   t3Token: string;
   /**
@@ -27,11 +38,16 @@ export interface Env {
   telegramToken: string;
   telegramChatId: string;
   whisperModel: string;
+  /** whisper-cli threads (WHISPER_THREADS, default 4). */
+  whisperThreads: number;
   /**
    * Demo recording helper: a JSON file of canned voice notes. When set, /api/voice
    * skips T3/whisper and returns the next note with a realistic delay.
+   * Cloud honours it too, but only when it is explicitly set.
    */
   scriptedTranscripts: string;
+  /** Cloud: delay before the sample agent's reply appears (PINPOINT_SAMPLE_REPLY_MS). */
+  sampleReplyMs: number;
   /** apps/server */
   serverRoot: string;
   /** repo root (pinpoint/) */
@@ -42,10 +58,25 @@ export interface Env {
   dataDir: string;
   /** demo/fixtures */
   fixturesDir: string;
+  /** apps/server package.json version, reported by cloud /api/health. */
+  serverVersion: string;
 }
 
 const SERVER_ROOT = fileURLToPath(new URL('../../', import.meta.url)).replace(/\/+$/, '');
 const REPO_ROOT = fileURLToPath(new URL('../../../../', import.meta.url)).replace(/\/+$/, '');
+
+function readServerVersion(): string {
+  try {
+    const raw = JSON.parse(
+      fs.readFileSync(path.join(SERVER_ROOT, 'package.json'), 'utf8'),
+    ) as { version?: unknown };
+    return typeof raw.version === 'string' && raw.version.length > 0 ? raw.version : '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+}
+
+const SERVER_VERSION = readServerVersion();
 
 function str(source: NodeJS.ProcessEnv, key: string, fallback = ''): string {
   const raw = source[key];
@@ -72,31 +103,51 @@ function list(source: NodeJS.ProcessEnv, key: string): string[] {
 }
 
 export function readEnv(source: NodeJS.ProcessEnv = process.env): Env {
-  const mode = str(source, 'PINPOINT_MODE').toLowerCase() === 'live' ? 'live' : 'demo';
+  const rawMode = str(source, 'PINPOINT_MODE').toLowerCase();
+  const mode: PinpointMode =
+    rawMode === 'live' ? 'live' : rawMode === 'cloud' ? 'cloud' : 'demo';
+  const cloud = mode === 'cloud';
+
   const port = Number.parseInt(str(source, 'PINPOINT_PORT', '8787'), 10);
   const dataDir = path.resolve(str(source, 'PINPOINT_DATA_DIR', path.join(SERVER_ROOT, '.data')));
+
+  // Cloud deliberately never reads T3_*, TELEGRAM_* or splitter provider env:
+  // the public server has no desk and never calls a model.
+  const rawSampleReplyMs = Number.parseInt(str(source, 'PINPOINT_SAMPLE_REPLY_MS', '5000'), 10);
+  const sampleReplyMs =
+    Number.isFinite(rawSampleReplyMs) && rawSampleReplyMs >= 0 ? rawSampleReplyMs : 5_000;
+  const rawThreads = Number.parseInt(str(source, 'WHISPER_THREADS', '4'), 10);
+  const whisperThreads = Number.isFinite(rawThreads)
+    ? Math.min(32, Math.max(1, rawThreads))
+    : 4;
+
   return {
     mode,
+    host: str(source, 'PINPOINT_HOST', '127.0.0.1'),
     port: Number.isFinite(port) && port > 0 && port < 65536 ? port : 8787,
-    t3Url: str(source, 'T3_URL', 'http://127.0.0.1:3773').replace(/\/+$/, ''),
-    t3Token: str(source, 'T3_TOKEN'),
-    t3Projects: list(source, 'T3_PROJECTS'),
-    allowedOrigins: list(source, 'PINPOINT_ALLOWED_ORIGINS'),
-    splitterProvider: provider(source, mode),
-    splitterModel: str(source, 'SPLITTER_MODEL', 'opencode-go/deepseek-v4.1-flash'),
-    anthropicKey: str(source, 'ANTHROPIC_API_KEY'),
-    anthropicModel: str(source, 'ANTHROPIC_MODEL', 'claude-sonnet-4-5'),
-    openrouterKey: str(source, 'OPENROUTER_API_KEY'),
-    openrouterModel: str(source, 'OPENROUTER_MODEL', 'anthropic/claude-sonnet-4.5'),
-    telegramToken: str(source, 'TELEGRAM_BOT_TOKEN'),
-    telegramChatId: str(source, 'TELEGRAM_CHAT_ID'),
+    trustProxy: str(source, 'PINPOINT_TRUST_PROXY') === '1',
+    t3Url: cloud ? '' : str(source, 'T3_URL', 'http://127.0.0.1:3773').replace(/\/+$/, ''),
+    t3Token: cloud ? '' : str(source, 'T3_TOKEN'),
+    t3Projects: cloud ? [] : list(source, 'T3_PROJECTS'),
+    allowedOrigins: cloud ? [] : list(source, 'PINPOINT_ALLOWED_ORIGINS'),
+    splitterProvider: cloud ? 'fixture' : provider(source, mode),
+    splitterModel: cloud ? 'fixture' : str(source, 'SPLITTER_MODEL', 'opencode-go/deepseek-v4.1-flash'),
+    anthropicKey: cloud ? '' : str(source, 'ANTHROPIC_API_KEY'),
+    anthropicModel: cloud ? '' : str(source, 'ANTHROPIC_MODEL', 'claude-sonnet-4-5'),
+    openrouterKey: cloud ? '' : str(source, 'OPENROUTER_API_KEY'),
+    openrouterModel: cloud ? '' : str(source, 'OPENROUTER_MODEL', 'anthropic/claude-sonnet-4.5'),
+    telegramToken: cloud ? '' : str(source, 'TELEGRAM_BOT_TOKEN'),
+    telegramChatId: cloud ? '' : str(source, 'TELEGRAM_CHAT_ID'),
     whisperModel: str(source, 'WHISPER_MODEL'),
+    whisperThreads,
     scriptedTranscripts: str(source, 'PINPOINT_SCRIPTED_TRANSCRIPTS'),
+    sampleReplyMs,
     serverRoot: SERVER_ROOT,
     repoRoot: REPO_ROOT,
-    deckFixture: str(source, 'PINPOINT_DECK_FIXTURE'),
+    deckFixture: cloud ? '' : str(source, 'PINPOINT_DECK_FIXTURE'),
     dataDir,
     fixturesDir: path.join(REPO_ROOT, 'demo', 'fixtures'),
+    serverVersion: SERVER_VERSION,
   };
 }
 

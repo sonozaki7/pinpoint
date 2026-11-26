@@ -79,11 +79,11 @@ async function transcribeWithT3(env: Env, pcm: Buffer): Promise<string> {
   return cleanTranscript(text);
 }
 
-function runWhisperCli(model: string, wavPath: string): Promise<string> {
+function runWhisperCli(model: string, wavPath: string, threads: number): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn(
       'whisper-cli',
-      ['-m', model, '-f', wavPath, '-l', 'en', '-nt', '-np'],
+      ['-m', model, '-f', wavPath, '-l', 'en', '-nt', '-np', '-t', String(threads)],
       { stdio: ['ignore', 'pipe', 'pipe'] },
     );
     let stdout = '';
@@ -121,7 +121,7 @@ async function transcribeWithWhisper(env: Env, wav: Buffer): Promise<string> {
   const file = path.join(dir, `voice-${process.pid}-${Date.now()}.wav`);
   try {
     fs.writeFileSync(file, wav);
-    return await runWhisperCli(model, file);
+    return await runWhisperCli(model, file, env.whisperThreads || 4);
   } finally {
     fs.rmSync(file, { force: true });
   }
@@ -130,6 +130,10 @@ async function transcribeWithWhisper(env: Env, wav: Buffer): Promise<string> {
 /**
  * SPEC §9: T3's local transcription first, then whisper-cli with a ggml model.
  * The glasses post raw PCM; a WAV fixture is also accepted.
+ *
+ * Cloud mode always uses whisper-cli: the public server has no T3 session and
+ * must never call the desk. The scripted path is only for explicit recording
+ * setups (PINPOINT_SCRIPTED_TRANSCRIPTS).
  */
 export function createVoiceService(env: Env): VoiceTranscriber {
   if (env.scriptedTranscripts) {
@@ -143,7 +147,7 @@ export function createVoiceService(env: Env): VoiceTranscriber {
       const wav = isWav(audio) ? audio : pcmToWav(pcm);
       const failures: string[] = [];
 
-      if (env.t3Token) {
+      if (env.mode !== 'cloud' && env.t3Token) {
         try {
           const started = Date.now();
           const text = await transcribeWithT3(env, pcm);

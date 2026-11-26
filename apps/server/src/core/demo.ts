@@ -7,7 +7,7 @@ import { errorMessage } from './errors.js';
 import { attentionSourceSchema, attentionThreadSchema, asDeck } from './schemas.js';
 import type { AttentionSource, AttentionThread } from './types.js';
 
-interface DemoData {
+export interface DemoData {
   fixtures: Fixture[];
   precomputed: Map<string, Deck>;
 }

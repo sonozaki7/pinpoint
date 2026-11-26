@@ -1,7 +1,10 @@
 import { serve } from '@hono/node-server';
+import { CLOUD_MAX_DEVICES } from './cloud/limits.js';
+import { loadSampleWorkspace } from './cloud/sample.js';
+import { CloudService } from './cloud/service.js';
 import { DeckStore } from './core/decks.js';
 import { loadDemoData, loadDeckFixture } from './core/demo.js';
-import { readEnv, assertLivePrivacy } from './core/env.js';
+import { readEnv, assertLivePrivacy, type Env } from './core/env.js';
 import { FakeT3Client } from './core/fakes.js';
 import { loadTelegramNotifier, loadT3Client } from './core/loaders.js';
 import { ReviewStore } from './core/reviews.js';
@@ -9,13 +12,46 @@ import { redactSecrets } from './core/redact.js';
 import { PinpointService } from './core/service.js';
 import { createSplitter } from './core/splitter/index.js';
 import { createApp } from './http/app.js';
+import { createCloudApp } from './http/cloudApp.js';
 import { createVoiceService } from './voice/service.js';
 import type { AttentionThread } from './core/types.js';
+
+async function runCloud(env: Env): Promise<void> {
+  // Cloud never loads T3, Telegram or a splitter. The sample workspace comes
+  // straight from demo fixtures, so a device opens its deck instantly.
+  const sample = loadSampleWorkspace(env);
+  const voice = createVoiceService(env);
+  const cloud = new CloudService({ env, sample, voice });
+  const app = createCloudApp({ cloud });
+  const server = serve({ fetch: app.fetch, port: env.port, hostname: env.host });
+
+  console.info(
+    `[pinpoint] listening on http://${env.host}:${env.port} mode=cloud version=${env.serverVersion} ` +
+      `workspace=sample devices<=${CLOUD_MAX_DEVICES} state=memory (restart wipes it) splitter=fixture voice=whisper`,
+  );
+
+  let closing = false;
+  const shutdown = (signal: string): void => {
+    if (closing) return;
+    closing = true;
+    console.info(`[pinpoint] shutting down (${signal})`);
+    const force = setTimeout(() => process.exit(0), 4_000);
+    force.unref();
+    cloud.stop();
+    server.close(() => process.exit(0));
+  };
+  process.on('SIGINT', () => shutdown('SIGINT'));
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+}
 
 async function main(): Promise<void> {
   const env = readEnv();
   // Privacy gate: a live server without an allowlist must not start (SPEC §6).
   assertLivePrivacy(env);
+  if (env.mode === 'cloud') {
+    await runCloud(env);
+    return;
+  }
   const demo = env.mode === 'demo' ? loadDemoData(env.fixturesDir) : undefined;
   const deckFixture = env.deckFixture ? loadDeckFixture(env.deckFixture) : undefined;
   if (deckFixture) console.info(`[pinpoint] deck fixture for ${[...deckFixture.keys()].join(', ')}`);
@@ -70,10 +106,18 @@ async function main(): Promise<void> {
 
   await service.start();
   const app = createApp({ service });
-  const server = serve({ fetch: app.fetch, port: env.port });
+  // Demo/live keep Node's old all-interfaces default unless PINPOINT_HOST is
+  // explicitly set, so a LAN phone preview keeps working exactly as before.
+  const bindHost =
+    (process.env.PINPOINT_HOST ?? '').trim().length > 0 ? env.host : undefined;
+  const server = serve({
+    fetch: app.fetch,
+    port: env.port,
+    ...(bindHost ? { hostname: bindHost } : {}),
+  });
 
   console.info(
-    `[pinpoint] listening on http://127.0.0.1:${env.port} mode=${env.mode} splitter=${splitter.label} telegram=${telegramLoaded.notifier.mode}`,
+    `[pinpoint] listening on http://${env.host}:${env.port} mode=${env.mode} splitter=${splitter.label} telegram=${telegramLoaded.notifier.mode}`,
   );
 
   void service.preload();

@@ -3,6 +3,9 @@ import { HttpError } from '../core/errors.js';
 /** PUT review autosaves are tiny; anything larger is a mistake or an attack. */
 export const MAX_JSON_BYTES = 256 * 1024;
 
+/** The public cloud server accepts only small review bodies. */
+export const MAX_CLOUD_JSON_BYTES = 64 * 1024;
+
 /**
  * Read a request body without ever holding more than `limit` bytes.
  *
@@ -44,4 +47,26 @@ export async function readBodyCapped(
     }
   }
   return Buffer.concat(chunks, size);
+}
+
+/** Read and parse a JSON body, with the same capped-stream behaviour as the routes. */
+export async function readJsonBody(
+  request: Request,
+  limit: number,
+  tooLargeMessage: string,
+): Promise<unknown> {
+  let bytes: Buffer;
+  try {
+    bytes = await readBodyCapped(request, limit, tooLargeMessage);
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    throw new HttpError(400, 'Could not read request body', 'bad_request');
+  }
+  const text = bytes.toString('utf8');
+  if (text.trim().length === 0) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new HttpError(400, 'Invalid JSON body', 'bad_request');
+  }
 }
