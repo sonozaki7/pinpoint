@@ -1,0 +1,47 @@
+name: pinpoint-cloud
+
+services:
+  pinpoint-cloud:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: pinpoint-cloud:local
+    container_name: pinpoint-cloud
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:4390:8787"
+    environment:
+      # `cloud` is the production mode. The first end-to-end check before cloud
+      # mode landed ran with PINPOINT_MODE=demo (override at deploy time).
+      PINPOINT_MODE: ${PINPOINT_MODE:-cloud}
+      PINPOINT_HOST: 0.0.0.0
+      PINPOINT_PORT: "8787"
+      PINPOINT_DATA_DIR: /data
+      PINPOINT_TRUST_PROXY: "1"
+      WHISPER_MODEL: /models/ggml-base.en.bin
+      WHISPER_THREADS: "4"
+      NODE_ENV: production
+    cpus: 4
+    mem_limit: 2g
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    volumes:
+      - pinpoint-data:/data
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "--max-time", "4", "http://127.0.0.1:8787/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 25s
+      retries: 3
+    stop_grace_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  pinpoint-data:
