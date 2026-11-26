@@ -5,8 +5,9 @@ Spec: `docs/SPEC.md` · Host advice: `docs/host-qa-notes.md` · Device risks: `d
 
 ## Run card
 
-- Objective: Pinpoint = review and steer everything your AI prepared, from G2 + R1, without the phone. Main track AI Assistants & Work (Gmail, Calendar, Notion, OpenRouter), second track Messaging & News (Telegram first), plus Best Telegram integration.
-- Hero use case ("Morning brief"): walking to work, the glasses show what your assistants prepared: email replies, a meeting move, a Notion task, a Telegram reply, your coding agents' plans. Scroll, skip what's fine (silence = yes), tap and say the one fix, double-tap: everything happens, a receipt shows on the glasses, corrected items come back once for a glance.
+- Objective: Pinpoint = review work your AIs already did, point by point, from G2 + R1, and put your words exactly where they belong. Main track AI Assistants & Work (Claude Code / Codex via T3 Code, Notion, Gmail), second track Messaging & News (Telegram companion), plus Best Telegram integration.
+- Scope (decided 2026-11-27 from docs/landscape.md; owner rejects AI slop): sources = coding agents (core), Notion pages waiting for review (notes become comments on the exact block), Gmail drafts an agent wrote (stretch; notes applied, shown once, then sent). No AI-drafted replies from nothing, no inbox triage, no meeting briefs, no calendar moves, no OpenRouter.
+- Pitch: "Approval isn't feedback." ~40 G2 coding-agent apps approve/deny or dictate; nobody lets you point at the exact line. Silence means agree.
 - Cost rule (owner): all coding/testing/research by DeepSeek V4.1 Flash delegates (OpenCode Go). Opus plans, reviews, commits. No paid services without asking (hosting = owner's VPS new-prod).
 - Internal deadlines (JST): feature freeze Sun 29 12:00 · final video Sun 18:00 · submit Sun 22:00.
 - Open blockers (owner, Fri morning): Google OAuth consent (≈10 min, docs/connectors.md), Notion integration token, OpenRouter key (optional), Even developer portal: upload .ehpk as Beta + 24×24 icon.
@@ -21,11 +22,12 @@ Spec: `docs/SPEC.md` · Host advice: `docs/host-qa-notes.md` · Device risks: `d
 | R1 | Device readiness audit | DeepSeek | done (e4e50ed) |
 | V3 | Video v3 pipeline (one bad step, one fix) | DeepSeek | running → becomes v4 with the Morning brief |
 | T1 | Telegram redesign (card, status, one note per sentence, legend) | DeepSeek | running |
-| K1 | Connectors: Gmail, Calendar, Notion, OpenRouter + seed + setup scripts | DeepSeek | running |
-| S1 | Morning brief engine: build actions deck, execute on send, revise noted items, receipts | DeepSeek | after G1 (needs 'actions' attention) |
-| G2 | Glasses: audit P0/P1 fixes, app tags/flags, receipt screen, revised follow-up, fewer symbols | DeepSeek | after G1 |
-| W1 | Web simulator site: real app code + browser mock backend + datasets + app panels | DeepSeek | after G1 |
-| T2 | Telegram: receipts with links, chat reply drafts from picked groups, Slack/Discord adapters | DeepSeek | after T1 |
+| K1 | Connectors: Gmail, Calendar, Notion, OpenRouter + seed + setup scripts | DeepSeek | running (then trim: drop Calendar + OpenRouter) |
+| S1 | Review sources: Notion page review (block comments + status) and Gmail draft review (apply notes, glance, send) in live mode; receipts | DeepSeek | after K1 |
+| G2 | Glasses: audit P0/P1 fixes, calm screen (words not glyphs), CHECK flags, 24×24 icon | DeepSeek | running |
+| W1 | Web simulator site: real app code + browser mock backend + datasets (coding agents; docs & drafts) + app panels | DeepSeek | running |
+| L1 | Landscape research (store 1,148 apps, 113 hackathon builds) | DeepSeek | done (cb244ab) |
+| T2 | Telegram: receipts with links for Notion/Gmail reviews; optional Slack/Discord companions | DeepSeek | after T1 |
 | P2 | Desk pairing relay (real G2 reaches your own desk anywhere) | DeepSeek | after S1 |
 | D1 | README, SUBMISSION, FEATURE_REQUESTS, business model, privacy page, 24×24 icon | DeepSeek + Opus | Sat |
 | X1 | Real end-to-end run with owner's Google/Notion (demo label/calendar) + footage | DeepSeek | Sat |
@@ -42,3 +44,4 @@ Spec: `docs/SPEC.md` · Host advice: `docs/host-qa-notes.md` · Device risks: `d
 
 - 2026-11-24 night | first build: simulator-verified app, live T3 run, video v2, site, Telegram bot.
 - 2026-11-27 00:30 | owner: video too complex, real-G2 doubts, Telegram confusing, wants Google/Notion + web simulator. Replanned (this file).
+- 2026-11-27 01:50 | owner: no AI slop, check existing apps. Landscape research → scope locked to review sources (agents, Notion, Gmail drafts). Notion token saved; Google client + DNS record pending from owner.
