@@ -1,51 +1,44 @@
 # Goal: Pinpoint submission-ready for Heads Up (deadline Mon Nov 30 04:59 JST)
 
-Status: active · Delivery boundary: public GitHub repo + live site + demo video + DoraHacks submission (submission itself needs the user)
-Spec: `docs/SPEC.md` · Demo/pitch: `docs/DEMO.md` · Acceptance rows: SPEC §13 (A1–A8)
+Status: active · Delivery boundary: public repo + live site with a try-it simulator + demo video + .ehpk + DoraHacks submission (the submission itself needs the owner)
+Spec: `docs/SPEC.md` · Host advice: `docs/host-qa-notes.md` · Device risks: `docs/device-readiness.md`
 
 ## Run card
 
-- Objective: build Pinpoint end to end (glasses app, server, T3 live mode, Telegram, site, video) per SPEC.
-- Cost rule (user, 2026-11-24): all coding/testing/research by DeepSeek V4.1 Flash delegates (OpenCode Go). Opus only plans, reviews summaries, commits, decides.
-- Current path: Wave 1 delegates running (see board).
-- Next three actions: integrate wave 1 → wave 2 (site deploy, demo recording, live T3 run) → polish + README.
-- Open blockers (need the user, deferred to morning): Telegram bot token + group, flip repo public, DNS for site (if needed), narration voice.
-- Last checkpoint: 2026-11-24 night run complete; video v2 + docs done; waiting on the morning checklist (docs/MORNING.md).
+- Objective: Pinpoint = review and steer everything your AI prepared, from G2 + R1, without the phone. Main track AI Assistants & Work (Gmail, Calendar, Notion, OpenRouter), second track Messaging & News (Telegram first), plus Best Telegram integration.
+- Hero use case ("Morning brief"): walking to work, the glasses show what your assistants prepared: email replies, a meeting move, a Notion task, a Telegram reply, your coding agents' plans. Scroll, skip what's fine (silence = yes), tap and say the one fix, double-tap: everything happens, a receipt shows on the glasses, corrected items come back once for a glance.
+- Cost rule (owner): all coding/testing/research by DeepSeek V4.1 Flash delegates (OpenCode Go). Opus plans, reviews, commits. No paid services without asking (hosting = owner's VPS new-prod).
+- Internal deadlines (JST): feature freeze Sun 29 12:00 · final video Sun 18:00 · submit Sun 22:00.
+- Open blockers (owner, Fri morning): Google OAuth consent (≈10 min, docs/connectors.md), Notion integration token, OpenRouter key (optional), Even developer portal: upload .ehpk as Beta + 24×24 icon.
 
 ## Task board
 
-| ID | Task | Owner (delegate) | Status | Result |
-|---|---|---|---|---|
-| W1 | Glasses app per SPEC §10, simulator screenshots | DeepSeek | done | 13 sim screenshots, .ehpk 47 KB, tests green |
-| W2 | Server core | DeepSeek | done | 125 tests; T3 voice 189 ms; opencode split 20 s, 8/8 quotes valid |
-| W3 | T3 client + `docs/t3-api-notes.md` | DeepSeek | done | live: report/plan/question verified on T3 0.1.11; 3 sandbox threads to clean up later |
-| W4 | Telegram module | DeepSeek | done | 32 tests, dry-run flow; needs real bot to verify |
-| W5 | Hosting recon | DeepSeek | done | GitHub Pages in sonozaki7/pinpoint once public |
-| W6 | Demo fixtures + sim recorder | DeepSeek | done | 4 fixtures, 25 points verified |
-| W7 | Landing site | DeepSeek | done | apps/site; hero stats are placeholders → replace with real run numbers |
-| W8 | Video pipeline + draft render (Remotion) | DeepSeek | done | 2:45 draft; W8b = v2 with real footage + Kokoro voice (running) |
-| W9a | Server live mode vs T3 (project allowlist) | DeepSeek | done | privacy gate; report/question/plan live-verified |
-| W10 | README, SUBMISSION.md, FEATURE_REQUESTS.md | DeepSeek | done (draft) | final pass after video/live numbers |
-| W11 | Glasses polish + run against real server | DeepSeek | done | focus cursor, counters; real mic via T3 179 ms |
-| W12 | Scene recordings + live proof run | DeepSeek | done | open→send 20.4 s, 2 notes, agent replied 7.3 s; T3 screenshot needs pairing (morning) |
-| W13 | Final docs + runbook (W13a done); publish + Telegram real run + final render + cleanup sandbox threads (needs user, see docs/MORNING.md) | — | waiting on user | |
-| W14 | Hardening + `npm run demo` + `npm run check` | DeepSeek | done | 155 server + 19 glasses tests |
-
-## Morning checklist for the user (big or account-bound decisions)
-
-1. Create the Telegram bot (@BotFather) and a private group with Topics; add the bot as admin (5 minutes, guided).
-2. Approve making the GitHub repo public (needed for submission).
-3. Approve the site URL/domain choice.
-4. Record the narration (script in `docs/DEMO.md`), or accept the TTS draft.
-5. Post the eligibility question on the Even Discord (draft in `docs/SUBMISSION.md`).
+| ID | Task | Owner | Status |
+|---|---|---|---|
+| C1 | Cloud mode (per-device sample workspace, whisper, limits) | DeepSeek | done (a44a548) |
+| C2 | Deploy Pinpoint Cloud on new-prod (pinpoint-api.qolso.com) | DeepSeek | running |
+| G1 | Glasses: real-device defaults, device id, phone page, lifecycle | DeepSeek | running |
+| R1 | Device readiness audit | DeepSeek | done (e4e50ed) |
+| V3 | Video v3 pipeline (one bad step, one fix) | DeepSeek | running → becomes v4 with the Morning brief |
+| T1 | Telegram redesign (card, status, one note per sentence, legend) | DeepSeek | running |
+| K1 | Connectors: Gmail, Calendar, Notion, OpenRouter + seed + setup scripts | DeepSeek | running |
+| S1 | Morning brief engine: build actions deck, execute on send, revise noted items, receipts | DeepSeek | after G1 (needs 'actions' attention) |
+| G2 | Glasses: audit P0/P1 fixes, app tags/flags, receipt screen, revised follow-up, fewer symbols | DeepSeek | after G1 |
+| W1 | Web simulator site: real app code + browser mock backend + datasets + app panels | DeepSeek | after G1 |
+| T2 | Telegram: receipts with links, chat reply drafts from picked groups, Slack/Discord adapters | DeepSeek | after T1 |
+| P2 | Desk pairing relay (real G2 reaches your own desk anywhere) | DeepSeek | after S1 |
+| D1 | README, SUBMISSION, FEATURE_REQUESTS, business model, privacy page, 24×24 icon | DeepSeek + Opus | Sat |
+| X1 | Real end-to-end run with owner's Google/Notion (demo label/calendar) + footage | DeepSeek | Sat |
 
 ## Decisions
 
 - New repo `pinpoint`; first commit imports Agent Relay pieces unchanged (disclosure, see `PRIOR_WORK.md`).
-- Approvals of shell commands are out of scope (Terminal Mode covers them); we review replies, plans, questions.
-- Splitter default = `opencode run` with DeepSeek (user's Go subscription), pluggable to Claude/OpenRouter.
-- Each app keeps its own npm package (no workspace) to avoid lockfile races between parallel agents.
+- Hosting: owner's VPS new-prod (shared production box: ledger every root action, touch nothing existing). Fly.io not used.
+- Real Google/Notion data is limited to a "pinpoint" Gmail label, a "Pinpoint demo" calendar and a "Pinpoint demo" Notion page. Nothing outside them is read or changed.
+- Corrected (noted) items are revised and shown once more before they go out; agreed items run on send.
+- The website's main job is the try-it simulator, built from the real glasses code.
 
 ## Progress log
 
-- 01:50 | scaffold | repo, SPEC, contract, DEMO, server deps, glasses deps | ok | next: spawn wave 1
+- 2026-11-24 night | first build: simulator-verified app, live T3 run, video v2, site, Telegram bot.
+- 2026-11-27 00:30 | owner: video too complex, real-G2 doubts, Telegram confusing, wants Google/Notion + web simulator. Replanned (this file).
