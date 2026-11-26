@@ -36,15 +36,17 @@ Lifecycle: the SDK's `FOREGROUND_ENTER`/`FOREGROUND_EXIT` events (and `document.
 | Review | Swipe up/down | Move the point focus; the four-row window scrolls in place |
 | | Tap a step/claim/draft point | Start a voice note; tap again to stop |
 | | Tap a question | Open Options |
-| | Tap the `> Send review (N notes)` row | Open Preview |
+| | Tap the `> Send review · 1 change, 6 OK` row | Open Preview |
 | | Double-tap | Back to Inbox (draft kept and autosaved) |
 | | Hold menu | `Send review`, `Read on phone`, `Clear notes`, `Refresh`, plus `Reset sample` in the sample workspace |
 | Options | Tap | Choose an option and return to Review, or `Say something else` to record |
 | | Double-tap | Back to Review |
-| Preview | Tap | Send to the agent, then `Sent to agent` for 1.5 s and back to Inbox |
-| | Double-tap | Back to Review |
+| Preview | Tap | Back to Review without sending |
+| | Double-tap | Send to the agent, then `Sent to the agent.` for 1.5 s and back to Inbox |
 
-Rows use ASCII markers: `o` unseen, `+` agreed (seen), `x` objection, `*` note, `?` question unanswered, `=` answered, and `!` before a high-risk point. The focused row is drawn at brightness 4 with a leading `>` cursor; every other row stays at brightness 2 and keeps a two-space indent. The review header uses words instead of cryptic counters: `auth-refresh-fix | 4/7 | 1 objection` (the counters are omitted while zero, and the title is shortened first so the line never exceeds 44 characters). The quote pane shows the exact quote, or the question's options, wrapped to at most three 44-character lines.
+Rows are words, not a legend of symbols. The focused row is the only one with a `>` cursor and is drawn at brightness 4; every other row stays at brightness 2 and keeps a three-space indent aligned with the cursor. A row the user commented on ends with a right-aligned word: `CHANGE` for an objection, `NOTE` for a note, or the chosen option for a question. A row the assistant flagged (high risk or a `flag`) ends with `CHECK` until the user comments. Nothing else is added.
+
+The header reads `login-fix · 4 of 7 · 1 change · 1 note` (counts are omitted while zero and the title is shortened first). The send row reads `Send review · 1 change, 6 OK`. The quote pane shows the focused point's quote, the question's options, or `You said: ...` after a note. Footers stay in words: `Tap: talk · Double-tap: back`, and `Tap: open · Hold: menu` on the inbox. Long strings are fitted with the firmware's own glyph widths (the `@evenrealities/pretext` tables) rather than a fixed character count, so `login-fix` is never cut while a long inbox row still stops before the list edge.
 
 ## Run the browser preview
 
@@ -76,7 +78,7 @@ npm run simulator -- "http://127.0.0.1:4173/" --automation-port 9898 --aid corea
 node scripts/check-simulator.mjs 9898 --server http://127.0.0.1:8788
 ```
 
-The script verifies the server reports `mode=demo` with four threads, then runs: inbox → open `auth-refresh-fix` → point 4 → voice note → Send row → Preview → Send → inbox with the thread gone → Options for `deps-upgrade` → choose an answer → root double-tap exit. PNGs are written to `demo/shots/glasses-01-inbox.png` … `glasses-13-exit.png`.
+The script verifies the demo server has the current fixtures, then runs: inbox → open `login-fix` → point 4 → voice note → Send row → Preview → double-tap Send → inbox with the thread gone → answer the payment question → root double-tap exit. PNGs are written to `demo/shots/glasses-01-inbox.png` … `glasses-13-exit.png`.
 
 The voice note is real audio: the script makes the phrase with macOS `say`, plays it through the speakers while the simulator records from the MacBook microphone selected with `--aid`, and the server transcribes the captured PCM through its own `/api/voice` route. Keep the Mac's output audible and the microphone unmuted for this check; it is a real room recording, not injected bytes. The script also decodes each review screenshot and proves the focused row's peak alpha is 255 against 197 for the dim rows, so the brightness difference is in the saved PNG, not only in the DOM.
 
@@ -101,12 +103,15 @@ The voice note is real audio: the script makes the phrase with macOS `say`, play
 
 ```sh
 npm run pack   # writes pinpoint.ehpk (SDK 0.0.16)
+npm run icon   # writes icon-24.png (24x24, 1-bit) and the 4x brand preview
 ```
+
+`icon-24.png` is the Hub store icon, not part of the package: exactly 24×24, every visible pixel opaque `#F4F4F4`, and every lit pixel starting a complete 2×2 block (the CLI's `pl()` check). Upload it with `evenhub create … --icon icon-24.png` or `evenhub update --icon icon-24.png`; `app.json` does not carry an icon field.
 
 ## Checks
 
 ```sh
-npm test          # tsx --test: focus, four-row window, markers, ASCII 44, notes, cloud API, device id
+npm test          # tsx --test: focus, four-row window, word labels, pixel fitting, exit repaint, icon, cloud API
 npm run build     # tsc --noEmit + vite build
 npm run test:ui   # 320–1440 px preview + mocked SDK transport, exit mode 1
 ```
@@ -118,4 +123,4 @@ The UI check needs Google Chrome or Playwright Chromium (`npx playwright install
 - Simulator-only: no BLE timing/flicker, no ring-vs-temple distinction, brightness levels are indicative, and the system exit dialog is not drawn (see caveat above).
 - Real-hardware risks: the simulator cannot prove the phone's network reachability, cloud CORS, SDK storage behaviour across app restarts, or that the Even app keeps the WebView alive while the phone is locked. The packaged build is bounded by the `app.json` network whitelist and SDK `0.0.16`.
 - The simulator check exercises the real server in demo mode on port 8788, including `/api/voice`; live T3 threads and real Telegram delivery belong to the server-side checks.
-- One fixed firmware font; strings are normalised to printable ASCII and capped before sending.
+- One fixed firmware font; strings are normalised to printable ASCII plus `·` and fitted to the measured pixel width of each container.

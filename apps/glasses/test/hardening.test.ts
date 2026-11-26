@@ -39,16 +39,31 @@ test("root double tap opens the exit dialog; other screens go back", () => {
 
   const preview = press({ ...review, focus: 7 }, 1_000).state;
   assert.equal(preview.screen, "preview");
-  assert.equal(doubleTap(preview).state.screen, "review");
+  assert.deepEqual(doubleTap(preview), { state: preview }, "an empty preview cannot send");
+  assert.equal(press(preview, 1_500).state.screen, "review", "a loading preview can be left");
 
-  const sending = { ...preview, sending: true };
-  assert.equal(doubleTap(sending).state, sending, "a send in flight cannot be backed out");
+  const loaded = {
+    ...preview,
+    preview: {
+      message: "m",
+      preview: ["1 change, 6 agreed", "Double-tap to send"] as [string, string],
+      counts: { objections: 0, answers: 0, notes: 1, agreed: 6 },
+    },
+    previewLoading: false,
+  };
+  assert.equal(press(loaded, 1_600).state.screen, "review", "a tap leaves a loaded preview");
+  const sending = doubleTap(loaded);
+  assert.equal(sending.effect?.type, "send");
+  assert.equal(sending.state.sending, true);
+
+  const inFlight = { ...loaded, sending: true };
+  assert.equal(doubleTap(inFlight).state, inFlight, "a send in flight cannot be backed out");
 });
 
 test("offline, empty inbox and a failed deck all offer a way forward", () => {
   const offline = markOffline(inboxState());
-  assert.equal(pageFor(offline, 1_000).message, "Server unreachable | tap to retry");
-  assert.equal(pageFor(offline, 1_000).footer, "tap: retry | 2x: exit");
+  assert.equal(pageFor(offline, 1_000).message, "Server unreachable · tap to retry");
+  assert.equal(pageFor(offline, 1_000).footer, "Tap: retry");
   assert.deepEqual(press(offline, 1_000).effect, { type: "retry" });
 
   const empty = adoptInbox(initialState({ demo: true, loading: false }), [], {
@@ -60,7 +75,7 @@ test("offline, empty inbox and a failed deck all offer a way forward", () => {
 
   const failed = deckFailed({ ...reviewState(), deck: null }, "Still building. Tap to retry.", 1_000);
   assert.match(pageFor(failed, 1_000).pane ?? "", /Still building/);
-  assert.equal(pageFor(failed, 1_000).footer, "tap: retry | 2x: back");
+  assert.equal(pageFor(failed, 1_000).footer, "Tap: retry · Double-tap: back");
   assert.deepEqual(press(failed, 1_000).effect, { type: "retry-deck" });
 
   const item = inboxState().inbox.find((entry) => entry.threadId === "login-fix");

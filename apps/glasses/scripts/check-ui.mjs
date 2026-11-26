@@ -30,7 +30,7 @@ try {
       assert.equal(clipped, false, `${selector} clipped at ${width}px`);
     }
   }
-  assert.match(await phone.locator("#glasses-head").textContent(), /PINPOINT \| 3 need you[\s\S]*demo data/);
+  assert.match(await phone.locator("#glasses-head").textContent(), /Pinpoint · 3 need you[\s\S]*demo data/);
   assert.equal(await phone.locator("#btn-reset-sample").isDisabled(), true);
   assert.match(await phone.locator("#phone-status").innerText(), /Demo data/);
   assert.match(await phone.locator(".gestures").innerText(), /Scroll[\s\S]*Tap[\s\S]*Double-tap[\s\S]*Hold/);
@@ -68,7 +68,7 @@ try {
   await page.waitForFunction(() => document.querySelector("#glasses-list")?.children.length === 3);
   await page.waitForFunction(() => window.__bridgeCalls.some((call) =>
     call.method === "rebuildPageContainer" && (call.data.listObject?.length ?? 0) > 0));
-  assert.match(await page.locator("#glasses-head").textContent(), /PINPOINT \| 3 need you/);
+  assert.match(await page.locator("#glasses-head").textContent(), /Pinpoint · 3 need you/);
   await page.locator("#developer-controls").evaluate((node) => { node.open = true; });
 
   const emit = (type, jsonData) => page.evaluate(({ type, jsonData }) => window._listenEvenAppMessage({
@@ -95,8 +95,8 @@ try {
   await waitText("#glasses-head", "login-fix");
   await waitText("#glasses-rows", "Sign out every customer once");
   assert.equal(await page.locator("#glasses-rows .row").count(), 4);
-  assert.match(await page.locator("#glasses-head").innerText(), /login-fix \| 1\/7/);
-  assert.doesNotMatch(await page.locator("#glasses-head").innerText(), /x0|\*0/);
+  assert.match(await page.locator("#glasses-head").innerText(), /login-fix · 1 of 7/);
+  assert.doesNotMatch(await page.locator("#glasses-head").innerText(), /objection/);
 
   const review = (await calls()).filter(({ method }) => method === "rebuildPageContainer").at(-1);
   assert.equal(review.data.containerTotalNum, 8);
@@ -105,33 +105,33 @@ try {
   const reviewRows = review.data.textObject.filter((box) => box.containerName.startsWith("row"));
   assert.equal(reviewRows.length, 4);
   assert.equal(reviewRows[0].textColor, 4, "focused row is brightest");
-  assert.match(reviewRows[0].content, /^> \+ 1 /);
+  assert.match(reviewRows[0].content, /^> 1 /);
   for (const row of reviewRows.slice(1)) {
     assert.equal(row.textColor, 2, `${row.containerName} stays dim`);
-    assert.match(row.content, /^ {2}/, `${row.containerName} has no cursor`);
+    assert.match(row.content, /^ {3}/, `${row.containerName} has no cursor`);
   }
 
   for (let i = 0; i < 3; i++) {
     await emit("sysEvent", { eventType: 2, eventSource: 1 });
     await delay(280); // swipes are debounced to one per 250 ms
   }
-  await waitText("#glasses-head", "4/7");
+  await waitText("#glasses-head", "4 of 7");
   assert.match(await page.locator("#glasses-rows .row").nth(3).innerText(), /Sign out every customer once/);
   const upgrades = (await calls()).filter(({ method }) => method === "textContainerUpgrade");
   const focusedRow = upgrades.filter(({ data }) => data.containerName === "row4").at(-1);
   assert.equal(focusedRow?.data.textColor, 4, "row 4 is bright after focus moves");
-  assert.match(focusedRow?.data.content ?? "", /^> !\+ 4 /);
+  assert.match(focusedRow?.data.content ?? "", /^> 4 .*CHECK$/);
   const dimRow = upgrades.filter(({ data }) => data.containerName === "row1").at(-1);
   assert.equal(dimRow?.data.textColor, 2, "row 1 dims after focus moves");
   assert.doesNotMatch(dimRow?.data.content ?? "", /^>/);
 
   await emit("sysEvent", { eventSource: 1 });
-  await waitText("#glasses-pane", "REC");
+  await waitText("#glasses-pane", "Recording");
   await delay(900);
   await emit("sysEvent", { eventSource: 1 });
-  await waitText("#glasses-pane", "Heard: No, keep the existing sessions");
-  assert.match(await page.locator("#glasses-rows .row").nth(3).innerText(), /^> !x 4 /);
-  assert.match(await page.locator("#glasses-head").innerText(), /login-fix \| 4\/7 \| 1 objection/);
+  await waitText("#glasses-pane", "You said: No, keep the existing sessions");
+  assert.match(await page.locator("#glasses-rows .row").nth(3).innerText(), /^> 4 .*CHANGE$/);
+  assert.match(await page.locator("#glasses-head").innerText(), /login-fix · 4 of 7 · 1 change/);
   const audio = (await calls()).filter(({ method }) => method === "audioControl");
   assert.equal(audio.at(-2)?.data.isOpen, true);
   assert.equal(audio.at(-2)?.data.source, "glasses");
@@ -141,11 +141,11 @@ try {
     await emit("sysEvent", { eventType: 2, eventSource: 1 });
     await delay(280); // swipes are debounced to one per 250 ms
   }
-  await waitText("#glasses-rows", "Send review (1 note)");
+  await waitText("#glasses-rows", "Send review · 1 change, 6 OK");
   await emit("sysEvent", { eventSource: 1 });
-  await waitText("#glasses-pane", "1 objection, 6 agreed");
-  await emit("sysEvent", { eventSource: 1 });
-  await waitText("#glasses-pane", "Sent to agent");
+  await waitText("#glasses-pane", "1 change, 6 agreed");
+  await emit("sysEvent", { eventType: 3, eventSource: 1 });
+  await waitText("#glasses-pane", "Sent to the agent.");
   await delay(1_800);
   await page.waitForFunction(() => document.querySelector("#glasses-list")?.children.length === 2);
   assert.match(await page.locator("#glasses-head").innerText(), /2 need you/);

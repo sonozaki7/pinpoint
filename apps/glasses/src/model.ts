@@ -355,6 +355,23 @@ export function endRecording(state: State): State {
   return state.recordingStartedAt === null ? state : { ...state, recordingStartedAt: null };
 }
 
+/**
+ * A foreground change (phone locked, exit dialog, menu overlay, return to the
+ * app) cancels any recording in progress. The microphone is never re-armed
+ * here; the user starts a fresh note with a tap.
+ */
+export function recordingOnSurface(state: State): { state: State; discard: boolean } {
+  if (state.recordingStartedAt === null) return { state, discard: false };
+  return { state: { ...state, recordingStartedAt: null }, discard: true };
+}
+
+/** Show the recording clock at most once per second. */
+export function recordingTickDelay(now: number, startedAt: number): number {
+  const elapsed = now - startedAt;
+  if (elapsed >= VOICE_MAX_MS) return 0;
+  return Math.min(1_000 - (elapsed % 1_000) + 30, VOICE_MAX_MS - elapsed);
+}
+
 export function setFlash(state: State, text: string, now: number, ms = 4_000): State {
   return { ...state, flash: { text, until: now + ms } };
 }
@@ -369,7 +386,7 @@ export function isObjection(text: string): boolean {
   return OBJECTION.test(text.trim());
 }
 
-export function applyVoice(state: State, text: string, now: number, verdict?: "object" | "note"): State {
+export function applyVoice(state: State, text: string, _now: number, verdict?: "object" | "note"): State {
   const point = focusedPoint(state);
   if (!point) return state;
   const decided: Note["verdict"] = point.kind === "question"
@@ -379,16 +396,16 @@ export function applyVoice(state: State, text: string, now: number, verdict?: "o
       : isObjection(text) ? "object" : "note";
   const note: Note = { pointId: point.id, verdict: decided, text };
   const notes = [...state.notes.filter((item) => item.pointId !== point.id), note];
-  return remember(setFlash({ ...state, notes, recordingStartedAt: null }, `Heard: ${text}`, now, 5_000));
+  return remember({ ...state, notes, recordingStartedAt: null, flash: null });
 }
 
-export function chooseOption(state: State, index: number, now: number): State {
+export function chooseOption(state: State, index: number, _now: number): State {
   const point = focusedPoint(state);
   const option = point?.options?.[index];
   if (!point || option === undefined) return state;
   const note: Note = { pointId: point.id, verdict: "answer", option };
   const notes = [...state.notes.filter((item) => item.pointId !== point.id), note];
-  return remember(setFlash({ ...state, screen: "review", notes, optionsFocus: 0 }, `Answer: ${option}`, now, 3_000));
+  return remember({ ...state, screen: "review", notes, optionsFocus: 0, flash: null });
 }
 
 export function clearNotes(state: State, now: number): State {
@@ -497,12 +514,19 @@ export function draftFor(state: State, now: number): ReviewDraft | null {
   };
 }
 
-export function press(state: State, now: number): PressResult {
+/**
+ * Tap. `listIndex` is the native list row that was actually tapped. A list
+ * click may omit the index for the first row (documented host behaviour), so
+ * callers pass 0 in that case; this function then opens the row the user sees
+ * highlighted instead of a stale `inboxFocus` from an earlier swipe.
+ */
+export function press(state: State, now: number, listIndex?: number): PressResult {
   if (state.screen === "inbox") {
     if (state.loading || state.offline || state.inbox.length === 0) {
       return { state, effect: { type: "retry" } };
     }
-    return { state, effect: { type: "open", index: state.inboxFocus } };
+    const index = clamp(listIndex ?? state.inboxFocus, 0, state.inbox.length - 1);
+    return { state: index === state.inboxFocus ? state : setInboxFocus(state, index), effect: { type: "open", index } };
   }
   if (state.screen === "review") {
     if (state.recordingStartedAt !== null) {
@@ -534,12 +558,9 @@ export function press(state: State, now: number): PressResult {
     return { state: beginRecording({ ...state, screen: "review" }, now), effect: { type: "record-start" } };
   }
   if (state.screen === "preview") {
-    if (!state.preview) {
-      if (state.previewLoading) return { state };
-      return { state: { ...state, previewLoading: true }, effect: { type: "preview" } };
-    }
-    if (!canSend(state)) return { state };
-    return { state: markSending(state), effect: { type: "send" } };
+    if (state.sending || state.sent) return { state };
+    if (state.preview || state.previewLoading) return { state: backToReview(state) };
+    return { state: { ...state, previewLoading: true }, effect: { type: "preview" } };
   }
   return { state };
 }
@@ -551,6 +572,12 @@ export function doubleTap(state: State): PressResult {
   }
   if (state.screen === "review") {
     return { state: backToInbox(state) };
+  }
+  if (state.screen === "preview") {
+    // Sending is the deliberate action on the preview: a double tap, as the
+    // pane says. A single tap backs out.
+    if (!canSend(state)) return { state };
+    return { state: markSending(state), effect: { type: "send" } };
   }
   return { state: backToReview(endRecording(state)) };
 }

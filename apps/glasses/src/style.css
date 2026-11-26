@@ -273,7 +273,7 @@ button.primary:hover { background: var(--accent-strong); border-color: var(--acc
   border-left: 2px solid transparent;
   color: #79a56d;
   cursor: pointer;
-  white-space: nowrap;
+  white-space: pre;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -281,7 +281,7 @@ button.primary:hover { background: var(--accent-strong); border-color: var(--acc
 .scr-rows { min-height: 0; display: grid; align-content: start; gap: 0.08em; }
 .row {
   color: #c5ffb0;
-  white-space: nowrap;
+  white-space: pre;
   overflow: hidden;
   text-overflow: ellipsis;
 }

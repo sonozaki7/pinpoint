@@ -5,11 +5,13 @@ import {
   ListItemContainerProperty,
   MenuContainerProperty,
   MenuItemProperty,
+  OsEventTypeList,
   RebuildPageContainer,
   StartUpPageCreateResult,
   TextContainerProperty,
   TextContainerUpgrade,
   waitForEvenAppBridge,
+  type EvenAppBridge,
 } from "@evenrealities/even_hub_sdk";
 import type { PageModel } from "./display";
 import { decodeInput, type Input } from "./events";
@@ -80,7 +82,7 @@ export function layoutFor(page: PageModel): PageLayout {
     const paneId = 3 + page.rows.length;
     boxes.push({
       name: "pane", id: paneId, content: page.pane ?? "", brightness: 2,
-      x: 18, y: 157, width: 540, height: 86, border: true, padding: 2,
+      x: 18, y: 157, width: 540, height: 90, border: true, padding: 2,
     });
     boxes.push({
       name: "footer", id: paneId + 1, content: page.footer, brightness: 2,
@@ -235,12 +237,47 @@ export class SerialWrites {
   }
 }
 
+export type ExitDialogStep = "ignore" | "repaint" | "close";
+
+/**
+ * The exit dialog inverts the foreground pair: ENTER means the dialog just
+ * appeared (the host already cleared our page), EXIT means the user answered
+ * "No" (the dialog closed and the page is still blank). Either way the page
+ * must be repainted; SYSTEM_EXIT/ABNORMAL_EXIT means the app is really going
+ * away, so only the flag is cleared.
+ */
+export function exitDialogStep(
+  open: boolean,
+  type: OsEventTypeList | undefined,
+): ExitDialogStep {
+  if (!open) return "ignore";
+  if (
+    type === OsEventTypeList.FOREGROUND_ENTER_EVENT ||
+    type === OsEventTypeList.FOREGROUND_EXIT_EVENT
+  ) {
+    return "repaint";
+  }
+  if (
+    type === OsEventTypeList.SYSTEM_EXIT_EVENT ||
+    type === OsEventTypeList.ABNORMAL_EXIT_EVENT
+  ) {
+    return "close";
+  }
+  return "ignore";
+}
+
+export interface ConnectEvenOptions {
+  /** Injectable for tests; production waits for the host bridge. */
+  bridge?: EvenAppBridge;
+}
+
 export async function connectEven(
   getPage: () => PageModel,
   onInput: (input: Input) => void,
   setHostStatus: (message: string) => void,
+  options: ConnectEvenOptions = {},
 ) {
-  const bridge = await waitForEvenAppBridge();
+  const bridge = options.bridge ?? await waitForEvenAppBridge();
   const initial = getPage();
   const result = await bridge.createStartUpPageContainer(createLayout(initial));
   if (result !== StartUpPageCreateResult.success) {
@@ -249,24 +286,45 @@ export async function connectEven(
   let shape = shapeOf(initial);
   let full = fullSignature(initial);
   let signatures = new Map(layoutFor(initial).text.map((box) => [box.name, signature(box)]));
+  let exitDialogOpen = false;
+  const writes = new SerialWrites();
+
+  /** Repaint even when the signature says nothing changed. */
+  function repaint() {
+    return writes.run(() => apply(getPage(), true)).catch((error) => {
+      console.error("[pinpoint] display", error);
+      setHostStatus("Even Hub display update failed");
+    });
+  }
 
   const unsubscribe = bridge.onEvenHubEvent((event) => {
+    const step = exitDialogStep(exitDialogOpen, event.sysEvent?.eventType);
+    if (step === "repaint") {
+      // A cancelled dialog leaves the page blank; rebuild behind it and again
+      // when it closes. A repeated host event is harmless because writes queue.
+      if (event.sysEvent?.eventType === OsEventTypeList.FOREGROUND_EXIT_EVENT) {
+        exitDialogOpen = false;
+      }
+      void repaint();
+    } else if (step === "close") {
+      exitDialogOpen = false;
+    }
     const input = decodeInput(event);
     if (input) onInput(input);
   });
-  window.addEventListener("pagehide", (event) => { if (!event.persisted) unsubscribe(); });
+  if (typeof window !== "undefined") {
+    window.addEventListener("pagehide", (event) => { if (!event.persisted) unsubscribe(); });
+  }
   const connected = "Glasses connected";
   setHostStatus(connected);
   console.info("[pinpoint] ready");
 
-  const writes = new SerialWrites();
-
-  async function apply(page: PageModel) {
+  async function apply(page: PageModel, force = false) {
     const nextFull = fullSignature(page);
-    if (nextFull === full) return;
+    if (!force && nextFull === full) return;
     const nextShape = shapeOf(page);
     const layout = layoutFor(page);
-    if (nextShape !== shape || page.kind === "inbox") {
+    if (force || nextShape !== shape || page.kind === "inbox") {
       const ok = await bridge.rebuildPageContainer(rebuildLayout(page));
       if (!ok) throw new Error("Even Hub rejected the page rebuild");
       shape = nextShape;
@@ -297,6 +355,7 @@ export async function connectEven(
       });
     },
     async exit() {
+      exitDialogOpen = true;
       await writes.run(async () => {
         try {
           if (!await bridge.shutDownPageContainer(1)) setHostStatus("Even Hub exit could not open");

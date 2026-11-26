@@ -6,10 +6,11 @@ import {
 } from "./api";
 import { MockPinpointApi } from "./mock";
 import {
-  adoptInbox, applyHealth, applyVoice, clearFlash, clearNotes, deckFailed, doubleTap, draftFor, endRecording,
+  adoptInbox, applyHealth, applyVoice, canSend, clearFlash, clearNotes, deckFailed, doubleTap, draftFor, endRecording,
   finishSend, focusedPoint, goPreview, initialState, markLoading, markOffline, markSending, markSent,
-  mergeDeck, moveFocus, noteFor, openDeck, press, previewFailed, resetWorkspace, sendFailed, setFlash,
-  setInboxFocus, setPreview, shouldAcceptSwipe, startReview, VOICE_MAX_MS, SENT_HOLD_MS,
+  mergeDeck, moveFocus, noteFor, openDeck, press, previewFailed, recordingOnSurface, recordingTickDelay,
+  resetWorkspace, sendFailed, setFlash, setInboxFocus, setPreview, shouldAcceptSwipe, startReview,
+  SENT_HOLD_MS,
   type Effect, type State,
 } from "./model";
 import { pageFor, type PageModel } from "./display";
@@ -126,13 +127,17 @@ function updateButtons() {
     : state.screen === "options"
       ? "Choose"
       : state.screen === "preview"
-        ? "Send"
+        ? state.sent || state.sending
+          ? "Wait"
+          : state.preview || state.previewLoading ? "Back" : "Retry"
         : state.screen === "review" && state.deck === null
           ? "Retry"
           : record
             ? "Stop"
             : sendRow ? "Preview" : focusedPoint(state)?.kind === "question" ? "Options" : "Talk");
-  setText(el.double, state.screen === "inbox" ? "Exit" : "Back");
+  setText(el.double, state.screen === "preview" && canSend(state)
+    ? "Send"
+    : state.screen === "inbox" ? "Exit" : "Back");
   setText(el.menuButton, "Hold menu");
   el.up.disabled = ifInboxEmpty();
   el.down.disabled = ifInboxEmpty();
@@ -201,12 +206,11 @@ function scheduleClock() {
   clearTimeout(clockTimer);
   const now = Date.now();
   if (state.recordingStartedAt !== null) {
-    const elapsed = now - state.recordingStartedAt;
-    if (elapsed >= VOICE_MAX_MS) {
+    const delay = recordingTickDelay(now, state.recordingStartedAt);
+    if (delay <= 0) {
       void stopRecording();
       return;
     }
-    const delay = Math.min(1_000 - (elapsed % 1_000) + 30, VOICE_MAX_MS - elapsed);
     clockTimer = setTimeout(() => render(), Math.max(60, delay));
     return;
   }
@@ -233,13 +237,40 @@ function handleInput(input: Input) {
     if (state.recordingStartedAt !== null) recorder.push(input.pcm);
     return;
   }
+  if (input.kind === "hold") {
+    // The OS claims tap-then-hold for its own contextual menu and then delivers
+    // the choice as `menu`. This raw pair is for hosts that do not claim it;
+    // cancel the pending 260 ms tap so it cannot fire under the overlay.
+    clearTimeout(tapTimer);
+    tapTimer = undefined;
+    console.info(`[pinpoint] hold ${input.phase}`);
+    return;
+  }
+  if (input.kind === "exit") {
+    console.info(`[pinpoint] exit reason=${input.reason} abnormal=${input.abnormal}`);
+    clearTimeout(tapTimer);
+    tapTimer = undefined;
+    recorder.stop();
+    void hardware?.mic(false);
+    state = endRecording(state);
+    return;
+  }
   if (input.kind === "surface") {
-    if (input.enter) onForeground();
-    else stopRecordingForBackground();
+    // Opening or closing the menu or the exit dialog also delivers a foreground
+    // event; a queued tap must not land under that overlay.
+    clearTimeout(tapTimer);
+    tapTimer = undefined;
+    if (input.enter) {
+      onForeground();
+    } else if (abortRecording("Recording stopped")) {
+      console.info("[pinpoint] recording stopped by background");
+    }
     render();
     return;
   }
   if (input.kind === "menu") {
+    clearTimeout(tapTimer);
+    tapTimer = undefined;
     void handleMenu(input.id);
     return;
   }
@@ -250,8 +281,12 @@ function handleInput(input: Input) {
     clearTimeout(tapTimer);
     tapTimer = undefined;
     const before = state;
-    if (state.screen === "inbox" && input.listIndex !== undefined) {
-      state = setInboxFocus(state, input.listIndex);
+    if (state.screen === "inbox") {
+      // A list event without an index means the first row, not "keep the old
+      // highlight". A host without a native list (the browser preview, or a
+      // ring event that bypasses it) still moves our own highlight.
+      if (input.fromList) state = setInboxFocus(state, input.listIndex ?? 0);
+      else state = moveFocus(state, input.kind === "up" ? -1 : 1);
     } else {
       state = moveFocus(state, input.kind === "up" ? -1 : 1);
     }
@@ -272,21 +307,22 @@ function handleInput(input: Input) {
     return;
   }
   const before = state;
-  if (state.screen === "inbox" && input.listIndex !== undefined) {
-    state = setInboxFocus(state, input.listIndex);
+  if (state.screen === "inbox" && input.fromList) {
+    state = setInboxFocus(state, input.listIndex ?? 0);
   }
   maybePersist(before, state);
   render();
   clearTimeout(tapTimer);
+  const tappedIndex = input.fromList ? input.listIndex : undefined;
   tapTimer = setTimeout(() => {
     tapTimer = undefined;
-    dispatch("tap");
+    dispatch("tap", tappedIndex);
   }, 260);
 }
 
-async function dispatch(kind: "tap" | "double") {
+async function dispatch(kind: "tap" | "double", listIndex?: number) {
   const before = state;
-  const result = kind === "tap" ? press(state, Date.now()) : doubleTap(state);
+  const result = kind === "tap" ? press(state, Date.now(), listIndex) : doubleTap(state);
   state = result.state;
   if (before.screen !== state.screen) {
     console.info(`[pinpoint] screen ${before.screen}->${state.screen}`);
@@ -711,16 +747,27 @@ async function resetSampleWorkspace() {
   }
 }
 
+/** Drop an in-flight recording and say so; returns false when idle. */
+function abortRecording(message: string): boolean {
+  const { state: next, discard } = recordingOnSurface(state);
+  if (!discard) return false;
+  state = next;
+  recorder.stop();
+  void hardware?.mic(false);
+  state = setFlash(state, message, Date.now(), 3_000);
+  console.info("[pinpoint] recording aborted");
+  return true;
+}
+
 function stopRecordingForBackground() {
-  if (state.recordingStartedAt === null) return;
-  discardRecording();
-  state = endRecording(state);
-  state = setFlash(state, "Recording stopped", Date.now(), 3_000);
-  render();
-  console.info("[pinpoint] recording stopped by background");
+  if (abortRecording("Recording stopped")) render();
 }
 
 function onForeground() {
+  // Coming back from a lock or an overlay cancels any recording and closes the
+  // microphone. It is never re-armed automatically; the user taps to start.
+  if (abortRecording("Recording canceled")) render();
+  void hardware?.mic(false);
   const now = Date.now();
   if (now - bootedAt < 2_500) return;
   if (now - lastForegroundRefresh < 1_500) return;

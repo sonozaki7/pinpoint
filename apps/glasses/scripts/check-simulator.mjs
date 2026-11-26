@@ -175,7 +175,7 @@ await pollConsole();
 await waitForLog(new RegExp(`\\[pinpoint\\] server=${server.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`), "the server URL");
 await waitForLog(/\[pinpoint\] ready/, "the SDK startup");
 await waitForLog(new RegExp(`mode=live screen=inbox items=${inboxCount}`), "the real server inbox");
-await waitForLog(new RegExp(`inbox-header="PINPOINT \\| ${inboxCount} need you"`), "the inbox header");
+await waitForLog(new RegExp(`inbox-header="Pinpoint · ${inboxCount} need you"`), "the inbox header");
 await delay(500);
 await screenshot("glasses-01-inbox.png");
 
@@ -185,7 +185,7 @@ for (let index = 0; index < targetIndex; index++) {
 }
 await input("click");
 await waitForLog(/screen=review thread=login-fix/, "the login-fix review");
-await waitForLog(/review-header="login-fix \| 1\/7"/, "the review header");
+await waitForLog(/review-header="login-fix · 1 of 7"/, "the review header");
 await delay(500);
 await screenshot("glasses-02-review.png", { focusRow: 0 });
 
@@ -218,7 +218,7 @@ assert.ok(pcmBytes >= 32_000, `microphone captured real audio (${pcmBytes} bytes
 const noteLog = await waitForLog(/note=p4 verdict=object text=".+"/, "the transcribed objection", 45_000);
 const transcript = noteLog.match(/text="(.+)"/)?.[1] ?? "";
 console.log(`real microphone note (${pcmBytes} bytes): "${transcript}"`);
-await waitForLog(/review-header="login-fix \| 4\/7 \| 1 objection"/, "the objection header");
+await waitForLog(/review-header="login-fix · 4 of 7 · 1 change"/, "the objection header");
 await delay(350);
 await screenshot("glasses-06-note.png");
 
@@ -234,12 +234,12 @@ await waitForLog(/preview objections=1/, "the composed preview");
 await delay(450);
 await screenshot("glasses-08-preview.png");
 
-await input("click");
+await input("double_click");
 await delay(380);
 await screenshot("glasses-09-sent.png");
 await waitForLog(new RegExp(`screen=inbox items=${inboxCount - 1}`), "the post-send inbox");
 await waitForLog(/inbox-ids=(?!.*login-fix)/, "an inbox without the sent thread");
-await waitForLog(new RegExp(`inbox-header="PINPOINT \\| ${inboxCount - 1} need you"`), "the post-send inbox header");
+await waitForLog(new RegExp(`inbox-header="Pinpoint · ${inboxCount - 1} need you"`), "the post-send inbox header");
 await delay(500);
 await screenshot("glasses-10-inbox-after.png");
 

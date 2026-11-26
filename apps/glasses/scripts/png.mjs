@@ -49,6 +49,29 @@ function paeth(a, b, c) {
   return pb <= pc ? b : c;
 }
 
+/** Encode straight RGBA pixels (8 bits per channel) as a PNG. */
+export function encodeRgbaPng(width, height, pixels) {
+  if (pixels.length !== width * height * 4) throw new Error("RGBA buffer has the wrong length");
+  const source = Buffer.isBuffer(pixels) ? pixels : Buffer.from(pixels);
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
+  header[8] = 8;
+  header[9] = 6;
+  const stride = width * 4;
+  const scanlines = Buffer.alloc((stride + 1) * height);
+  for (let y = 0; y < height; y++) {
+    scanlines[y * (stride + 1)] = 0;
+    source.copy(scanlines, y * (stride + 1) + 1, y * stride, (y + 1) * stride);
+  }
+  return Buffer.concat([
+    SIGNATURE,
+    chunk("IHDR", header),
+    chunk("IDAT", deflateSync(scanlines, { level: 9 })),
+    chunk("IEND", Buffer.alloc(0)),
+  ]);
+}
+
 /** Decode the simulator's RGBA PNG into straight pixels. */
 export function decodeGlassesPng(buffer) {
   const chunks = readChunks(buffer);

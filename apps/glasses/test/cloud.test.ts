@@ -30,13 +30,13 @@ function sampleState(): State {
 
 test("the sample workspace names itself, offers Reset sample, and explains the empty inbox", () => {
   const state = sampleState();
-  assert.equal(pageFor(state, 1_000).title, "Sample - 3 need you");
+  assert.equal(pageFor(state, 1_000).title, "Sample · 3 need you");
   assert.deepEqual(pageFor(state, 1_000).menu.map((item) => item.label), ["Refresh", "Reset sample"]);
 
   const empty = adoptInbox(state, [], { demo: false, offline: false });
   assert.equal(pageFor(empty, 1_000).title, "Sample");
   assert.equal(pageFor(empty, 1_000).message, "All clear. Hold for menu: Reset sample");
-  assert.equal(pageFor(empty, 1_000).footer, "hold: menu | 2x: exit");
+  assert.equal(pageFor(empty, 1_000).footer, "Hold: menu");
 
   const item = state.inbox.find((entry) => entry.threadId === "login-fix");
   assert.ok(item);
@@ -49,14 +49,14 @@ test("the sample workspace names itself, offers Reset sample, and explains the e
 
 test("the ordinary demo keeps its own header and menu", () => {
   const state = inboxState();
-  assert.equal(pageFor(state, 1_000).title, "PINPOINT | 3 need you");
+  assert.equal(pageFor(state, 1_000).title, "Pinpoint · 3 need you");
   assert.deepEqual(pageFor(state, 1_000).menu.map((item) => item.label), ["Refresh"]);
 });
 
 test("a short inbox notice replaces the footer until it expires", () => {
   const state = setFlash(sampleState(), "Agent replied", 1_000, 3_000);
   assert.equal(pageFor(state, 2_000).footer, "Agent replied");
-  assert.match(pageFor(state, 5_000).footer, /^swipe: move/);
+  assert.match(pageFor(state, 5_000).footer, /^Tap: open/);
 });
 
 test("health names the workspace and server version; an offline message overrides the default", () => {

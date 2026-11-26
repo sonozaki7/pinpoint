@@ -12,6 +12,7 @@
     "test": "tsx --test test/*.test.ts",
     "test:ui": "node scripts/check-ui.mjs",
     "pack": "npm run build:device && evenhub pack app.json dist-even --sdk-ver 0.0.16 -o pinpoint.ehpk",
+    "icon": "node scripts/make-icon.mjs",
     "simulator": "node node_modules/@evenrealities/evenhub-simulator/bin/index.js",
     "dev:device": "vite --mode evenhub",
     "build:device": "tsc --noEmit && vite build --mode evenhub --outDir dist-even"
