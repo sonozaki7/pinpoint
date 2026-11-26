@@ -475,7 +475,7 @@ describe('source merging', () => {
       expect(byId.get('auth-refresh-fix')?.app).toBe('t3');
       expect(byId.get('launch-post')?.app).toBe('notion');
       expect(byId.get('draft-priya')?.app).toBe('gmail');
-      expect(byId.get('draft-priya')?.summary).toBe('6 drafts');
+      expect(byId.get('draft-priya')?.summary).toBe('draft, 6 lines');
 
       const draftDeck = await service.getDeckHttp('draft-priya');
       expect(draftDeck.status).toBe('ready');

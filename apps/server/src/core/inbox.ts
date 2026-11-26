@@ -382,7 +382,7 @@ export class InboxService {
     const drafts = deck?.points.filter((point) => point.kind === 'draft').length ?? 0;
     let base: string;
     if (thread.app === 'gmail') {
-      base = deck ? `${drafts} draft${drafts === 1 ? '' : 's'}` : 'draft';
+      base = deck ? `draft, ${drafts} line${drafts === 1 ? '' : 's'}` : 'draft';
     } else if (thread.app === 'notion') {
       base = deck ? `page, ${deck.points.length} points` : 'page review';
     } else {
