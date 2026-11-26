@@ -12,6 +12,10 @@
     "sync-recordings": "node scripts/sync-recordings.mjs",
     "voice": "node scripts/build-audio.mjs",
     "render:pinpoint": "remotion render src/index.tsx PinpointDemo ../out/pinpoint-demo-v2.mp4 --codec=h264 --crf=20 --pixel-format=yuv420p --concurrency=6 --browser-executable=\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\"",
+    "render:simple": "remotion render src/index.tsx PinpointSimple ../out/pinpoint-demo-v3.mp4 --codec=h264 --crf=20 --pixel-format=yuv420p --audio-codec=aac --audio-bitrate=192k --concurrency=6 --browser-executable=\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\"",
+    "audio:simple": "node scripts/build-audio-simple.mjs",
+    "poster:simple": "remotion still src/index.tsx PinpointSimple ../out/poster-v3.png --frame=1425 --browser-executable=\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\"",
+    "sheet:simple": "node scripts/contact-sheet-simple.mjs",
     "render:teaser": "remotion render src/index.tsx PinpointTeaser ../out/pinpoint-teaser-9x16.mp4 --codec=h264 --crf=20 --pixel-format=yuv420p --concurrency=6 --browser-executable=\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\"",
     "poster": "remotion still src/index.tsx PinpointDemo ../out/poster-v2.png --frame=1530 --browser-executable=\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\"",
     "sheet": "node scripts/contact-sheet.mjs"

@@ -151,3 +151,35 @@ plan fixture text; the Kokoro voice.
 The author’s own voice can replace Kokoro without touching a scene. The hero
 deck order is still the pinned 7-point fixture (`live-auth-refresh-fix.deck.json`);
 the thread, review send and 7 s reply are real (see `docs/recording-log.md`).
+
+## v3 · PinpointSimple (plain-language cut)
+
+The judge-facing v3 cut is a second composition, `PinpointSimple`, at
+1920×1080 / 30 fps / 103 s. `PinpointDemo` is untouched and still renders.
+
+```sh
+cd demo/film
+npm run audio:simple       # Kokoro af_heart + am_michael phone-EQ note → public/audio/simple-voice.wav
+npm run render:simple      # → demo/out/pinpoint-demo-v3.mp4
+npm run poster:simple      # → demo/out/poster-v3.png
+npm run sheet:simple       # → demo/out/v3-sheet.png, 5×7, one frame every 3 s
+```
+
+New footage for this cut comes from `demo/scripts/record-sim.mjs` scenes
+`simple-plan`, `simple-payment`, `simple-inbox` (see `demo/recordings/` and
+`demo/film/public/clips/{plan-review,payment-question,inbox-fix}.mp4`). The
+clips were recorded from the frozen checkout `ebc1251` with the sample
+workspace pinned to `login-fix`, `payment-upgrade`, `inbox-morning`; the
+recording aids live in that checkout, not in the product.
+
+The full scene list, exact narration, and the real-vs-designed breakdown are in
+`demo/out/v3-scenes.md`. Credits and licenses are in `CREDITS.md`.
+
+The Telegram phone in scene 7 is a designed reconstruction, not a screenshot:
+the available capture shows the earlier technical plan, which v3 must not show.
+It is labelled “Telegram · sample workspace” on screen.
+
+Delivery note: Remotion's H.264 output is full-range (`yuvj420p` on this
+machine). The submitted file was re-encoded once to limited-range `yuv420p`
+(CRF 18) and its audio remuxed from the normalized mix, so players and editors
+agree on colour; loudness stayed at −16.0 LUFS and true peak −1.6 dBFS.

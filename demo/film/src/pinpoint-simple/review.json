@@ -1,0 +1,8 @@
+{
+  "threadId": "login-fix",
+  "captured": "2026-11-27T00:23:14Z",
+  "source": "POST /api/review/login-fix/send (demo server, frozen checkout ebc1251) — exact composed review written by apps/server/src/core/composer.ts",
+  "message": "Review from G2 (Pinpoint) — 7 points\n✗ 4. \"Sign out every customer once, to clear out the broken logins.\" → Don't sign everyone out. Just fix the broken logins.\n✓ Agreed: 1, 2, 3, 5, 6, 7. Go ahead with the rest of the plan.",
+  "preview": ["1 objection, 6 agreed", "Tap to send to login-fix"],
+  "counts": {"objections": 1, "answers": 0, "notes": 0, "agreed": 6}
+}

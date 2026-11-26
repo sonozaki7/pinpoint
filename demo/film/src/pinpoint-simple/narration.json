@@ -1,0 +1,27 @@
+{
+  "tts": "kokoro",
+  "voice": "af_heart",
+  "speed": 1.0,
+  "lang": "en-us",
+  "duration": 103,
+  "voiceFile": "simple-voice.wav",
+  "sampleRate": 48000,
+  "note": "PinpointSimple narration. Main voice af_heart; the user's spoken note uses am_michael with a light phone-mic EQ. Lines are start-anchored; build-audio-simple.mjs measures each line and writes captions.generated.json.",
+  "lines": [
+    {"id": "s1", "at": 1.1, "text": "Your AI agent just finished a plan. It needs your OK."},
+    {"id": "s2", "at": 7.5, "text": "But you're not at your desk. You have your glasses."},
+    {"id": "s3a", "at": 13.8, "text": "Today, glasses give you two buttons. Yes, or no."},
+    {"id": "s3b", "at": 18.3, "text": "But step four signs out every customer."},
+    {"id": "s3c", "at": 22.8, "text": "Yes ships the mistake. No throws away six good steps."},
+    {"id": "s4", "at": 30.7, "text": "Pinpoint lets you point at the exact step, and say what to change."},
+    {"id": "s5a", "at": 37.2, "text": "Scroll with your ring."},
+    {"id": "s5b", "at": 39.5, "text": "Tap, and say what to change."},
+    {"id": "s5user", "at": 41.2, "voice": "am_michael", "eq": "phone", "text": "Don't sign everyone out. Just fix the broken logins."},
+    {"id": "s5c", "at": 49.8, "text": "Every step you skip counts as agreed."},
+    {"id": "s5d", "at": 54.0, "text": "Tap twice to send."},
+    {"id": "s6", "at": 63.2, "text": "Your agent gets exact, quoted feedback, and keeps working."},
+    {"id": "s7", "at": 76.2, "text": "Need the full text? It's in Telegram, with your note pinned to the exact sentence."},
+    {"id": "s8", "at": 86.0, "text": "It works for anything your agents write."},
+    {"id": "s9", "at": 96.0, "text": "Pinpoint. Ring for where. Voice for what."}
+  ]
+}

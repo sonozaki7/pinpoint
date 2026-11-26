@@ -3,5 +3,6 @@
 .venv/
 .models/
 public/audio/pinpoint-voice-kokoro.mp3
+public/audio/simple-voice.wav
 public/audio/pinpoint-bed-v2.mp3
 public/audio/teaser-voice-kokoro.mp3
