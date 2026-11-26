@@ -15,6 +15,11 @@
       "threadId": "inbox-morning",
       "pointId": "p3",
       "text": "Make it Thursday, not Tuesday."
+    },
+    {
+      "threadId": "login-fix",
+      "pointId": "p4",
+      "text": "Don't sign everyone out. Just fix the broken logins."
     }
   ]
 }

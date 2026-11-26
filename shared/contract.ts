@@ -64,15 +64,34 @@ export interface PreviewResult {
 
 export interface SendResult {
   ok: boolean;
-  delivered: 't3' | 'demo-log';
+  delivered: 't3' | 'demo-log' | 'sample'; // 'sample': Pinpoint Cloud sample workspace (no real agent)
   telegramLink?: string;
   error?: string;
 }
 
 export interface Health {
   ok: boolean;
-  mode: 'demo' | 'live';
+  mode: 'demo' | 'live' | 'cloud';
   t3: 'ok' | 'unreachable' | 'unauthorized' | 'off';
-  telegram: 'ok' | 'dry-run' | 'error';
+  telegram: 'ok' | 'dry-run' | 'error' | 'off';
   splitter: string;
+  version?: string; // server version, e.g. "1.0.0"
+  workspace?: 'sample' | 'desk'; // cloud mode: what this device is looking at
+  pairing?: boolean; // cloud mode: true once desk pairing (relay) is available
+  desk?: { name: string; online: boolean }; // cloud mode: the paired desk, when workspace === 'desk'
+}
+
+// Pinpoint Cloud (PINPOINT_MODE=cloud, https://pinpoint-api.qolso.com): every request from the
+// glasses carries a device id (random UUID made on first run, kept in SDK storage). The cloud keeps a
+// private sample workspace per device. After desk pairing (phase 2) the device also sends its token and
+// the cloud relays its requests to the paired desk (the user's own computer running T3 Code).
+export const DEVICE_HEADER = 'X-Pinpoint-Device';
+export const TOKEN_HEADER = 'X-Pinpoint-Token';
+export const CLOUD_URL = 'https://pinpoint-api.qolso.com';
+
+export interface PairResult {
+  ok: boolean;
+  token?: string; // device token for TOKEN_HEADER; shown once
+  desk?: { name: string };
+  error?: string;
 }

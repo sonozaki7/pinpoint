@@ -1,0 +1,8 @@
+{
+  "_comment": "Threads in the Pinpoint Cloud sample workspace, in inbox order (newest first). Plain-language on purpose: judges and first-time users see these on their own G2.",
+  "threads": [
+    "login-fix",
+    "payment-upgrade",
+    "inbox-morning"
+  ]
+}

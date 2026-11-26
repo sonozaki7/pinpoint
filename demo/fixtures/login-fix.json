@@ -1,0 +1,75 @@
+{
+  "thread": {
+    "threadId": "login-fix",
+    "title": "login-fix",
+    "project": "acme-shop",
+    "attention": "plan",
+    "updatedAt": "2026-11-27T08:41:00.000Z"
+  },
+  "source": {
+    "sourceMessageId": "01JDSAMPLELOGINFIX00000001",
+    "kind": "plan",
+    "text": "## Plan: stop customers getting logged out at random\n\nWhat's happening: when a customer's login expires while two tabs are open, both tabs try to renew it at the same moment. One wins, the other fails, and the customer is logged out. Support has 38 tickets about this in the last two weeks, mostly from people who keep the shop open in several tabs while they compare products.\n\nHere is how I'd fix it:\n\n1. Reproduce the bug with two open tabs, so we can watch it happen. I'll script it in the browser test suite so it runs the same way every time.\n2. Add a test that fails while the bug exists. That way we know the fix works, and we'll notice if the bug ever comes back.\n3. Let one tab renew the login while the other tabs wait for it. The waiting tabs reuse the new login as soon as it arrives, so nobody sees an error.\n4. Sign out every customer once, to clear out the broken logins. Some logins are already in a bad state, and this is the quickest way to reset them.\n5. Keep the 30-day sign-in, same as today. Customers shouldn't notice any change apart from the bug going away.\n6. Release to 5% of customers first and watch the error rate. If logouts drop as expected, we continue; if anything looks off, we roll back in one click.\n7. Release to everyone if errors stay flat for a day.\n\nWhat I need from you: an OK on the plan, or changes to any step. I'll start with step 1 as soon as you approve, and I'll post an update in this thread when the test is in place."
+  },
+  "deck": {
+    "threadId": "login-fix",
+    "sourceMessageId": "01JDSAMPLELOGINFIX00000001",
+    "title": "login-fix",
+    "attention": "plan",
+    "headline": "Login fix: 7-step plan",
+    "points": [
+      {
+        "id": "p1",
+        "index": 1,
+        "kind": "step",
+        "glance": "Reproduce the bug with two open tabs",
+        "quote": "Reproduce the bug with two open tabs, so we can watch it happen."
+      },
+      {
+        "id": "p2",
+        "index": 2,
+        "kind": "step",
+        "glance": "Add a test that fails on the bug",
+        "quote": "Add a test that fails while the bug exists."
+      },
+      {
+        "id": "p3",
+        "index": 3,
+        "kind": "step",
+        "glance": "One tab renews login, other tabs wait",
+        "quote": "Let one tab renew the login while the other tabs wait for it."
+      },
+      {
+        "id": "p4",
+        "index": 4,
+        "kind": "risk",
+        "glance": "Sign out every customer once",
+        "quote": "Sign out every customer once, to clear out the broken logins.",
+        "risk": "high"
+      },
+      {
+        "id": "p5",
+        "index": 5,
+        "kind": "step",
+        "glance": "Keep the 30-day sign-in as today",
+        "quote": "Keep the 30-day sign-in, same as today."
+      },
+      {
+        "id": "p6",
+        "index": 6,
+        "kind": "step",
+        "glance": "Release to 5% first, watch errors",
+        "quote": "Release to 5% of customers first and watch the error rate."
+      },
+      {
+        "id": "p7",
+        "index": 7,
+        "kind": "step",
+        "glance": "Release to all if errors stay flat",
+        "quote": "Release to everyone if errors stay flat for a day."
+      }
+    ],
+    "createdAt": "2026-11-27T08:41:09.000Z",
+    "splitter": "fixture"
+  }
+}

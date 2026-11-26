@@ -1,0 +1,80 @@
+{
+  "thread": {
+    "threadId": "payment-upgrade",
+    "title": "payment-upgrade",
+    "project": "acme-shop",
+    "attention": "question",
+    "updatedAt": "2026-11-27T08:37:00.000Z"
+  },
+  "source": {
+    "sourceMessageId": "01JDSAMPLEPAYMENTUPG000001",
+    "kind": "question",
+    "text": "## One decision before I touch payments\n\nThe payment library we use has a new major version (v5). It's faster and fixes a rare double-charge bug, but it changes how refunds are called, so it needs a careful test.\n\nSome context for the decision:\n\n- The big weekend sale starts Friday. Last year's sale brought in about a third of the month's orders, so checkout has to be rock solid until Monday.\n- The double-charge bug is real but rare. The double-charge bug has hit 2 orders in 6 months, and both customers were refunded the same day.\n- The refund change touches the support tools too. Staff issue refunds from the admin panel, and that code would need a small update and a test run with real-looking orders.\n- Upgrading takes me about half a day, plus a full day of testing in a private copy of the shop.\n\n**Upgrade now, or wait until Monday after the sale?**\n\nMy recommendation: wait until Monday. A refund mistake during the sale would cost more than the bug does, and on Monday I can test with the support team around. If you'd rather not wait, the safer middle ground is to upgrade in a test shop now and switch the real shop over on Monday.\n\nEither way, I'll write down the refund changes for the support team so nobody is surprised.\n\nI'll keep everything as it is until you decide, and I won't touch checkout during the sale without asking you first.",
+    "question": {
+      "requestId": "req_01JDSAMPLEPAY",
+      "questions": [
+        {
+          "id": "q_payments_v5",
+          "question": "Upgrade now, or wait until Monday after the sale?",
+          "options": [
+            "Wait until Monday",
+            "Upgrade now",
+            "Upgrade in a test shop"
+          ]
+        }
+      ]
+    }
+  },
+  "deck": {
+    "threadId": "payment-upgrade",
+    "sourceMessageId": "01JDSAMPLEPAYMENTUPG000001",
+    "title": "payment-upgrade",
+    "attention": "question",
+    "headline": "Upgrade payments now or Monday?",
+    "points": [
+      {
+        "id": "p1",
+        "index": 1,
+        "kind": "question",
+        "glance": "Upgrade payments now or after the sale?",
+        "quote": "Upgrade now, or wait until Monday after the sale?",
+        "options": [
+          "Wait until Monday",
+          "Upgrade now",
+          "Upgrade in a test shop"
+        ],
+        "questionId": "q_payments_v5"
+      },
+      {
+        "id": "p2",
+        "index": 2,
+        "kind": "claim",
+        "glance": "v5 is faster, fixes rare double-charge",
+        "quote": "It's faster and fixes a rare double-charge bug"
+      },
+      {
+        "id": "p3",
+        "index": 3,
+        "kind": "claim",
+        "glance": "Refunds change, so it needs a careful test",
+        "quote": "it changes how refunds are called, so it needs a careful test"
+      },
+      {
+        "id": "p4",
+        "index": 4,
+        "kind": "claim",
+        "glance": "Big weekend sale starts Friday",
+        "quote": "The big weekend sale starts Friday."
+      },
+      {
+        "id": "p5",
+        "index": 5,
+        "kind": "claim",
+        "glance": "Double-charge hit 2 orders in 6 months",
+        "quote": "The double-charge bug has hit 2 orders in 6 months"
+      }
+    ],
+    "createdAt": "2026-11-27T08:37:05.000Z",
+    "splitter": "fixture"
+  }
+}

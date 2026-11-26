@@ -23,7 +23,7 @@ afterEach(async () => {
 });
 
 describe('scripted transcripts file', () => {
-  it('ships the three demo notes in storyboard order', () => {
+  it('ships the demo notes in storyboard order', () => {
     const script = JSON.parse(fs.readFileSync(FIXTURE, 'utf8')) as unknown;
     const parsed = parseScriptedTranscripts(script);
     expect(parsed.delayMs).toBe(1_200);
@@ -39,6 +39,7 @@ describe('scripted transcripts file', () => {
         'Use a request queue. A mutex deadlocks with the retry path.',
       ],
       ['inbox-morning', 'p3', 'Make it Thursday, not Tuesday.'],
+      ['login-fix', 'p4', "Don't sign everyone out. Just fix the broken logins."],
     ]);
   });
 
