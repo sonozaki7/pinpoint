@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pinpoint — try the G2 review simulator</title>
+<meta name="description" content="Review your AI agent’s work from Even G2, point by point. Try the real Pinpoint app in your browser: a 576 × 288 lens, a virtual R1 ring, voice notes and the agent’s reply. No glasses, no install.">
+<link rel="canonical" href="https://pinpoint.qolso.com/">
+<meta name="theme-color" content="#050706">
+<meta name="color-scheme" content="dark">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Pinpoint">
+<meta property="og:title" content="Pinpoint — review your AI’s work from your glasses">
+<meta property="og:description" content="Try the real Pinpoint simulator in your browser. Ring for where. Voice for what. No glasses, no install.">
+<meta property="og:url" content="https://pinpoint.qolso.com/">
+<meta property="og:image" content="https://pinpoint.qolso.com/media/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Pinpoint: a G2 lens showing seven one-line plan points, one flagged with a spoken objection.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Pinpoint — review your AI’s work from your glasses">
+<meta name="twitter:description" content="Try the real Pinpoint simulator in your browser. Ring for where. Voice for what.">
+<meta name="twitter:image" content="https://pinpoint.qolso.com/media/og.png">
+
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="media/apple-touch-icon.png">
+<link rel="stylesheet" href="/src/site.css">
+</head>
+<body>
+
+<a class="skip" href="#simulator">Skip to the simulator</a>
+
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="brand" href="#top" aria-label="Pinpoint, back to top">
+      <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <circle cx="12" cy="12" r="5.2" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M12 1.5v5M12 17.5v5M1.5 12h5M17.5 12h5" stroke="currentColor" stroke-width="1.4"/>
+        <circle cx="12" cy="12" r="1.6" fill="currentColor"/>
+      </svg>
+      <span>Pinpoint</span>
+    </a>
+    <nav class="nav" aria-label="Sections">
+      <a href="#simulator">Simulator</a>
+      <a href="#how">How it works</a>
+      <a href="#device">Use it on your G2</a>
+      <a href="#privacy">Privacy</a>
+      <a class="nav-gh" href="https://github.com/sonozaki7/pinpoint" rel="noopener">GitHub <span aria-hidden="true">↗</span></a>
+    </nav>
+    <a class="btn btn-small" href="#simulator">Try it now</a>
+  </div>
+</header>
+
+<main id="top">
+
+  <!-- SIMULATOR -->
+  <section class="hero" id="simulator" aria-labelledby="sim-title">
+    <div class="hero-glow" aria-hidden="true"></div>
+    <div class="wrap">
+      <div class="hero-head">
+        <p class="eyebrow"><span class="pulse" aria-hidden="true"></span> Live simulator · no glasses, no install</p>
+        <h1 id="sim-title">Review your AI’s work <span>from your glasses.</span></h1>
+        <p class="tagline">Ring for where. Voice for what.</p>
+        <p class="lede">This is Pinpoint running in your browser: the same 576 × 288 G2 screen, the same review logic, a virtual R1 ring. Scroll to a step, say one sentence, and send. The agent replies four seconds later.</p>
+
+        <div class="sim-toolbar">
+          <div class="dataset-tabs" id="dataset-tabs" role="tablist" aria-label="Sample datasets"></div>
+          <div class="sim-actions">
+            <button class="btn btn-primary" id="play-button" type="button">
+              <span class="play-icon" aria-hidden="true"></span><span id="play-label">Watch it play</span>
+            </button>
+            <button class="btn btn-ghost" id="reset-button" type="button">Reset</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="sim-grid">
+        <div class="stage" id="stage">
+          <div class="console" id="console">
+            <div class="console-top">
+              <figure class="g2-frame" aria-labelledby="g2-label">
+                <div class="g2-bar">
+                  <span id="g2-label">Simulated G2 display</span>
+                  <span class="g2-spec">576 × 288 · green mono</span>
+                </div>
+                <div class="g2-bezel">
+                  <div class="g2-viewport" data-g2-viewport>
+                    <div class="g2-screen" data-g2-screen aria-hidden="true">
+                      <div class="g2-head" data-g2-head></div>
+                      <ol class="g2-list" data-g2-list hidden></ol>
+                      <div class="g2-rows" data-g2-rows></div>
+                      <div class="g2-pane" data-g2-pane hidden></div>
+                      <div class="g2-footer" data-g2-footer></div>
+                    </div>
+                  </div>
+                </div>
+                <p class="sr-only" data-g2-summary aria-live="polite"></p>
+              </figure>
+
+              <div class="ring-block">
+                <div class="ring" data-ring role="button" tabindex="0" aria-label="Virtual R1 ring. Scroll or drag to move, tap to select, double-tap to go back, press and hold for the menu.">
+                  <span class="ring-wheel" aria-hidden="true"><span class="ring-mark"></span></span>
+                  <span class="ring-core" aria-hidden="true"><b>R1</b><small>ring</small></span>
+                </div>
+                <p class="ring-hint">Wheel or drag · tap · double-tap · hold</p>
+                <div class="ring-keys" role="group" aria-label="Ring gestures">
+                  <button type="button" data-ring-action="up" aria-label="Scroll up">↑</button>
+                  <button type="button" data-ring-action="tap">Tap</button>
+                  <button type="button" data-ring-action="down" aria-label="Scroll down">↓</button>
+                  <button type="button" data-ring-action="double">2×</button>
+                  <button type="button" data-ring-action="hold">Hold</button>
+                </div>
+                <p class="gesture-toast" id="gesture-toast" role="status" aria-live="polite"></p>
+              </div>
+            </div>
+
+            <div class="stage-lower">
+              <div class="coach">
+                <button class="type-link" id="type-link" type="button" hidden>Mic not working? Type the note instead.</button>
+                <div class="guide" id="guide" hidden>
+                  <p class="guide-kicker">Guided first run</p>
+                  <p class="guide-text" id="guide-text"></p>
+                  <button class="guide-dismiss" id="guide-dismiss" type="button">Dismiss hint</button>
+                </div>
+
+                <div class="playback" id="playback" hidden>
+                  <div class="playback-top">
+                    <p class="playback-kicker">Watch it play · <span id="playback-step">1</span>/7</p>
+                    <button class="playback-stop" id="playback-stop" type="button">Stop</button>
+                  </div>
+                  <p class="playback-text" id="playback-text" aria-live="polite"></p>
+                </div>
+
+                <p class="keyboard-help">Keyboard: click the ring, then <kbd>↑</kbd> <kbd>↓</kbd> <kbd>Enter</kbd> <kbd>Esc</kbd> <kbd>H</kbd>.</p>
+              </div>
+            </div>
+
+            <div class="fallback" id="fallback" role="group" aria-labelledby="fallback-title" hidden>
+              <div class="fallback-head">
+                <p id="fallback-title">Type it instead</p>
+                <button id="fallback-close" type="button" aria-label="Close the typing panel">×</button>
+              </div>
+              <p class="fallback-quote" id="fallback-quote"></p>
+              <div class="chips" id="fallback-chips"></div>
+              <form class="fallback-form" id="fallback-form">
+                <label class="sr-only" for="fallback-input">Your note</label>
+                <input id="fallback-input" type="text" autocomplete="off" placeholder="Say what to change…" maxlength="220">
+                <button type="submit">Add note</button>
+              </form>
+              <p class="fallback-status" id="fallback-status" aria-live="polite"></p>
+            </div>
+
+            <div class="hold-menu" id="hold-menu" hidden role="menu" aria-label="Hold menu">
+              <p class="hold-menu-title">Hold menu</p>
+              <div id="hold-menu-items"></div>
+            </div>
+          </div>
+
+          <p class="stage-note">Simulated lens · real state machine · demo backend in this tab</p>
+        </div>
+
+        <aside class="panels" aria-label="What happens in your apps">
+          <section class="app-panel agent-panel" aria-labelledby="agent-panel-title">
+            <header class="app-panel-head">
+              <span class="app-dot" aria-hidden="true"></span>
+              <div>
+                <h2 id="agent-panel-title">Agent thread</h2>
+                <p id="agent-panel-label">T3 Code · sample</p>
+              </div>
+            </header>
+            <div class="app-panel-body" id="agent-panel-body"></div>
+          </section>
+
+          <section class="app-panel desk-panel" aria-labelledby="desk-panel-title">
+            <header class="app-panel-head">
+              <span class="app-dot app-dot-desk" aria-hidden="true"></span>
+              <div>
+                <h2 id="desk-panel-title">Telegram · Pinpoint Desk</h2>
+                <p id="desk-panel-label">private sample desk</p>
+              </div>
+            </header>
+            <div class="app-panel-body" id="desk-panel-body"></div>
+          </section>
+
+          <p class="panels-note">The same notes, in both places. Sample data only; a voice clip is the one thing that leaves this tab, and only while recording.</p>
+        </aside>
+      </div>
+
+      <p class="sim-footnote">
+        Runs the app’s own state machine, display renderer and review composer — not a video.
+        <a href="https://github.com/sonozaki7/pinpoint" rel="noopener">Read the source <span aria-hidden="true">↗</span></a>
+      </p>
+    </div>
+  </section>
+
+  <section class="section" id="how" aria-labelledby="how-title">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="kicker"><span>01</span> How it works</p>
+        <h2 id="how-title">Seven steps. Point, say, send.</h2>
+        <p class="section-sub">Silence means agree. You only speak when something is wrong, and every note stays attached to the exact sentence it answers.</p>
+      </div>
+      <ol class="steps">
+        <li class="step">
+          <p class="step-num">01</p>
+          <h3>Split</h3>
+          <p>Your agent’s plan becomes one line per step. Each line is tied to a verbatim quote from the original message, so nothing is invented.</p>
+          <p class="step-meta">quote-verified · 4–10 points</p>
+        </li>
+        <li class="step">
+          <p class="step-num">02</p>
+          <h3>Point</h3>
+          <p>Ring to the step. Tap and speak one sentence; silence agrees. Your note stays on that exact line, and Pinpoint moves you to the next line that needs you.</p>
+          <p class="step-meta">R1 · tap / double-tap / hold</p>
+        </li>
+        <li class="step">
+          <p class="step-num">03</p>
+          <h3>Send</h3>
+          <p>Tap Send for a five-second undo countdown. Pinpoint composes a cited review — objections first, answers, notes, then the points you agreed to — and the agent keeps working.</p>
+          <p class="step-meta">5-second undo · deterministic composer</p>
+        </li>
+      </ol>
+      <p class="principle">Silence means agree. <span>Your correction is the signal.</span></p>
+    </div>
+  </section>
+
+  <section class="section" id="demo" aria-labelledby="demo-title">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="kicker"><span>02</span> Demo</p>
+        <h2 id="demo-title">One review, start to reply.</h2>
+        <p class="section-sub">The same flow you just used, recorded on the simulator. Under three minutes, captions burned in.</p>
+      </div>
+      <div class="video-shell">
+        <video class="demo-video" controls preload="none" playsinline poster="media/demo-poster.png">
+          <source src="media/pinpoint-demo.mp4" type="video/mp4">
+          Your browser does not support the video element.
+        </video>
+      </div>
+      <div class="video-meta">
+        <span>2:40</span><span>1920 × 1080</span><span>h264</span><span>captioned</span>
+        <span class="video-meta-end">Ring for where. Voice for what.</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="device" aria-labelledby="device-title">
+    <div class="wrap">
+      <div class="device-grid">
+        <div>
+          <div class="section-head">
+            <p class="kicker"><span>03</span> Hardware</p>
+            <h2 id="device-title">Use it on your G2.</h2>
+            <p class="section-sub">The browser is the demo. The glasses are the product: the same seven points on a 576 × 288 green display, with the R1 in your hand and your voice as the only input.</p>
+          </div>
+          <ol class="install-steps">
+            <li><span>01</span><div><h3>Install Even Hub</h3><p>Pinpoint runs as a G2 app inside Even Realities’ phone app. The beta build is installed from Even Hub with a QR code.</p></div></li>
+            <li><span>02</span><div><h3>Add the Pinpoint build</h3><p>Our signed beta lands with the next release. Until then, the simulator above is the full app, not a mock-up.</p></div></li>
+            <li><span>03</span><div><h3>Pick your workspace</h3><p>Pinpoint Cloud starts with a private sample workspace on any G2. Pair your own computer later to review real T3 Code threads.</p></div></li>
+          </ol>
+        </div>
+        <div class="qr-block">
+          <div class="qr-grid">
+            <div class="qr-card">
+              <div class="qr-placeholder" aria-hidden="true"><span>QR</span></div>
+              <p>G2 beta install</p>
+              <small>placeholder · signed build pending</small>
+            </div>
+            <div class="qr-card">
+              <div class="qr-placeholder" aria-hidden="true"><span>QR</span></div>
+              <p>Pair this desk</p>
+              <small>placeholder · pairing preview</small>
+            </div>
+          </div>
+          <p class="qr-note">These are placeholders, not scannable codes. When the beta is public, the install and pairing QR codes replace them here.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="integrations" aria-labelledby="integrations-title">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="kicker"><span>04</span> Integrations</p>
+        <h2 id="integrations-title">The apps your work already lives in.</h2>
+        <p class="section-sub">Pinpoint reads what your agents produced, and writes the review back where they will see it. This demo uses sample threads; the desk build connects the real thing.</p>
+      </div>
+      <ul class="integration-grid">
+        <li class="integration">
+          <p class="i-tag">Mail</p>
+          <h3>Gmail</h3>
+          <p>Drafts prepared overnight, reviewed as points. Silence sends; a note rewrites just that sentence.</p>
+          <span class="i-state">sample data</span>
+        </li>
+        <li class="integration">
+          <p class="i-tag">Cal</p>
+          <h3>Google Calendar</h3>
+          <p>Meeting moves and time conflicts arrive as a plan. One correction can keep an afternoon free.</p>
+          <span class="i-state">desk mode</span>
+        </li>
+        <li class="integration">
+          <p class="i-tag">Task</p>
+          <h3>Notion</h3>
+          <p>Pages, specs and task batches become reviewable points instead of a wall of text on your phone.</p>
+          <span class="i-state">next dataset</span>
+        </li>
+        <li class="integration">
+          <p class="i-tag">Agent</p>
+          <h3>T3 Code</h3>
+          <p>Your coding agent’s plan lands on the glasses. The composed review goes back into the same thread.</p>
+          <span class="i-state">live in this demo</span>
+        </li>
+        <li class="integration">
+          <p class="i-tag">TG</p>
+          <h3>Telegram</h3>
+          <p>Pinpoint Desk holds the full text and attaches each note as a quote-reply on the exact sentence.</p>
+          <span class="i-state">sample desk</span>
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="section" id="privacy" aria-labelledby="privacy-title">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="kicker"><span>05</span> Privacy &amp; safety</p>
+        <h2 id="privacy-title">A microphone that is on only when you are.</h2>
+      </div>
+      <div class="privacy-grid">
+        <div class="privacy-card">
+          <h3>In this simulator</h3>
+          <ul class="ticks">
+            <li>Sample threads and notes live in this browser tab. Closing it clears them; a random device ID is kept in local storage for voice rate limits.</li>
+            <li>Audio is captured only between the tap that starts recording and the tap that stops it.</li>
+            <li>A voice clip goes to our Whisper server for transcription; the audio is not kept with your review.</li>
+            <li>If the mic is blocked or the server is unreachable, suggestions and a text box take over. Review never stalls.</li>
+          </ul>
+        </div>
+        <div class="privacy-card">
+          <h3>On the real device</h3>
+          <ul class="ticks">
+            <li>The glasses record only after you tap, and show a recording marker the whole time.</li>
+            <li>Pinpoint Cloud gives each device a private sample workspace, deleted after seven days without use.</li>
+            <li>Pairing a desk is opt-in. Without pairing, nothing reaches your own computer.</li>
+            <li>No ads, no tracking scripts, no account needed for the sample workspace.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section open-source" id="open-source" aria-labelledby="oss-title">
+    <div class="wrap oss-grid">
+      <div>
+        <p class="kicker"><span>06</span> Open source</p>
+        <h2 id="oss-title">The demo is the app.</h2>
+        <p class="section-sub">This page imports the glasses state machine, the display renderer and the review composer. The sample threads are the repository’s own fixtures. What you try here is what runs on the device.</p>
+      </div>
+      <div class="oss-actions">
+        <a class="btn btn-primary" href="https://github.com/sonozaki7/pinpoint" rel="noopener">View the code on GitHub <span aria-hidden="true">↗</span></a>
+        <p class="oss-note">MIT licensed · built for the Heads Up hackathon, Nov 2026.</p>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap footer-top">
+    <a class="brand" href="#top" aria-label="Pinpoint, back to top">
+      <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <circle cx="12" cy="12" r="5.2" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M12 1.5v5M12 17.5v5M1.5 12h5M17.5 12h5" stroke="currentColor" stroke-width="1.4"/>
+        <circle cx="12" cy="12" r="1.6" fill="currentColor"/>
+      </svg>
+      <span>Pinpoint</span>
+    </a>
+    <nav class="footer-nav" aria-label="Footer">
+      <a href="#simulator">Simulator</a>
+      <a href="#how">How it works</a>
+      <a href="#device">Use it on your G2</a>
+      <a href="https://github.com/sonozaki7/pinpoint" rel="noopener">GitHub ↗</a>
+    </nav>
+  </div>
+  <div class="wrap footer-bottom">
+    <p>Built for the Heads Up hackathon (Even Realities × TVM Ventures), Nov 2026.</p>
+    <p class="fine">Not affiliated with Even Realities, T3 Tools, Telegram, Google, or Notion. Product names are used only to say what the app connects to.</p>
+  </div>
+</footer>
+
+<noscript><p class="noscript">The simulator needs JavaScript. The app itself runs on Even G2; the code is on GitHub.</p></noscript>
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>

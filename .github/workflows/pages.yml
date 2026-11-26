@@ -1,15 +1,21 @@
-name: Deploy landing page
+name: Deploy simulator site
 
-# Publishes apps/site to GitHub Pages at https://pinpoint.qolso.com/
-# Activated by the repo owner once the repository is public and Pages is set to
-# "GitHub Actions". All asset links in the site are relative, so the /pinpoint/
-# project path works without changes.
+# Builds apps/web (Vite + TypeScript) into the GitHub Pages artifact at
+# https://pinpoint.qolso.com/. Static assets (fonts, media, OG image, favicon,
+# CNAME) still live in apps/site; Vite copies them into the built output.
+# Build output is never committed.
 
 on:
   push:
     branches: [main]
     paths:
+      - "apps/web/**"
       - "apps/site/**"
+      - "shared/**"
+      - "apps/glasses/src/**"
+      - "apps/server/src/core/**"
+      - "apps/server/src/cloud/reply.ts"
+      - "demo/fixtures/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -32,13 +38,37 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            apps/web/package-lock.json
+            apps/glasses/package-lock.json
+
+      - name: Install simulator dependencies
+        # The simulator imports the real glasses app code, which needs the Even Hub SDK types.
+        run: |
+          npm ci --prefix apps/web
+          npm ci --prefix apps/glasses
+
+      - name: Build site
+        run: npm run build --prefix apps/web
+
+      - name: Check deployed files
+        run: |
+          test -f apps/web/dist/index.html
+          test -f apps/web/dist/CNAME
+          test -f apps/web/dist/media/og.png
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
       - name: Upload site
         uses: actions/upload-pages-artifact@v3
         with:
-          path: apps/site
+          path: apps/web/dist
 
       - name: Deploy
         id: deployment
