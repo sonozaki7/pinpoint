@@ -202,3 +202,111 @@ describe('quoted history', () => {
     expect(stripQuotedHistory(text)).toBe('Confirmed.');
   });
 });
+
+describe('GmailConnector drafts', () => {
+  function draftPayload(body: string): Record<string, unknown> {
+    return {
+      id: 'd1',
+      message: {
+        id: 'm1',
+        threadId: 't1',
+        internalDate: String(Date.parse('2026-11-27T09:00:00.000Z')),
+        payload: {
+          mimeType: 'text/plain',
+          headers: [
+            { name: 'To', value: 'Priya Shah <priya@acme.example>' },
+            { name: 'Subject', value: 'Re: Acme contract - net-45 terms' },
+          ],
+          body: { data: base64url(body) },
+        },
+      },
+    };
+  }
+
+  it('lists and reads drafts from the configured query', async () => {
+    const calls: string[] = [];
+    const { GmailConnector } = await import('../src/connectors/gmail.js');
+    const fetchImpl = (async (input: string | URL | Request) => {
+      const url = String(input);
+      calls.push(url);
+      if (url.includes('/users/me/drafts?')) {
+        return jsonResponse({ drafts: [{ id: 'd1', message: { id: 'm1', threadId: 't1' } }] });
+      }
+      if (url.includes('/users/me/drafts/d1?format=full')) {
+        return jsonResponse(draftPayload('We agree to net-60 terms.'));
+      }
+      return jsonResponse({}, 404);
+    }) as unknown as typeof fetch;
+
+    const gmail = new GmailConnector({ auth, fetchImpl });
+    const drafts = await gmail.listDrafts({ query: 'label:pinpoint', max: 5 });
+    expect(drafts).toHaveLength(1);
+    expect(drafts[0]).toMatchObject({
+      id: 'd1',
+      messageId: 'm1',
+      threadId: 't1',
+      toName: 'Priya',
+      subject: 'Re: Acme contract - net-45 terms',
+      body: 'We agree to net-60 terms.',
+      link: 'https://mail.google.com/mail/u/0/#drafts/d1',
+    });
+    expect(calls[0]).toContain('q=label%3Apinpoint');
+    expect(calls[0]).toContain('maxResults=5');
+  });
+
+  it('updates the draft body in place, keeping To, Subject and thread', async () => {
+    const calls: Array<{ url: string; method: string; body?: unknown }> = [];
+    const fetchImpl = (async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      calls.push({
+        url,
+        method: init?.method ?? 'GET',
+        body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined,
+      });
+      if (url.includes('/users/me/drafts/d1?format=full')) {
+        return jsonResponse(draftPayload('We agree to net-60 terms.'));
+      }
+      if (url.endsWith('/users/me/drafts/d1') && init?.method === 'PUT') {
+        return jsonResponse({ id: 'd1' });
+      }
+      return jsonResponse({}, 404);
+    }) as unknown as typeof fetch;
+
+    const gmail = new GmailConnector({ auth, fetchImpl });
+    const result = await gmail.updateDraft('d1', 'We agree to net-45 terms.');
+    expect(result).toEqual({
+      id: 'd1',
+      link: 'https://mail.google.com/mail/u/0/#drafts/d1',
+    });
+
+    const put = calls.find((call) => call.method === 'PUT');
+    expect(put).toBeDefined();
+    const payload = put!.body as { message: { raw: string; threadId: string } };
+    expect(payload.message.threadId).toBe('t1');
+    const raw = Buffer.from(payload.message.raw, 'base64url').toString('utf8');
+    expect(raw).toContain('To: Priya Shah <priya@acme.example>');
+    expect(raw).toContain('Subject: Re: Acme contract - net-45 terms');
+    expect(raw).toContain('We agree to net-45 terms.');
+  });
+
+  it('sends the stored draft and returns its thread link', async () => {
+    const calls: string[] = [];
+    const fetchImpl = (async (input: string | URL | Request) => {
+      const url = String(input);
+      calls.push(url);
+      if (url.endsWith('/users/me/drafts/send')) {
+        return jsonResponse({ id: 'sent-1', threadId: 't1' });
+      }
+      return jsonResponse({}, 404);
+    }) as unknown as typeof fetch;
+
+    const gmail = new GmailConnector({ auth, fetchImpl });
+    const result = await gmail.sendDraft('d1');
+    expect(result).toEqual({
+      id: 'sent-1',
+      threadId: 't1',
+      link: 'https://mail.google.com/mail/u/0/#all/t1',
+    });
+    expect(calls[0]).toContain('/drafts/send');
+  });
+});

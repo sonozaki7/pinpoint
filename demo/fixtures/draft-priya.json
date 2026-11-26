@@ -1,0 +1,85 @@
+{
+  "thread": {
+    "threadId": "draft-priya",
+    "title": "Draft reply to Priya: contract terms",
+    "project": "Gmail",
+    "attention": "report",
+    "updatedAt": "2026-11-27T09:12:00.000Z",
+    "app": "gmail"
+  },
+  "source": {
+    "sourceMessageId": "gmail-draft-priya-1",
+    "kind": "reply",
+    "app": "gmail",
+    "text": "Hi Priya,\n\nThanks for sending the revised contract over. We're happy to agree to net-60 payment terms. Our finance team can start invoicing from Monday once the countersigned copy is back. I'll also ask legal to narrow clause 12 to the reseller scope. The delivery date in clause 9 works for us as written. We can have the signed copy back to you by Friday.\n\nBest,\nSam",
+    "evidence": {
+      "notes": [
+        {
+          "title": "Acme contract",
+          "text": "Acme contract: net-45 agreed with Priya on Nov 12; clause 12 to be narrowed",
+          "url": "https://www.notion.so/pinpoint-acme-contract"
+        }
+      ]
+    },
+    "target": {
+      "name": "Priya",
+      "recipient": "Priya",
+      "subject": "Re: Acme contract - net-45 terms",
+      "link": "https://mail.google.com/mail/u/0/#drafts/pinpoint-draft-priya"
+    }
+  },
+  "deck": {
+    "threadId": "draft-priya",
+    "sourceMessageId": "gmail-draft-priya-1",
+    "title": "Draft reply to Priya: contract terms",
+    "attention": "report",
+    "headline": "Draft to Priya: 6 sentences",
+    "points": [
+      {
+        "id": "p1",
+        "index": 1,
+        "kind": "draft",
+        "glance": "Thanks for the revised contract",
+        "quote": "Thanks for sending the revised contract over."
+      },
+      {
+        "id": "p2",
+        "index": 2,
+        "kind": "draft",
+        "glance": "Net-60 payment terms",
+        "quote": "We're happy to agree to net-60 payment terms.",
+        "flag": "notes say net-45"
+      },
+      {
+        "id": "p3",
+        "index": 3,
+        "kind": "draft",
+        "glance": "Can invoice from Monday",
+        "quote": "Our finance team can start invoicing from Monday once the countersigned copy is back."
+      },
+      {
+        "id": "p4",
+        "index": 4,
+        "kind": "draft",
+        "glance": "Legal to narrow clause 12",
+        "quote": "I'll also ask legal to narrow clause 12 to the reseller scope."
+      },
+      {
+        "id": "p5",
+        "index": 5,
+        "kind": "draft",
+        "glance": "Clause 9 delivery date works",
+        "quote": "The delivery date in clause 9 works for us as written."
+      },
+      {
+        "id": "p6",
+        "index": 6,
+        "kind": "draft",
+        "glance": "Signed copy back by Friday",
+        "quote": "We can have the signed copy back to you by Friday."
+      }
+    ],
+    "createdAt": "2026-11-27T09:12:03.000Z",
+    "splitter": "fixture"
+  }
+}

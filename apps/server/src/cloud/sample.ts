@@ -56,12 +56,7 @@ export function loadSampleWorkspace(env: Env): SampleWorkspaceDefinition {
     }
     const definition: SampleThreadDefinition = {
       thread: { ...fixture.thread },
-      source: {
-        ...fixture.source,
-        ...(fixture.source.question
-          ? { question: { ...fixture.source.question, questions: fixture.source.question.questions.map((q) => ({ ...q, options: [...q.options] })) } }
-          : {}),
-      },
+      source: structuredClone(fixture.source),
       deck: fixture.deck,
     };
     threads.push(definition);

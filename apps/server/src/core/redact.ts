@@ -16,7 +16,7 @@ const RULES: ReadonlyArray<readonly [RegExp, string]> = [
   [/([?&](?:wsTicket|ticket|token|key|api_key|access_token)=)[^&\s"']+/gi, '$1***'],
   // Environment-style assignments if a config dump ever reaches a log.
   [
-    /\b(T3_TOKEN|TELEGRAM_BOT_TOKEN|ANTHROPIC_API_KEY|OPENROUTER_API_KEY)\s*=\s*[^\s"']+/g,
+    /\b(T3_TOKEN|TELEGRAM_BOT_TOKEN|ANTHROPIC_API_KEY|NOTION_TOKEN)\s*=\s*[^\s"']+/g,
     '$1=***',
   ],
 ];

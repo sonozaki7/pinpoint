@@ -3,6 +3,7 @@ import type { Deck, InboxItem, Note, ReviewDraft } from '../../../../shared/cont
 
 export const attentionSchema = z.enum(['question', 'plan', 'failed', 'report']);
 export const pointKindSchema = z.enum(['step', 'claim', 'question', 'risk', 'draft']);
+export const appSchema = z.enum(['t3', 'notion', 'gmail', 'telegram', 'slack', 'discord']);
 
 export const attentionThreadSchema = z.object({
   threadId: z.string().min(1),
@@ -10,6 +11,31 @@ export const attentionThreadSchema = z.object({
   project: z.string().min(1),
   attention: attentionSchema,
   updatedAt: z.string().min(1),
+  app: appSchema.optional(),
+});
+
+export const sourceBlockSchema = z.object({
+  id: z.string().min(1),
+  text: z.string(),
+});
+
+export const sourceEvidenceSchema = z.object({
+  notes: z
+    .array(
+      z.object({
+        title: z.string(),
+        text: z.string(),
+        url: z.string().optional(),
+      }),
+    )
+    .optional(),
+});
+
+export const sourceTargetSchema = z.object({
+  name: z.string().optional(),
+  recipient: z.string().optional(),
+  subject: z.string().optional(),
+  link: z.string().optional(),
 });
 
 export const attentionSourceSchema = z.object({
@@ -28,6 +54,10 @@ export const attentionSourceSchema = z.object({
       ),
     })
     .optional(),
+  app: appSchema.optional(),
+  blocks: z.array(sourceBlockSchema).optional(),
+  evidence: sourceEvidenceSchema.optional(),
+  target: sourceTargetSchema.optional(),
 });
 
 export const noteSchema = z.object({
@@ -36,6 +66,11 @@ export const noteSchema = z.object({
   text: z.string().max(4000).optional(),
   option: z.string().max(200).optional(),
   audioMs: z.number().finite().nonnegative().optional(),
+  /**
+   * The sentence after a spoken note was applied. Empty string means the
+   * sentence was deleted; the send path uses that to drop it from the draft.
+   */
+  after: z.string().max(2000).optional(),
 });
 
 export const reviewDraftSchema = z.object({
@@ -55,6 +90,8 @@ export const pointSchema = z.object({
   options: z.array(z.string()).optional(),
   questionId: z.string().optional(),
   risk: z.enum(['low', 'high']).optional(),
+  flag: z.string().max(24).optional(),
+  anchor: z.string().optional(),
 });
 
 export const deckSchema = z.object({
@@ -80,6 +117,11 @@ export const draftInputSchema = z.object({
   seen: z.array(z.string()).optional(),
 });
 
+export const editInputSchema = z.object({
+  pointId: z.string().min(1),
+  text: z.string().min(1).max(2000),
+});
+
 export const rawPointSchema = z.object({
   kind: z.string().optional(),
   glance: z.string().optional(),
@@ -87,6 +129,7 @@ export const rawPointSchema = z.object({
   options: z.array(z.string()).optional(),
   questionId: z.string().optional(),
   risk: z.string().optional(),
+  flag: z.string().optional(),
 });
 
 export const splitterResponseSchema = z.object({
@@ -116,6 +159,7 @@ export function asInbox(value: unknown): InboxItem | null {
       deckReady: z.boolean(),
       pointCount: z.number(),
       draftNotes: z.number(),
+      app: appSchema.optional(),
     })
     .safeParse(value);
   return parsed.success ? (parsed.data as InboxItem) : null;

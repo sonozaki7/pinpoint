@@ -1,6 +1,41 @@
-import type { Deck, Point, ReviewDraft, ThreadAttention } from '../../../../shared/contract.js';
+import type {
+  AppId,
+  Deck,
+  Point,
+  ReviewDraft,
+  ThreadAttention,
+} from '../../../../shared/contract.js';
 
-/** The message an attention thread wants reviewed. Same shape as T3Client.getSource's result. */
+/** One addressable block in a review source (a Notion paragraph, heading, ...). */
+export interface SourceBlock {
+  id: string;
+  text: string;
+}
+
+/** Notes the source app already holds; used only as evidence for a point's flag. */
+export interface SourceEvidence {
+  notes?: { title: string; text: string; url?: string }[];
+}
+
+/** Names and links the receipt needs; never shown as review content. */
+export interface SourceTarget {
+  /** Short name for a receipt, e.g. "Launch post". */
+  name?: string;
+  /** First name the mail is addressed to, e.g. "Priya". */
+  recipient?: string;
+  subject?: string;
+  /** Deep link to the source item in its own app. */
+  link?: string;
+}
+
+/**
+ * The message an attention thread wants reviewed. Same shape as T3Client.getSource's result.
+ *
+ * Review sources add optional fields the deck builder and receipt use:
+ * `app` (which surface this came from), `blocks` (Notion block ids and text for
+ * server-side anchors), `evidence` (linked notes the flagger may cite) and
+ * `target` (receipt names/links). T3 sources leave them unset.
+ */
 export interface AttentionSource {
   sourceMessageId: string;
   text: string;
@@ -9,6 +44,10 @@ export interface AttentionSource {
     requestId: string;
     questions: { id: string; question: string; options: string[] }[];
   };
+  app?: AppId;
+  blocks?: SourceBlock[];
+  evidence?: SourceEvidence;
+  target?: SourceTarget;
 }
 
 /** SPEC §6. */
@@ -18,6 +57,8 @@ export interface AttentionThread {
   project: string;
   attention: ThreadAttention;
   updatedAt: string;
+  /** Which surface produced the work; absent means T3. */
+  app?: AppId;
 }
 
 /** Extra delivery options for a message sent to T3 (plan approval, SPEC §6). */

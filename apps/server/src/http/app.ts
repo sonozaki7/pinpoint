@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { HttpError, errorMessage } from '../core/errors.js';
-import { draftInputSchema } from '../core/schemas.js';
+import { draftInputSchema, editInputSchema } from '../core/schemas.js';
 import type { PinpointService } from '../core/service.js';
 import { MAX_PCM_BYTES } from '../voice/wav.js';
 import { MAX_JSON_BYTES, readBodyCapped } from './body.js';
@@ -108,6 +108,22 @@ export function createApp(deps: AppDeps): Hono {
 
   app.get('/api/review/:threadId', async (c) => {
     return c.json(await service.getDraft(c.req.param('threadId')));
+  });
+
+  app.post('/api/edit/:threadId', async (c) => {
+    const raw = await readJson(c.req.raw);
+    const parsed = editInputSchema.safeParse(raw);
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      throw new HttpError(
+        400,
+        `Invalid edit body${issue ? `: ${issue.path.join('.')} ${issue.message}` : ''}`,
+        'bad_request',
+      );
+    }
+    return c.json(
+      await service.edit(c.req.param('threadId'), parsed.data.pointId, parsed.data.text),
+    );
   });
 
   app.post('/api/review/:threadId/preview', async (c) => {

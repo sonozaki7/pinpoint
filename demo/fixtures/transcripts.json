@@ -20,6 +20,16 @@
       "threadId": "login-fix",
       "pointId": "p4",
       "text": "Don't sign everyone out. Just fix the broken logins."
+    },
+    {
+      "threadId": "launch-post",
+      "pointId": "p4",
+      "text": "Not everyone today. Say 10% today and everyone by Friday."
+    },
+    {
+      "threadId": "draft-priya",
+      "pointId": "p2",
+      "text": "Net-45, not net-60."
     }
   ]
 }

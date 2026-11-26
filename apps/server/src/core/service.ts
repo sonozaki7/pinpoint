@@ -1,21 +1,29 @@
 import type {
   Deck,
+  EditResult,
   Health,
+  Note,
   PreviewResult,
   ReviewDraft,
   SendResult,
 } from '../../../../shared/contract.js';
-import { allAgreedReview, composeReview } from './composer.js';
+import { composeReview } from './composer.js';
 import type { DeckStore } from './decks.js';
+import { publicDeck } from './decks.js';
 import type { Env } from './env.js';
 import { HttpError, errorMessage } from './errors.js';
 import { InboxService, type DeckLookup } from './inbox.js';
 import { emptyDraft, mergeDraft, normalizeDraft } from './reviews.js';
 import type { ReviewStore } from './reviews.js';
 import type { Splitter } from './splitter/types.js';
+import { runOpencode } from './splitter/opencode.js';
+import type { SentenceRewrite } from './edit.js';
+import type { AppId } from '../../../../shared/contract.js';
 import type { AttentionThread, TelegramNotifier, T3Client } from './types.js';
 import type { VoiceHint, VoiceTranscriber } from '../voice/service.js';
 import { verdictForTranscript } from '../voice/verdict.js';
+import { T3ReviewSource } from '../sources/t3.js';
+import type { ReviewSource } from '../sources/types.js';
 
 export interface ServiceDeps {
   env: Env;
@@ -27,6 +35,10 @@ export interface ServiceDeps {
   reviews: ReviewStore;
   voice: VoiceTranscriber;
   precomputed?: Map<string, Deck>;
+  /** Every configured review source. Default: T3 only (keeps demo/tests unchanged). */
+  sources?: ReviewSource[];
+  /** Test hook for the one-sentence LLM fallback; live defaults to the opencode path. */
+  editLlm?: SentenceRewrite;
 }
 
 interface DraftInput {
@@ -36,9 +48,6 @@ interface DraftInput {
 }
 
 const PHONE_AGREE_MESSAGE = '✓ Reviewed on phone: all points agreed. Continue.';
-
-/** The T3 web app's plan-implementation prefix (see docs/t3-api-notes.md §4). */
-const PLAN_IMPLEMENT_PREFIX = 'PLEASE IMPLEMENT THIS PLAN:\n';
 
 export class PinpointService {
   readonly env: Env;
@@ -50,6 +59,8 @@ export class PinpointService {
   private readonly decks: DeckStore;
   private readonly reviews: ReviewStore;
   private readonly voice: VoiceTranscriber;
+  private readonly sources: ReviewSource[];
+  private readonly editLlm?: SentenceRewrite;
   private t3Probe: { at: number; value: Health['t3'] } | null = null;
   private telegramStarted = false;
   /** Thread ids with a send in flight, so a double tap cannot post twice. */
@@ -64,9 +75,16 @@ export class PinpointService {
     this.decks = deps.decks;
     this.reviews = deps.reviews;
     this.voice = deps.voice;
+    this.sources = deps.sources ?? [new T3ReviewSource(deps.t3, { demo: deps.env.mode === 'demo' })];
+    this.editLlm =
+      deps.editLlm ??
+      (deps.env.mode === 'live' && deps.env.splitterProvider !== 'fixture'
+        ? async ({ system, user }) =>
+            runOpencode(`${system}\n\n${user}`, deps.env.splitterModel, 20_000)
+        : undefined);
     this.inbox = new InboxService({
       env: deps.env,
-      t3: deps.t3,
+      sources: this.sources,
       telegram: deps.telegram,
       splitter: deps.splitter,
       decks: deps.decks,
@@ -137,7 +155,8 @@ export class PinpointService {
 
   async getDeckHttp(threadId: string): Promise<DeckLookup> {
     try {
-      return await this.inbox.getDeck(threadId, false);
+      const lookup = await this.inbox.getDeck(threadId, false);
+      return lookup.status === 'ready' ? { status: 'ready', deck: publicDeck(lookup.deck) } : lookup;
     } catch (error) {
       throw new HttpError(502, `Could not load deck: ${errorMessage(error)}`, 't3_error');
     }
@@ -148,7 +167,7 @@ export class PinpointService {
     try {
       thread = await this.inbox.lookupThread(threadId);
     } catch (error) {
-      throw new HttpError(502, `Could not reach T3: ${errorMessage(error)}`, 't3_error');
+      throw new HttpError(502, `Could not load review items: ${errorMessage(error)}`, 'source_error');
     }
     if (!thread) throw new HttpError(404, `Unknown thread ${threadId}`, 'not_found');
     return thread;
@@ -239,17 +258,29 @@ export class PinpointService {
     const deck = await this.requireDeck(threadId);
     const draft = await this.draftFor(threadId, deck);
     const preview = composeReview(deck, draft);
-    const delivered: SendResult['delivered'] = this.env.mode === 'demo' ? 'demo-log' : 't3';
+    const source = this.inbox.sourceFor(threadId) ?? this.sources[0];
+    const delivered = this.deliveredFor(source?.app);
 
-    let source: Awaited<ReturnType<InboxService['sourceForThread']>> | undefined;
+    let detail: Awaited<ReturnType<InboxService['sourceForThread']>> | undefined;
     try {
-      source = await this.inbox.sourceForThread(threadId);
+      detail = await this.inbox.sourceForThread(threadId);
     } catch (error) {
       console.warn(`[service] source unavailable for send: ${errorMessage(error)}`);
     }
 
+    if (!source || !detail) {
+      return { ok: false, delivered, error: 'No review source is available for this item' };
+    }
+
+    let delivery;
     try {
-      await this.deliver(thread, deck, draft, preview.message, source);
+      delivery = await source.deliver({
+        thread,
+        deck,
+        draft,
+        message: preview.message,
+        source: detail,
+      });
     } catch (error) {
       return { ok: false, delivered, error: errorMessage(error) };
     }
@@ -264,67 +295,79 @@ export class PinpointService {
       console.warn(`[service] telegram onReviewSent failed: ${telegramError}`);
     }
 
-    await this.reviews.clear(threadId);
+    if (!delivery.error) await this.reviews.clear(threadId);
     return {
-      ok: true,
-      delivered,
+      ok: !delivery.error,
+      delivered: delivery.delivered,
+      ...(delivery.receipt ? { receipt: delivery.receipt } : {}),
       ...(telegramLink ? { telegramLink } : {}),
-      ...(telegramError ? { error: `Telegram: ${telegramError}` } : {}),
+      ...(delivery.error ?? telegramError
+        ? { error: [delivery.error, telegramError ? `Telegram: ${telegramError}` : ''].filter(Boolean).join('; ') }
+        : {}),
     };
   }
 
-  private async deliver(
-    thread: AttentionThread,
-    deck: Deck,
-    draft: ReviewDraft,
-    message: string,
-    source: Awaited<ReturnType<InboxService['sourceForThread']>> | undefined,
-  ): Promise<void> {
-    if (source?.kind === 'question' && source.question) {
-      const answers: Record<string, string> = {};
-      for (const question of source.question.questions) {
-        const point = deck.points.find((candidate) => candidate.questionId === question.id);
-        const note = point
-          ? draft.notes.find((candidate) => candidate.pointId === point.id)
-          : undefined;
-        const chosen = note?.option ?? note?.text ?? question.options[0];
-        if (chosen) answers[question.id] = chosen;
-      }
-      if (Object.keys(answers).length > 0) {
-        await this.t3.answerQuestion(thread.threadId, source.question.requestId, answers);
-      }
-      const hasComment = draft.notes.some((note) => note.verdict !== 'answer');
-      if (hasComment) await this.t3.sendMessage(thread.threadId, message);
-      return;
+  private deliveredFor(app: AppId | undefined): SendResult['delivered'] {
+    if (this.env.mode === 'demo') return 'demo-log';
+    if (app === 'notion') return 'notion';
+    if (app === 'gmail') return 'gmail';
+    return 't3';
+  }
+
+  /**
+   * POST /api/edit/:threadId — apply one spoken note to one draft sentence.
+   * The result is saved on the note (`Note.after`) so preview and send use it.
+   */
+  async edit(threadId: string, pointId: string, text: string): Promise<EditResult> {
+    const thread = await this.requireThread(threadId);
+    const deck = await this.requireDeck(threadId);
+    const point = deck.points.find((candidate) => candidate.id === pointId);
+    if (!point) throw new HttpError(404, `Unknown point ${pointId}`, 'not_found');
+
+    const draft = await this.draftFor(threadId, deck);
+    const existing = draft.notes.find((note) => note.pointId === pointId);
+    const before =
+      existing?.after !== undefined && existing.after.length > 0 ? existing.after : point.quote;
+    const source = this.inbox.sourceFor(threadId) ?? this.sources[0];
+    if (!source?.edit) {
+      return {
+        ok: false,
+        pointId,
+        before,
+        error: "This item can't be edited here",
+      };
     }
 
-    // Plan approval (SPEC §6, docs/t3-api-notes.md §4): with no objections the
-    // user is saying "implement it", so send the plan the way the T3 web app
-    // does, with sourcePlanRef. Reviewer notes ride along in the same message.
-    if (source?.kind === 'plan') {
-      const objections = draft.notes.filter((note) => note.verdict === 'object');
-      if (objections.length === 0) {
-        const notes = draft.notes
-          .map((note) => {
-            const point = deck.points.find((candidate) => candidate.id === note.pointId);
-            if (!point) return null;
-            const text = (note.option ?? note.text ?? '').trim();
-            return `● ${point.index}. "${point.quote.slice(0, 140)}" → ${text || 'Note.'}`;
-          })
-          .filter((line): line is string => line !== null);
-        const extra =
-          notes.length > 0 ? `\n\nReviewer notes from Pinpoint:\n${notes.join('\n')}` : '';
-        await this.t3.sendMessage(
-          thread.threadId,
-          `${PLAN_IMPLEMENT_PREFIX}${source.text.trim()}${extra}`,
-          { sourcePlanId: source.sourceMessageId },
-        );
-        console.info(`[service] approved plan for ${thread.title} (no objections)`);
-        return;
-      }
+    let result: EditResult;
+    try {
+      result = await source.edit({
+        thread,
+        point,
+        before,
+        text,
+        ...(this.editLlm ? { llm: this.editLlm } : {}),
+      });
+    } catch (error) {
+      console.warn(`[service] edit failed: ${errorMessage(error)}`);
+      return { ok: false, pointId, before, error: "Couldn't change this line" };
+    }
+    if (!result.ok) return result;
+
+    const after = result.method === 'delete' ? '' : result.after;
+    if (after === undefined) {
+      return { ok: false, pointId, before, error: "Couldn't change this line" };
     }
 
-    await this.t3.sendMessage(thread.threadId, message);
+    const notes: Note[] = draft.notes.filter((note) => note.pointId !== pointId);
+    notes.push({
+      pointId,
+      verdict: existing?.verdict ?? 'note',
+      text: existing?.text ?? text,
+      ...(existing?.option ? { option: existing.option } : {}),
+      after,
+    });
+    await this.reviews.put(mergeDraft(draft, threadId, { notes }));
+    return result;
   }
 
   async phone(threadId: string, pointId: string): Promise<{ ok: boolean; link?: string }> {

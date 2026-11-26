@@ -28,6 +28,7 @@ const MAX_WORDS = 700;
 const ATTENTION = new Set(["question", "plan", "failed", "report"]);
 const KINDS = new Set(["step", "claim", "question", "risk", "draft"]);
 const SOURCE_KINDS = new Set(["plan", "reply", "question"]);
+const APPS = new Set(["t3", "notion", "gmail", "telegram", "slack", "discord"]);
 
 const errors = [];
 const notes = [];
@@ -100,6 +101,9 @@ for (const path of files) {
   check(`${label} thread`, typeof thread.project === "string" && thread.project.length > 0, "project missing");
   check(`${label} thread`, ATTENTION.has(thread.attention), `attention "${thread.attention}" not in ${[...ATTENTION].join("|")}`);
   check(`${label} thread`, !Number.isNaN(Date.parse(thread.updatedAt ?? "")), `updatedAt not a date: ${thread.updatedAt}`);
+  if (thread.app !== undefined) {
+    check(`${label} thread`, APPS.has(thread.app), `app "${thread.app}" not in ${[...APPS].join("|")}`);
+  }
 
   // source
   check(`${label} source`, typeof source.sourceMessageId === "string" && source.sourceMessageId.length > 0, "sourceMessageId missing");
@@ -109,7 +113,9 @@ for (const path of files) {
   const text = typeof source.text === "string" ? source.text : "";
   if (check(`${label} source`, text.length > 0, "text missing")) {
     const count = words(text);
-    check(`${label} source`, count >= MIN_WORDS && count <= MAX_WORDS, `text is ${count} words (expected ${MIN_WORDS}-${MAX_WORDS})`);
+    // A Gmail draft is short by design: one point per sentence, not a long report.
+    const minWords = thread.app === "gmail" ? 60 : MIN_WORDS;
+    check(`${label} source`, count >= minWords && count <= MAX_WORDS, `text is ${count} words (expected ${minWords}-${MAX_WORDS})`);
   }
   if (source.kind === "question") {
     const question = source.question;
@@ -152,6 +158,12 @@ for (const path of files) {
     if (check(where, quote.length > 0, "quote missing")) {
       check(where, text.includes(quote), `quote is not an exact substring of source.text: "${quote.slice(0, 60)}..."`);
       check(where, quote.length <= MAX_QUOTE, `quote is ${quote.length} chars (max ${MAX_QUOTE})`);
+    }
+
+    if (point?.flag !== undefined) {
+      check(where, typeof point.flag === "string" && point.flag.length > 0 && point.flag.length <= 24,
+        `flag is ${String(point.flag).length} chars (max 24): "${point.flag}"`);
+      check(where, isAscii(point.flag), `flag is not plain ASCII: "${point.flag}"`);
     }
 
     if (point?.kind === "question") {

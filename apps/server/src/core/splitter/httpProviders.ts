@@ -45,29 +45,3 @@ export async function splitWithAnthropic(
   if (!text.trim()) throw new SplitterError('anthropic returned no text');
   return text;
 }
-
-export async function splitWithOpenRouter(
-  input: SplitInput,
-  apiKey: string,
-  model: string,
-): Promise<string> {
-  if (!apiKey) throw new SplitterError('OPENROUTER_API_KEY is not set');
-  const payload = (await postJson(
-    'https://openrouter.ai/api/v1/chat/completions',
-    { authorization: `Bearer ${apiKey}` },
-    {
-      model,
-      temperature: 0,
-      response_format: { type: 'json_object' },
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: buildSplitPrompt(input) },
-      ],
-    },
-  )) as { choices?: { message?: { content?: string } }[] };
-  const text = payload.choices?.[0]?.message?.content;
-  if (typeof text !== 'string' || text.trim().length === 0) {
-    throw new SplitterError('openrouter returned no text');
-  }
-  return text;
-}

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// Connect Pinpoint to Gmail + Google Calendar with a desktop OAuth client and
-// a loopback redirect. Prints setup steps, opens the consent page, saves the
-// token to apps/server/.data/google-token.json (mode 0600), then verifies by
-// printing counts only. Never prints tokens, mail bodies or email addresses.
+// Connect Pinpoint to Gmail with a desktop OAuth client and a loopback
+// redirect. Prints setup steps, opens the consent page, saves the token to
+// apps/server/.data/google-token.json (mode 0600), then verifies by printing
+// counts only. Never prints tokens, mail bodies or email addresses.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -15,20 +15,9 @@ import { fileURLToPath } from 'node:url';
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const SERVER_ROOT = path.resolve(SCRIPT_DIR, '..', 'apps', 'server');
 
-const CORE_SCOPES = [
-  'https://www.googleapis.com/auth/gmail.modify',
-  'https://www.googleapis.com/auth/calendar.events',
-];
-
-// Only the demo seeding needs these: Google cannot list calendars or create a
-// secondary calendar with the two core scopes.
-const DEMO_SCOPES = [
-  'https://www.googleapis.com/auth/calendar.calendarlist.readonly',
-  'https://www.googleapis.com/auth/calendar.app.created',
-];
-
-const withDemo = process.argv.includes('--demo');
-const SCOPES = withDemo ? [...CORE_SCOPES, ...DEMO_SCOPES] : [...CORE_SCOPES];
+// One data scope: read/label, update and send drafts, and mark mail read.
+// Pinpoint has no calendar scope and never scans the whole mailbox.
+const SCOPES = ['https://www.googleapis.com/auth/gmail.modify'];
 
 function flag(name) {
   const index = process.argv.indexOf(name);
@@ -45,7 +34,7 @@ function cloudSteps() {
 1. Open https://console.cloud.google.com/projectcreate
    Create a project named "Pinpoint" (or pick an existing Pinpoint project).
 2. Open https://console.cloud.google.com/apis/library
-   Search "Gmail API" -> Enable. Then search "Google Calendar API" -> Enable.
+   Search "Gmail API" -> Enable.
 3. Open https://console.cloud.google.com/apis/credentials/consent
    Choose External, fill in app name "Pinpoint" and your support email, save.
    Under "Test users", add your own Google address. Testing mode is fine.
@@ -54,12 +43,8 @@ function cloudSteps() {
    -> name "Pinpoint desktop" -> Create -> Download JSON.
 5. Move that JSON here: ${clientPath}
 
-Then run this script again. For the hackathon demo use --demo, which adds two
-narrow calendar-setup permissions so the seed can create "Pinpoint demo":
-
-  node scripts/connect-google.mjs --demo
-
-Without --demo, the request is limited to gmail.modify and calendar.events.`);
+Then run this script again. The request is limited to gmail.modify, so
+Pinpoint cannot read calendars or delete mail permanently.`);
 }
 
 async function main() {
@@ -117,17 +102,13 @@ async function main() {
   }
 
   console.log(`\nGoogle connected. Token saved to ${tokenPath} (mode 0600).`);
-  const [labels, calendars] = await Promise.all([
+  const [labels, drafts] = await Promise.all([
     countLabels(token.access_token).catch(() => null),
-    countCalendars(token.access_token).catch(() => null),
+    countDrafts(token.access_token).catch(() => null),
   ]);
   console.log(`Gmail labels visible: ${labels === null ? 'unavailable' : labels}`);
-  console.log(`Calendars visible: ${calendars === null ? 'unavailable' : calendars}`);
-  console.log(
-    withDemo
-      ? '\nNext: node scripts/seed-demo.mjs'
-      : '\nFor the demo calendar and demo mail: node scripts/connect-google.mjs --demo',
-  );
+  console.log(`Drafts visible: ${drafts === null ? 'unavailable' : drafts}`);
+  console.log('\nNext: node scripts/seed-demo.mjs');
 }
 
 function waitForCallback({ server, client, redirectUri, verifier, state, tokenPath }) {
@@ -180,7 +161,7 @@ function waitForCallback({ server, client, redirectUri, verifier, state, tokenPa
           response,
           200,
           'Pinpoint is connected',
-          'Gmail and Calendar access is saved. You can close this tab.',
+          'Gmail access is saved. You can close this tab.',
         );
         finish(null, token);
       } catch (error) {
@@ -263,14 +244,14 @@ async function countLabels(accessToken) {
   return Array.isArray(payload.labels) ? payload.labels.length : 0;
 }
 
-async function countCalendars(accessToken) {
+async function countDrafts(accessToken) {
   const response = await fetch(
-    'https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=250',
+    'https://gmail.googleapis.com/gmail/v1/users/me/drafts?maxResults=1',
     { headers: { authorization: `Bearer ${accessToken}` } },
   );
-  if (!response.ok) throw new Error(`Calendar list: HTTP ${response.status}`);
+  if (!response.ok) throw new Error(`Gmail drafts: HTTP ${response.status}`);
   const payload = await response.json();
-  return Array.isArray(payload.items) ? payload.items.length : 0;
+  return Array.isArray(payload.drafts) ? payload.drafts.length : 0;
 }
 
 function respond(response, status, title, message) {

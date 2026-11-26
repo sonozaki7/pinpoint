@@ -1,10 +1,7 @@
-// Connector interfaces for the desk integrations behind the Morning brief.
-// The brief engine builds against these types only; real implementations live
-// in gmail.ts / calendar.ts / notion.ts / openrouter.ts and the demo versions
-// in fake.ts. Owner: connectors agent. Do not change without telling the brief
-// agent, it codes against this file in parallel.
+// Connector interfaces for the review sources. Real implementations live in
+// gmail.ts / notion.ts / googleAuth.ts / opencode.ts. Cloud mode returns none.
 
-/** One email thread that may need a reply. */
+/** One email thread that may need a reply (legacy morning-brief shape). */
 export interface EmailThread {
   threadId: string;
   messageId: string;
@@ -28,25 +25,29 @@ export interface MailConnector {
   }): Promise<{ id: string; link: string }>;
 }
 
-export interface CalEvent {
-  calendarId: string;
-  eventId: string;
-  title: string;
-  start: string;
-  end: string;
-  attendees: string[];
+/** A Gmail draft an agent already wrote. `body` is the plain-text reply. */
+export interface DraftMessage {
+  /** Draft id, not the message id. */
+  id: string;
+  messageId: string;
+  threadId: string;
+  to: string;
+  toName: string;
+  cc?: string;
+  bcc?: string;
+  subject: string;
+  body: string;
+  updatedAt: string;
   link: string;
 }
 
-export interface CalendarConnector {
-  listEvents(opts: { from: string; to: string }): Promise<CalEvent[]>;
-  freeBusy(opts: { from: string; to: string }): Promise<Array<{ start: string; end: string }>>;
-  moveEvent(input: {
-    calendarId: string;
-    eventId: string;
-    start: string;
-    end: string;
-  }): Promise<{ link: string }>;
+export interface DraftConnector {
+  listDrafts(opts: { query: string; max: number }): Promise<DraftMessage[]>;
+  getDraft(draftId: string): Promise<DraftMessage>;
+  /** Replace the draft body, keeping recipient, subject and thread. */
+  updateDraft(draftId: string, body: string): Promise<{ id: string; link: string }>;
+  /** Send the draft exactly as stored. */
+  sendDraft(draftId: string): Promise<{ id: string; threadId: string; link: string }>;
 }
 
 export interface NoteHit {
@@ -66,6 +67,33 @@ export interface NotesConnector {
   }): Promise<{ id: string; url: string }>;
 }
 
+/** One page waiting for review, with its blocks in document order. */
+export interface ReviewPageBlock {
+  id: string;
+  text: string;
+}
+
+export interface ReviewPage {
+  id: string;
+  url: string;
+  title: string;
+  updatedAt: string;
+}
+
+export interface ReviewPageDetail extends ReviewPage {
+  blocks: ReviewPageBlock[];
+}
+
+export interface ReviewConnector {
+  listReviewPages(): Promise<ReviewPage[]>;
+  getReviewPage(pageId: string): Promise<ReviewPageDetail>;
+  /** Attach a comment to one block. Throws when the API rejects block parents. */
+  commentOnBlock(blockId: string, text: string): Promise<void>;
+  /** Attach a comment to the page (quote fallback). */
+  commentOnPage(pageId: string, text: string): Promise<void>;
+  setReviewStatus(pageId: string, status: string): Promise<void>;
+}
+
 export interface LlmConnector {
   name: string;
   complete(input: {
@@ -78,8 +106,9 @@ export interface LlmConnector {
 
 export interface Connectors {
   mail?: MailConnector;
-  calendar?: CalendarConnector;
+  drafts?: DraftConnector;
   notes?: NotesConnector;
+  reviews?: ReviewConnector;
   llm?: LlmConnector;
 }
 

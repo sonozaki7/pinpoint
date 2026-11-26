@@ -1,5 +1,6 @@
 import type {
   Deck,
+  EditResult,
   InboxItem,
   Note,
   PreviewResult,
@@ -7,11 +8,14 @@ import type {
   SendResult,
 } from '../../../../shared/contract.js';
 import { composeReview } from '../core/composer.js';
-import { deckFromPrecomputed } from '../core/decks.js';
+import { deckFromPrecomputed, publicDeck } from '../core/decks.js';
+import { applyDraftEdits, receiptName } from '../core/draft.js';
+import { editSentence } from '../core/edit.js';
 import { HttpError } from '../core/errors.js';
 import { emptyDraft, mergeDraft } from '../core/reviews.js';
 import { makeGlance, toAscii } from '../core/text.js';
 import type { AttentionSource, AttentionThread } from '../core/types.js';
+import { gmailReceipt, notionReceipt } from '../sources/receipts.js';
 import { DeviceStore } from './deviceStore.js';
 import {
   CLOUD_DEVICE_TTL_MS,
@@ -42,6 +46,8 @@ export interface DeviceWorkspace {
   sourceForThread(threadId: string): AttentionSource;
   getDraft(threadId: string): ReviewDraft;
   putDraft(threadId: string, input: WorkspaceDraftInput): ReviewDraft;
+  /** Apply one spoken note to one draft sentence (deterministic, no LLM). */
+  edit(threadId: string, pointId: string, text: string): Promise<EditResult>;
   preview(threadId: string): PreviewResult;
   send(threadId: string): Promise<SendResult>;
   phone(threadId: string, pointId: string): { ok: boolean; link?: string };
@@ -71,6 +77,12 @@ interface SentReview {
 
 function summaryFor(thread: AttentionThread, deck: Deck): string {
   const drafts = deck.points.filter((point) => point.kind === 'draft').length;
+  if (thread.app === 'gmail') {
+    return makeGlance(toAscii(`${drafts} draft${drafts === 1 ? '' : 's'}`), 30);
+  }
+  if (thread.app === 'notion') {
+    return makeGlance(toAscii(`page, ${deck.points.length} points`), 30);
+  }
   let base: string;
   switch (thread.attention) {
     case 'plan':
@@ -162,13 +174,14 @@ export class SampleDeviceWorkspace implements DeviceWorkspace {
         deckReady: true,
         pointCount: entry.deck.points.length,
         draftNotes: this.drafts.get(threadId)?.notes.length ?? 0,
+        ...(entry.thread.app ? { app: entry.thread.app } : {}),
       });
     }
     return { items, updatedAt: new Date().toISOString() };
   }
 
   getDeck(threadId: string): Deck {
-    return this.require(threadId).deck;
+    return publicDeck(this.require(threadId).deck);
   }
 
   sourceForThread(threadId: string): AttentionSource {
@@ -191,6 +204,55 @@ export class SampleDeviceWorkspace implements DeviceWorkspace {
     return merged;
   }
 
+  async edit(threadId: string, pointId: string, text: string): Promise<EditResult> {
+    const entry = this.require(threadId);
+    const point = entry.deck.points.find((candidate) => candidate.id === pointId);
+    if (!point) throw new HttpError(404, `Unknown point ${pointId}`, 'not_found');
+    if (entry.thread.app !== 'gmail') {
+      return {
+        ok: false,
+        pointId,
+        before: point.quote,
+        error: "This item can't be edited here",
+      };
+    }
+
+    const draft = this.getDraft(threadId);
+    const existing = draft.notes.find((note) => note.pointId === pointId);
+    const before =
+      existing?.after !== undefined && existing.after.length > 0 ? existing.after : point.quote;
+    const result = await editSentence({ before, note: text });
+    if (!result.ok) {
+      return { ok: false, pointId, before, error: result.error ?? "Couldn't change this line" };
+    }
+    const after = result.method === 'delete' ? '' : result.after;
+    if (after === undefined) {
+      return { ok: false, pointId, before, error: "Couldn't change this line" };
+    }
+    const notes: Note[] = draft.notes.filter((note) => note.pointId !== pointId);
+    notes.push({
+      pointId,
+      verdict: existing?.verdict ?? 'note',
+      text: existing?.text ?? text,
+      ...(existing?.option ? { option: existing.option } : {}),
+      after,
+    });
+    this.drafts.set(
+      threadId,
+      mergeDraft(draft, threadId, {
+        notes,
+        sourceMessageId: entry.deck.sourceMessageId,
+      }),
+    );
+    return {
+      ok: true,
+      pointId,
+      before,
+      after: result.after,
+      ...(result.method ? { method: result.method } : {}),
+    };
+  }
+
   preview(threadId: string): PreviewResult {
     const entry = this.require(threadId);
     return composeReview(entry.deck, this.getDraft(threadId));
@@ -211,19 +273,54 @@ export class SampleDeviceWorkspace implements DeviceWorkspace {
         message: preview.message,
         deliveredAt: new Date().toISOString(),
       });
+
+      const receipt = this.sampleReceipt(entry, draft);
       this.drafts.delete(threadId);
       this.active.delete(threadId);
 
-      // The first send to a fixture thread gets one delayed agent reply.
-      // Sending that reply just clears it; there is no second reply.
-      if (entry.kind === 'base') {
+      // A T3 fixture thread gets one delayed agent reply. Notion pages and
+      // Gmail drafts are the finished work itself: sending is the last step.
+      const app = entry.thread.app ?? 't3';
+      if (entry.kind === 'base' && app === 't3') {
         this.scheduleReply(threadId, entry.thread, entry.deck, draft);
       }
 
-      return { ok: true, delivered: 'sample' };
+      return { ok: true, delivered: 'sample', ...(receipt ? { receipt } : {}) };
     } finally {
       this.sending.delete(threadId);
     }
+  }
+
+  /** What the sample send would have done, marked "(sample)" so nothing looks real. */
+  private sampleReceipt(
+    entry: ActiveThread,
+    draft: ReviewDraft,
+  ): SendResult['receipt'] | undefined {
+    const app = entry.thread.app;
+    const byId = new Set(entry.deck.points.map((point) => point.id));
+    const notes = draft.notes.filter((note) => byId.has(note.pointId));
+    const link = entry.source.target?.link;
+    if (app === 'gmail') {
+      const edited = applyDraftEdits(entry.source.text, entry.deck, draft);
+      if (edited.applied > 0) {
+        console.info(`[cloud sample] gmail: ${edited.applied} edit(s) applied; nothing was sent`);
+      }
+      const to =
+        entry.source.target?.recipient ??
+        receiptName(entry.thread.title.replace(/^draft reply to\s+/i, '').split(':')[0] ?? '');
+      return gmailReceipt({ to, link, suffix: ' (sample)' });
+    }
+    if (app === 'notion') {
+      return notionReceipt({
+        comments: notes.length,
+        failed: 0,
+        name: entry.source.target?.name ?? entry.thread.title,
+        status: notes.length > 0 ? 'Changes requested' : 'Approved',
+        link,
+        suffix: ' (sample)',
+      });
+    }
+    return undefined;
   }
 
   private scheduleReply(

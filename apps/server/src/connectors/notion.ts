@@ -14,6 +14,10 @@ import {
   clampCount,
   type NoteHit,
   type NotesConnector,
+  type ReviewConnector,
+  type ReviewPage,
+  type ReviewPageBlock,
+  type ReviewPageDetail,
 } from './types.js';
 import { retryDelayMs, safeErrorCode, sleep, type FetchLike } from './http.js';
 
@@ -21,6 +25,8 @@ const NOTION_BASE = 'https://api.notion.com/v1';
 export const NOTION_API_VERSION = '2026-03-11';
 const MAX_NOTE_CHARS = 4_000;
 const MAX_PAGE_CHARS = 2_000;
+const REVIEW_STATUS_DEFAULT = 'Status';
+const REVIEW_INITIAL_STATUS = 'Needs review';
 
 interface RichTextItem {
   plain_text?: string;
@@ -42,6 +48,7 @@ interface NotionPage {
   id?: string;
   url?: string;
   in_trash?: boolean;
+  last_edited_time?: string;
   parent?: { type?: string; page_id?: string; data_source_id?: string; database_id?: string };
   properties?: Record<string, NotionProperty>;
 }
@@ -65,30 +72,46 @@ interface DataSourceTaskSchema {
   properties: Record<string, NotionProperty>;
 }
 
+interface ReviewSchema {
+  dataSourceId: string;
+  titleProperty: string;
+  statusProperty: string;
+  statusType: 'status' | 'select';
+}
+
 export interface NotionConnectorOptions {
   token: string;
-  /** NOTION_TASKS_DB: database id or data source id. */
+  /** NOTION_TASKS_DB: database id or data source id (task creation, optional). */
   tasksDb?: string;
+  /** NOTION_REVIEW_DB: database id or data source id of the review pages. */
+  reviewDb?: string;
   /** NOTION_NOTES_ROOT: preferred notes page; used only to rank search hits. */
   notesRoot?: string;
+  /** NOTION_STATUS_PROP: name of the review status property. */
+  statusProp?: string;
   fetchImpl?: FetchLike;
   baseUrl?: string;
   retryDelay?: number;
 }
 
-export class NotionConnector implements NotesConnector {
+export class NotionConnector implements NotesConnector, ReviewConnector {
   private readonly token: string;
   private readonly tasksDb: string;
+  private readonly reviewDb: string;
+  private readonly statusProp: string;
   private readonly notesRoot: string;
   private readonly fetchImpl: FetchLike;
   private readonly baseUrl: string;
   private readonly retryDelay: number;
   private schemaPromise: Promise<DataSourceTaskSchema> | undefined;
+  private reviewSchemaPromise: Promise<ReviewSchema> | undefined;
 
   constructor(options: NotionConnectorOptions) {
     if (!options.token) throw new ConnectorError('notion', 'NOTION_TOKEN is not set');
     this.token = options.token;
     this.tasksDb = (options.tasksDb ?? '').trim();
+    this.reviewDb = (options.reviewDb ?? '').trim();
+    this.statusProp = (options.statusProp ?? '').trim() || REVIEW_STATUS_DEFAULT;
     this.notesRoot = (options.notesRoot ?? '').trim();
     this.fetchImpl = options.fetchImpl ?? globalThis.fetch;
     this.baseUrl = options.baseUrl ?? NOTION_BASE;
@@ -192,6 +215,177 @@ export class NotionConnector implements NotesConnector {
       id: page.id,
       url: page.url ?? `https://www.notion.so/${page.id.replace(/-/g, '')}`,
     };
+  }
+
+  // --- Review pages: comments on exact blocks, status on send --------------
+
+  async listReviewPages(): Promise<ReviewPage[]> {
+    if (!this.reviewDb) {
+      throw new ConnectorError(
+        'notion',
+        'NOTION_REVIEW_DB is not set; run "node scripts/connect-notion.mjs"',
+      );
+    }
+    const schema = await this.resolveReviewSchema();
+    const filter =
+      schema.statusType === 'status'
+        ? { property: schema.statusProperty, status: { equals: REVIEW_INITIAL_STATUS } }
+        : { property: schema.statusProperty, select: { equals: REVIEW_INITIAL_STATUS } };
+
+    const payload = await this.request<NotionList<NotionPage>>(
+      `/data_sources/${encodeURIComponent(schema.dataSourceId)}/query`,
+      { method: 'POST', body: { filter, page_size: 25 } },
+    );
+    return (payload?.results ?? [])
+      .filter((page): page is NotionPage & { id: string } => {
+        return page.object === 'page' && typeof page.id === 'string' && page.in_trash !== true;
+      })
+      .map((page) => ({
+        id: page.id,
+        url: page.url ?? notionPageUrl(page.id),
+        title: pageTitle(page),
+        updatedAt: page.last_edited_time ?? new Date().toISOString(),
+      }));
+  }
+
+  async getReviewPage(pageId: string): Promise<ReviewPageDetail> {
+    if (!pageId) throw new ConnectorError('notion', 'review page has no id');
+    const page = await this.request<NotionPage>(`/pages/${encodeURIComponent(pageId)}`, {
+      method: 'GET',
+    });
+    if (!page?.id) throw new ConnectorError('notion', 'notion page could not be read');
+    const blocks = await this.collectBlocks(page.id, 0);
+    return {
+      id: page.id,
+      url: page.url ?? notionPageUrl(page.id),
+      title: pageTitle(page),
+      updatedAt: page.last_edited_time ?? new Date().toISOString(),
+      blocks,
+    };
+  }
+
+  async commentOnBlock(blockId: string, text: string): Promise<void> {
+    if (!blockId) throw new ConnectorError('notion', 'comment has no block anchor');
+    await this.request('/comments', {
+      method: 'POST',
+      body: { parent: { block_id: blockId }, rich_text: richTextItems(text) },
+    });
+  }
+
+  async commentOnPage(pageId: string, text: string): Promise<void> {
+    if (!pageId) throw new ConnectorError('notion', 'comment has no page');
+    await this.request('/comments', {
+      method: 'POST',
+      body: { parent: { page_id: pageId }, rich_text: richTextItems(text) },
+    });
+  }
+
+  async setReviewStatus(pageId: string, status: string): Promise<void> {
+    const schema = await this.resolveReviewSchema();
+    const value =
+      schema.statusType === 'status'
+        ? { status: { name: status } }
+        : { select: { name: status } };
+    await this.request(`/pages/${encodeURIComponent(pageId)}`, {
+      method: 'PATCH',
+      body: { properties: { [schema.statusProperty]: value } },
+    });
+  }
+
+  private async collectBlocks(blockId: string, depth: number): Promise<ReviewPageBlock[]> {
+    if (depth > 3) return [];
+    const blocks: ReviewPageBlock[] = [];
+    let cursor: string | undefined;
+    let page = 0;
+    do {
+      const params = new URLSearchParams({ page_size: '100' });
+      if (cursor) params.set('start_cursor', cursor);
+      const listing = await this.request<NotionList<NotionBlock>>(
+        `/blocks/${encodeURIComponent(blockId)}/children?${params.toString()}`,
+        { method: 'GET' },
+      );
+      for (const block of listing?.results ?? []) {
+        if (!block || typeof block.id !== 'string') continue;
+        const line = blockText(block);
+        if (line) blocks.push({ id: block.id, text: line });
+        const type = block.type ?? '';
+        const recurse =
+          block.has_children === true &&
+          type !== 'child_page' &&
+          type !== 'child_database' &&
+          depth < 3;
+        if (recurse) {
+          try {
+            blocks.push(...(await this.collectBlocks(block.id, depth + 1)));
+          } catch {
+            // A nested block the integration cannot read must not hide the page.
+          }
+        }
+      }
+      cursor = listing?.has_more && listing.next_cursor ? listing.next_cursor : undefined;
+      page += 1;
+    } while (cursor && page < 3);
+    return blocks;
+  }
+
+  private async resolveReviewSchema(): Promise<ReviewSchema> {
+    if (!this.reviewSchemaPromise) {
+      this.reviewSchemaPromise = this.loadReviewSchema().catch((error) => {
+        this.reviewSchemaPromise = undefined;
+        throw error;
+      });
+    }
+    return this.reviewSchemaPromise;
+  }
+
+  private async loadReviewSchema(): Promise<ReviewSchema> {
+    const reference = this.reviewDb;
+    if (!reference) throw new ConnectorError('notion', 'NOTION_REVIEW_DB is not set');
+
+    let firstError: unknown;
+    try {
+      const database = await this.request<{
+        data_sources?: Array<{ id?: string; name?: string }>;
+        properties?: Record<string, NotionProperty>;
+      }>(`/databases/${encodeURIComponent(reference)}`, { method: 'GET' });
+
+      const sources = Array.isArray(database?.data_sources) ? database.data_sources : [];
+      const source =
+        sources.find((entry) => (entry.name ?? '').toLowerCase() === 'docs') ?? sources[0];
+      if (source?.id) {
+        const dataSource = await this.request<{
+          id?: string;
+          properties?: Record<string, NotionProperty>;
+        }>(`/data_sources/${encodeURIComponent(source.id)}`, { method: 'GET' });
+        if (dataSource?.properties) {
+          return reviewSchema(dataSource.id ?? source.id, dataSource.properties, this.statusProp);
+        }
+      }
+      if (database?.properties) {
+        // Defensive support for an older database-shaped payload.
+        return reviewSchema(reference, database.properties, this.statusProp);
+      }
+    } catch (error) {
+      firstError = error;
+    }
+
+    try {
+      const dataSource = await this.request<{
+        id?: string;
+        properties?: Record<string, NotionProperty>;
+      }>(`/data_sources/${encodeURIComponent(reference)}`, { method: 'GET' });
+      if (dataSource?.properties) {
+        return reviewSchema(dataSource.id ?? reference, dataSource.properties, this.statusProp);
+      }
+    } catch (error) {
+      if (!firstError) firstError = error;
+    }
+
+    throw new ConnectorError(
+      'notion',
+      'NOTION_REVIEW_DB could not be read; check the id and share the database with the integration',
+      { cause: firstError },
+    );
   }
 
   private rootRank(page: NotionPage): number {
@@ -353,6 +547,45 @@ function pageTitle(page: NotionPage): string {
     return richText(property.title);
   }
   return '(untitled)';
+}
+
+function notionPageUrl(pageId: string): string {
+  return `https://www.notion.so/${pageId.replace(/-/g, '')}`;
+}
+
+function reviewSchema(
+  dataSourceId: string,
+  properties: Record<string, NotionProperty>,
+  statusName: string,
+): ReviewSchema {
+  const titleEntry = Object.entries(properties).find(([, value]) => value.type === 'title');
+  if (!titleEntry) throw new ConnectorError('notion', 'review database has no title property');
+  const wanted = statusName.toLowerCase();
+  const isStatus = (value: NotionProperty): boolean =>
+    value.type === 'status' || value.type === 'select';
+  const statusEntry =
+    Object.entries(properties).find(
+      ([name, value]) => name.toLowerCase() === wanted && isStatus(value),
+    ) ?? Object.entries(properties).find(([, value]) => isStatus(value));
+  if (!statusEntry) {
+    throw new ConnectorError('notion', 'review database has no status or select property');
+  }
+  return {
+    dataSourceId,
+    titleProperty: titleEntry[0],
+    statusProperty: statusEntry[0],
+    statusType: statusEntry[1].type === 'select' ? 'select' : 'status',
+  };
+}
+
+/** Notion rich text is capped at 2,000 characters per item. */
+function richTextItems(text: string): Array<{ type: 'text'; text: { content: string } }> {
+  const clean = String(text ?? '').trim() || '—';
+  const chunks: Array<{ type: 'text'; text: { content: string } }> = [];
+  for (let index = 0; index < clean.length; index += 1_900) {
+    chunks.push({ type: 'text', text: { content: clean.slice(index, index + 1_900) } });
+  }
+  return chunks.slice(0, 10);
 }
 
 function pickDateProperty(

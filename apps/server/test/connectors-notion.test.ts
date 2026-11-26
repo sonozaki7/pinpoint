@@ -139,6 +139,184 @@ describe('NotionConnector.search', () => {
   });
 });
 
+describe('NotionConnector review pages', () => {
+  const reviewSchema = {
+    object: 'data_source',
+    id: 'ds-docs',
+    properties: {
+      Name: { id: 'title', name: 'Name', type: 'title', title: {} },
+      Status: { id: 'status1', name: 'Status', type: 'status', status: {} },
+    },
+  };
+
+  function reviewFetch(options?: { select?: boolean }) {
+    const calls: Array<{ url: string; method: string; body?: unknown }> = [];
+    const fetchImpl = (async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      calls.push({
+        url,
+        method: init?.method ?? 'GET',
+        body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined,
+      });
+      if (url.endsWith('/databases/db-docs')) {
+        return jsonResponse({
+          object: 'database',
+          id: 'db-docs',
+          data_sources: [{ id: 'ds-docs', name: 'Docs' }],
+        });
+      }
+      if (url.endsWith('/data_sources/ds-docs') && (!init?.method || init.method === 'GET')) {
+        return jsonResponse({
+          ...reviewSchema,
+          properties: options?.select
+            ? {
+                Name: reviewSchema.properties.Name,
+                Status: { id: 'select1', name: 'Status', type: 'select', select: {} },
+              }
+            : reviewSchema.properties,
+        });
+      }
+      if (url.endsWith('/data_sources/ds-docs/query')) {
+        return jsonResponse({
+          results: [
+            {
+              object: 'page',
+              id: 'page-1',
+              url: 'https://www.notion.so/page-1',
+              last_edited_time: '2026-11-27T09:00:00.000Z',
+              properties: {
+                Name: { type: 'title', title: [{ plain_text: 'Launch post: Pinpoint 1.0 (draft)' }] },
+                Status: { type: 'status', status: { name: 'Needs review' } },
+              },
+            },
+            {
+              object: 'page',
+              id: 'page-trash',
+              in_trash: true,
+              properties: { Name: { type: 'title', title: [{ plain_text: 'Old' }] } },
+            },
+          ],
+        });
+      }
+      if (url.endsWith('/pages/page-1') && (!init?.method || init.method === 'GET')) {
+        return jsonResponse({
+          object: 'page',
+          id: 'page-1',
+          url: 'https://www.notion.so/page-1',
+          last_edited_time: '2026-11-27T09:00:00.000Z',
+          properties: {
+            Name: { type: 'title', title: [{ plain_text: 'Launch post: Pinpoint 1.0 (draft)' }] },
+          },
+        });
+      }
+      if (url.includes('/blocks/page-1/children')) {
+        return jsonResponse({
+          results: [
+            {
+              object: 'block',
+              id: 'blk-1',
+              type: 'paragraph',
+              paragraph: { rich_text: [{ plain_text: 'First line.' }] },
+            },
+            {
+              object: 'block',
+              id: 'blk-2',
+              type: 'heading_2',
+              has_children: true,
+              heading_2: { rich_text: [{ plain_text: 'A heading.' }] },
+            },
+          ],
+          has_more: false,
+        });
+      }
+      if (url.includes('/blocks/blk-2/children')) {
+        return jsonResponse({
+          results: [
+            {
+              object: 'block',
+              id: 'blk-3',
+              type: 'bulleted_list_item',
+              bulleted_list_item: { rich_text: [{ plain_text: 'Nested line.' }] },
+            },
+          ],
+          has_more: false,
+        });
+      }
+      if (url.endsWith('/comments')) return jsonResponse({ object: 'comment', id: 'c1' });
+      if (url.endsWith('/pages/page-1') && init?.method === 'PATCH') {
+        return jsonResponse({ object: 'page', id: 'page-1' });
+      }
+      return jsonResponse({}, 404);
+    }) as unknown as typeof fetch;
+    return { calls, fetchImpl };
+  }
+
+  it('queries the status property and returns only live pages', async () => {
+    const { calls, fetchImpl } = reviewFetch();
+    const notion = new NotionConnector({
+      token: 'secret-token',
+      reviewDb: 'db-docs',
+      fetchImpl,
+    });
+    const pages = await notion.listReviewPages();
+    expect(pages).toEqual([
+      {
+        id: 'page-1',
+        url: 'https://www.notion.so/page-1',
+        title: 'Launch post: Pinpoint 1.0 (draft)',
+        updatedAt: '2026-11-27T09:00:00.000Z',
+      },
+    ]);
+    const query = calls.find((call) => call.url.endsWith('/query'));
+    expect(query?.body).toMatchObject({
+      filter: { property: 'Status', status: { equals: 'Needs review' } },
+      page_size: 25,
+    });
+  });
+
+  it('reads the page blocks with ids, including nested blocks', async () => {
+    const { fetchImpl } = reviewFetch();
+    const notion = new NotionConnector({ token: 'secret-token', fetchImpl });
+    const page = await notion.getReviewPage('page-1');
+    expect(page.blocks).toEqual([
+      { id: 'blk-1', text: 'First line.' },
+      { id: 'blk-2', text: 'A heading.' },
+      { id: 'blk-3', text: 'Nested line.' },
+    ]);
+  });
+
+  it('comments on a block, falls back to the page, and sets the status', async () => {
+    const { calls, fetchImpl } = reviewFetch();
+    const notion = new NotionConnector({ token: 'secret-token', reviewDb: 'db-docs', fetchImpl });
+    await notion.commentOnBlock('blk-1', 'Change: Use 10% today. — via Pinpoint (G2)');
+    await notion.commentOnPage('page-1', '"First line." — Change: Use 10% today.');
+    await notion.setReviewStatus('page-1', 'Changes requested');
+
+    const comments = calls.filter((call) => call.url.endsWith('/comments'));
+    expect(comments).toHaveLength(2);
+    expect(comments[0]!.body).toMatchObject({
+      parent: { block_id: 'blk-1' },
+      rich_text: [{ type: 'text', text: { content: 'Change: Use 10% today. — via Pinpoint (G2)' } }],
+    });
+    expect(comments[1]!.body).toMatchObject({ parent: { page_id: 'page-1' } });
+
+    const patch = calls.find((call) => call.method === 'PATCH');
+    expect(patch?.body).toEqual({
+      properties: { Status: { status: { name: 'Changes requested' } } },
+    });
+  });
+
+  it('uses a select property when the database has one', async () => {
+    const { calls, fetchImpl } = reviewFetch({ select: true });
+    const notion = new NotionConnector({ token: 'secret-token', reviewDb: 'db-docs', fetchImpl });
+    await notion.setReviewStatus('page-1', 'Approved');
+    const patch = calls.find((call) => call.method === 'PATCH');
+    expect(patch?.body).toEqual({
+      properties: { Status: { select: { name: 'Approved' } } },
+    });
+  });
+});
+
 describe('NotionConnector.createTask', () => {
   it('discovers the data source and maps title/date/details to the schema', async () => {
     const calls: Array<{ url: string; method: string; headers: Record<string, string>; body?: unknown }> = [];

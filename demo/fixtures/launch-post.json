@@ -1,0 +1,123 @@
+{
+  "thread": {
+    "threadId": "launch-post",
+    "title": "launch-post",
+    "project": "Notion",
+    "attention": "report",
+    "updatedAt": "2026-11-27T09:05:00.000Z",
+    "app": "notion"
+  },
+  "source": {
+    "sourceMessageId": "notion-launch-post-1",
+    "kind": "reply",
+    "app": "notion",
+    "text": "Pinpoint 1.0 turns your AI's long replies into a short list of points you can settle from your glasses.\n\nEach point quotes the exact line it refers to, so there is no guessing about what you are approving.\n\nThe launch week starts on Monday with a small group of design partners.\n\nAvailable to every customer starting today.\n\nPricing stays at twelve dollars a month for the first year.\n\nOur promise is simple: Pinpoint never writes the work you are reviewing. It shows the line, collects your note and puts that note back where it belongs, whether that is a coding agent, a Notion page or a mail draft.\n\nFor launch day, the inbox shows three kinds of work: a coding agent's plan, a Notion page waiting for review, and a mail draft an agent already wrote. The same three taps work for all of them: open, speak the correction, send.\n\nThe demo workspace in the app is the same one judges see, with a sample page and a sample draft. Nothing in the demo touches a real account, and every receipt says so.\n\nThe release notes and a two-minute film go live on the same day. If something breaks, the team rolls back in one click and posts an update in the same thread.\n\nEvery note you speak is saved with the review, so you can leave the page and come back without losing what you said. The page shows the note next to the line, and the receipt shows where it landed.",
+    "blocks": [
+      {
+        "id": "blk-launch-1",
+        "text": "Pinpoint 1.0 turns your AI's long replies into a short list of points you can settle from your glasses."
+      },
+      {
+        "id": "blk-launch-2",
+        "text": "Each point quotes the exact line it refers to, so there is no guessing about what you are approving."
+      },
+      {
+        "id": "blk-launch-3",
+        "text": "The launch week starts on Monday with a small group of design partners."
+      },
+      {
+        "id": "blk-launch-4",
+        "text": "Available to every customer starting today."
+      },
+      {
+        "id": "blk-launch-5",
+        "text": "Pricing stays at twelve dollars a month for the first year."
+      },
+      {
+        "id": "blk-launch-6",
+        "text": "Our promise is simple: Pinpoint never writes the work you are reviewing. It shows the line, collects your note and puts that note back where it belongs, whether that is a coding agent, a Notion page or a mail draft."
+      },
+      {
+        "id": "blk-launch-7",
+        "text": "For launch day, the inbox shows three kinds of work: a coding agent's plan, a Notion page waiting for review, and a mail draft an agent already wrote. The same three taps work for all of them: open, speak the correction, send."
+      },
+      {
+        "id": "blk-launch-8",
+        "text": "The demo workspace in the app is the same one judges see, with a sample page and a sample draft. Nothing in the demo touches a real account, and every receipt says so."
+      },
+      {
+        "id": "blk-launch-9",
+        "text": "The release notes and a two-minute film go live on the same day. If something breaks, the team rolls back in one click and posts an update in the same thread."
+      },
+      {
+        "id": "blk-launch-10",
+        "text": "Every note you speak is saved with the review, so you can leave the page and come back without losing what you said. The page shows the note next to the line, and the receipt shows where it landed."
+      }
+    ],
+    "target": {
+      "name": "Launch post",
+      "link": "https://www.notion.so/pinpoint-launch-post"
+    }
+  },
+  "deck": {
+    "threadId": "launch-post",
+    "sourceMessageId": "notion-launch-post-1",
+    "title": "launch-post",
+    "attention": "report",
+    "headline": "Launch post: 7 claims",
+    "points": [
+      {
+        "id": "p1",
+        "index": 1,
+        "kind": "claim",
+        "glance": "Turns long replies into points",
+        "quote": "Pinpoint 1.0 turns your AI's long replies into a short list of points you can settle from your glasses."
+      },
+      {
+        "id": "p2",
+        "index": 2,
+        "kind": "claim",
+        "glance": "Each point quotes the exact line",
+        "quote": "Each point quotes the exact line it refers to, so there is no guessing about what you are approving."
+      },
+      {
+        "id": "p3",
+        "index": 3,
+        "kind": "claim",
+        "glance": "Launch week starts with partners",
+        "quote": "The launch week starts on Monday with a small group of design partners."
+      },
+      {
+        "id": "p4",
+        "index": 4,
+        "kind": "claim",
+        "glance": "Available to everyone today?",
+        "quote": "Available to every customer starting today.",
+        "flag": "check this"
+      },
+      {
+        "id": "p5",
+        "index": 5,
+        "kind": "claim",
+        "glance": "Pricing: twelve dollars a month",
+        "quote": "Pricing stays at twelve dollars a month for the first year."
+      },
+      {
+        "id": "p6",
+        "index": 6,
+        "kind": "claim",
+        "glance": "Puts your note back in place",
+        "quote": "It shows the line, collects your note and puts that note back where it belongs"
+      },
+      {
+        "id": "p7",
+        "index": 7,
+        "kind": "claim",
+        "glance": "Three taps: open, speak, send",
+        "quote": "The same three taps work for all of them: open, speak the correction, send."
+      }
+    ],
+    "createdAt": "2026-11-27T09:05:04.000Z",
+    "splitter": "fixture"
+  }
+}

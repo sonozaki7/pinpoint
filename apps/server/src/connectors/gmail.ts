@@ -6,6 +6,8 @@ import {
   ConnectorError,
   clampCount,
   type AccessTokenProvider,
+  type DraftConnector,
+  type DraftMessage,
   type EmailThread,
   type MailConnector,
 } from './types.js';
@@ -13,6 +15,7 @@ import { requestJson, type FetchLike } from './http.js';
 
 const GMAIL_BASE = 'https://gmail.googleapis.com/gmail/v1';
 const DEFAULT_QUERY = 'label:pinpoint is:unread';
+const DEFAULT_DRAFTS_QUERY = 'label:pinpoint';
 
 interface GmailHeader {
   name?: string;
@@ -48,6 +51,15 @@ interface GmailThreadList {
   threads?: Array<{ id?: string; snippet?: string }>;
 }
 
+interface GmailDraft {
+  id?: string;
+  message?: GmailMessage;
+}
+
+interface GmailDraftList {
+  drafts?: Array<{ id?: string; message?: { id?: string; threadId?: string } }>;
+}
+
 export interface GmailConnectorOptions {
   auth: AccessTokenProvider;
   /** GMAIL_QUERY: used when a caller passes an empty query. */
@@ -56,7 +68,7 @@ export interface GmailConnectorOptions {
   baseUrl?: string;
 }
 
-export class GmailConnector implements MailConnector {
+export class GmailConnector implements MailConnector, DraftConnector {
   private readonly auth: AccessTokenProvider;
   private readonly fetchImpl: FetchLike;
   private readonly baseUrl: string;
@@ -150,6 +162,64 @@ export class GmailConnector implements MailConnector {
     return { id: sent.id, link: threadLink(input.threadId) };
   }
 
+  // --- Gmail drafts: review an agent-authored draft, never compose one ----
+
+  async listDrafts(opts: { query: string; max: number }): Promise<DraftMessage[]> {
+    const query = opts.query?.trim() || DEFAULT_DRAFTS_QUERY;
+    const max = clampCount(opts.max, 1, 20, 10);
+    const params = new URLSearchParams({ q: query, maxResults: String(max) });
+    const list = await this.get<GmailDraftList>(`/users/me/drafts?${params.toString()}`);
+    const entries = Array.isArray(list?.drafts) ? list.drafts : [];
+    const drafts: DraftMessage[] = [];
+    for (const entry of entries) {
+      if (!entry.id) continue;
+      try {
+        drafts.push(await this.getDraft(entry.id));
+      } catch (error) {
+        // One unreadable draft must not hide the others.
+        if (entries.length === 1) throw error;
+      }
+      if (drafts.length >= max) break;
+    }
+    return drafts;
+  }
+
+  async getDraft(draftId: string): Promise<DraftMessage> {
+    if (!draftId) throw new ConnectorError('gmail', 'draft has no id');
+    const draft = await this.get<GmailDraft>(
+      `/users/me/drafts/${encodeURIComponent(draftId)}?format=full`,
+    );
+    const mapped = mapDraft(draft, draftId);
+    if (!mapped) throw new ConnectorError('gmail', 'gmail draft could not be read');
+    return mapped;
+  }
+
+  async updateDraft(draftId: string, body: string): Promise<{ id: string; link: string }> {
+    if (!draftId) throw new ConnectorError('gmail', 'draft has no id');
+    const current = await this.getDraft(draftId);
+    const raw = buildDraftRaw(current, body);
+    const saved = await this.send<{ id?: string }>(
+      `/users/me/drafts/${encodeURIComponent(draftId)}`,
+      { message: { raw: Buffer.from(raw, 'utf8').toString('base64url'), threadId: current.threadId } },
+      'PUT',
+    );
+    return { id: saved?.id ?? draftId, link: draftLink(draftId) };
+  }
+
+  async sendDraft(draftId: string): Promise<{ id: string; threadId: string; link: string }> {
+    if (!draftId) throw new ConnectorError('gmail', 'draft has no id');
+    const sent = await this.post<{ id?: string; threadId?: string }>('/users/me/drafts/send', {
+      id: draftId,
+    });
+    if (!sent?.id) throw new ConnectorError('gmail', 'gmail send returned no message id');
+    const threadId = sent.threadId ?? (await this.getDraft(draftId).catch(() => null))?.threadId ?? '';
+    return {
+      id: sent.id,
+      threadId,
+      link: threadId ? threadLink(threadId) : draftLink(draftId),
+    };
+  }
+
   private async replyContext(
     messageId: string,
   ): Promise<{ messageId: string; references: string }> {
@@ -180,10 +250,22 @@ export class GmailConnector implements MailConnector {
     return (await this.request<T>(path, body)) as T;
   }
 
-  private async request<T>(path: string, body?: unknown): Promise<T | null> {
+  private async send<T = unknown>(
+    path: string,
+    body: unknown,
+    method: 'POST' | 'PUT',
+  ): Promise<T> {
+    return (await this.request<T>(path, body, method)) as T;
+  }
+
+  private async request<T>(
+    path: string,
+    body?: unknown,
+    method?: 'POST' | 'PUT',
+  ): Promise<T | null> {
     const token = await this.auth.accessToken();
     return (await requestJson(this.fetchImpl, `${this.baseUrl}${path}`, {
-      method: body === undefined ? 'GET' : 'POST',
+      method: method ?? (body === undefined ? 'GET' : 'POST'),
       headers: { authorization: `Bearer ${token}` },
       body,
       label: 'gmail',
@@ -193,6 +275,60 @@ export class GmailConnector implements MailConnector {
 
 function threadLink(threadId: string): string {
   return `https://mail.google.com/mail/u/0/#all/${encodeURIComponent(threadId)}`;
+}
+
+function draftLink(draftId: string): string {
+  return `https://mail.google.com/mail/u/0/#drafts/${encodeURIComponent(draftId)}`;
+}
+
+function firstName(raw: string): string {
+  const { name, email } = parseAddress(raw);
+  const base = name && name !== email ? name : email;
+  const clean = base.includes('@') ? base.split('@')[0]!.split('+')[0]!.replace(/[._-]+/g, ' ').trim() : base;
+  const first = clean.split(/[\s,]+/).filter(Boolean)[0] ?? '';
+  if (first.length === 0) return 'them';
+  return `${first[0]!.toUpperCase()}${first.slice(1)}`;
+}
+
+function mapDraft(draft: GmailDraft, fallbackId: string): DraftMessage | null {
+  const message = draft.message;
+  if (!message) return null;
+  const headers = headerMap(message.payload?.headers);
+  const threadId = message.threadId ?? '';
+  const receivedMs = Number(message.internalDate);
+  const updatedAt =
+    Number.isFinite(receivedMs) && receivedMs > 0
+      ? new Date(receivedMs).toISOString()
+      : new Date(headers.date ? Date.parse(headers.date) : Date.now()).toISOString();
+  return {
+    id: draft.id ?? fallbackId,
+    messageId: message.id ?? '',
+    threadId,
+    to: headers.to ?? '',
+    toName: firstName(headers.to ?? ''),
+    ...(headers.cc ? { cc: headers.cc } : {}),
+    ...(headers.bcc ? { bcc: headers.bcc } : {}),
+    subject: headers.subject ?? '(no subject)',
+    body: extractBody(message.payload),
+    updatedAt: Number.isNaN(Date.parse(updatedAt)) ? new Date().toISOString() : updatedAt,
+    link: draftLink(draft.id ?? fallbackId),
+  };
+}
+
+/** Rebuild a plain-text draft with the same recipient, subject and thread. */
+function buildDraftRaw(draft: DraftMessage, body: string): string {
+  const lines = [`To: ${sanitizeHeader(draft.to)}`];
+  if (draft.cc) lines.push(`Cc: ${sanitizeHeader(draft.cc)}`);
+  if (draft.bcc) lines.push(`Bcc: ${sanitizeHeader(draft.bcc)}`);
+  lines.push(
+    `Subject: ${sanitizeHeader(draft.subject)}`,
+    'MIME-Version: 1.0',
+    'Content-Type: text/plain; charset="UTF-8"',
+    'Content-Transfer-Encoding: 8bit',
+    '',
+    normalizeNewlines(body),
+  );
+  return lines.join('\r\n');
 }
 
 function sanitizeHeader(value: string): string {

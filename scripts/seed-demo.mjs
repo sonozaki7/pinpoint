@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // Idempotent demo data for the Pinpoint desk. It only touches the "pinpoint"
-// Gmail label, the "Pinpoint demo" calendar, and the Notion demo page:
-//   - inserts 2 unread demo emails (never sends)
-//   - creates the Tuesday/Wednesday clash on a secondary calendar
-//   - ensures the Acme contract note exists
-// It never deletes anything and never prints bodies, tokens or addresses.
+// Gmail label and the shared "Pinpoint demo" Notion page:
+//   - Priya's email and the agent's draft reply (with the net-60 mistake)
+//   - a "Docs" database with the launch-post page waiting for review
+//   - an "Acme contract" note that records the net-45 terms
+// It never sends, deletes or prints bodies, tokens or addresses.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -12,10 +12,29 @@ import { fileURLToPath } from 'node:url';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const SERVER_ROOT = path.resolve(SCRIPT_DIR, '..', 'apps', 'server');
+const REPO_ROOT = path.resolve(SCRIPT_DIR, '..');
 const ENV_FILE = path.join(SERVER_ROOT, '.env');
 const NOTION_VERSION = '2026-03-11';
 const NOTE_TEXT =
   'Acme contract: net-45 agreed with Priya on Nov 12; clause 12 to be narrowed';
+const STATUS_OPTIONS = ['Needs review', 'Changes requested', 'Approved'];
+
+const PRIYA_BODY =
+  'Hi,\n\n' +
+  'Thanks for the call on Nov 12. We agreed net-45 on the Acme contract, but ' +
+  'clause 12 is still too broad. Can you narrow it to the reseller scope and ' +
+  'send the revised draft before Friday?\n\n' +
+  'Best,\nPriya';
+
+// The agent's draft reply, deliberately wrong on the payment terms.
+const DRAFT_BODY =
+  'Hi Priya,\n\n' +
+  'Thanks for sending the revised contract over. We\'re happy to agree to net-60 payment terms. ' +
+  'Our finance team can start invoicing from Monday once the countersigned copy is back. ' +
+  'I\'ll also ask legal to narrow clause 12 to the reseller scope. ' +
+  'The delivery date in clause 9 works for us as written. ' +
+  'We can have the signed copy back to you by Friday.\n\n' +
+  'Best,\nSam';
 
 function flag(name) {
   const index = process.argv.indexOf(name);
@@ -31,10 +50,6 @@ try {
 const dataDir = path.resolve(flag('--data-dir') ?? path.join(SERVER_ROOT, '.data'));
 const clientPath = path.join(dataDir, 'google-client.json');
 const tokenPath = path.join(dataDir, 'google-token.json');
-const timeZone =
-  (process.env.PINPOINT_TZ ?? '').trim() ||
-  Intl.DateTimeFormat().resolvedOptions().timeZone ||
-  'UTC';
 
 let googleToken = null;
 let googleClient = null;
@@ -48,10 +63,8 @@ async function main() {
   loadGoogle();
   if (googleReady) {
     await section('Gmail', seedGmail);
-    await section('Calendar', seedCalendar);
   } else {
-    console.log('Gmail: skipped (run "node scripts/connect-google.mjs --demo" first)');
-    console.log('Calendar: skipped (run "node scripts/connect-google.mjs --demo" first)');
+    console.log('Gmail: skipped (run "node scripts/connect-google.mjs" first)');
   }
 
   loadNotion();
@@ -92,7 +105,9 @@ function loadGoogle() {
 }
 
 function loadNotion() {
-  notionReady = Boolean((process.env.NOTION_TOKEN ?? '').trim() && (process.env.NOTION_NOTES_ROOT ?? '').trim());
+  notionReady = Boolean(
+    (process.env.NOTION_TOKEN ?? '').trim() && (process.env.NOTION_NOTES_ROOT ?? '').trim(),
+  );
 }
 
 async function seedGmail() {
@@ -116,169 +131,81 @@ async function seedGmail() {
   }
   if (!label?.id) throw new Error('could not create the pinpoint label');
 
-  const messages = [
-    {
-      who: 'Priya Shah',
-      plus: 'priya',
-      subject: 'Acme contract - net-45 and clause 12',
-      search: 'Acme contract',
-      body:
-        'Hi,\n\n' +
-        'Thanks for the call on Nov 12. We agreed net-45 on the Acme contract, but ' +
-        'clause 12 is still too broad. Can you narrow it to the reseller scope and ' +
-        'send the revised draft before Friday?\n\n' +
-        'Best,\nPriya',
-    },
-    {
-      who: 'Tomas Berg',
-      plus: 'tomas',
-      subject: 'Podcast recording - Tuesday 10:00?',
-      search: 'Podcast recording',
-      body:
-        'Hey!\n\n' +
-        'Tuesday 10:00 works for me for the podcast recording. Shall we lock it in? ' +
-        'I can bring the mic and the outline.\n\n' +
-        'Tomas',
-    },
-  ];
+  const priyaAddress = plusAddress(account, 'priya');
 
-  let created = 0;
-  let existing = 0;
-  for (const message of messages) {
-    const query = `label:pinpoint subject:"${message.search}"`;
-    const found = await google(
-      `/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=1`,
-    );
-    if (Array.isArray(found.messages) && found.messages.length > 0) {
-      existing += 1;
-      continue;
-    }
-
-    const from = plusAddress(account, message.plus);
+  // 1. Priya's email (only if the label has none yet).
+  const foundMessages = await google(
+    `/gmail/v1/users/me/messages?q=${encodeURIComponent('label:pinpoint subject:"Acme contract"')}&maxResults=1`,
+  );
+  let threadId = '';
+  let emailCreated = 0;
+  if (Array.isArray(foundMessages.messages) && foundMessages.messages.length > 0) {
+    threadId = String(foundMessages.messages[0].threadId ?? '');
+  } else {
     const raw = [
-      `From: "${message.who}" <${from}>`,
+      `From: "Priya Shah" <${priyaAddress}>`,
       `To: ${account}`,
-      `Subject: ${message.subject}`,
+      'Subject: Acme contract - net-45 terms',
       `Date: ${new Date().toUTCString()}`,
-      `Message-ID: <pinpoint-${message.plus}-${Date.now()}@pinpoint.local>`,
+      `Message-ID: <pinpoint-priya-${Date.now()}@pinpoint.local>`,
       'MIME-Version: 1.0',
       'Content-Type: text/plain; charset="UTF-8"',
       'Content-Transfer-Encoding: 8bit',
       '',
-      message.body,
+      PRIYA_BODY,
     ].join('\r\n');
-
-    await google('/gmail/v1/users/me/messages', {
+    const inserted = await google('/gmail/v1/users/me/messages', {
       method: 'POST',
       body: {
         raw: Buffer.from(raw, 'utf8').toString('base64url'),
-        labelIds: [label.id, 'INBOX', 'UNREAD'],
+        labelIds: [label.id, 'INBOX'],
       },
     });
-    created += 1;
+    threadId = String(inserted.threadId ?? '');
+    emailCreated = 1;
   }
 
-  console.log(`Gmail: 2 demo threads in label "pinpoint" (${created} new, ${existing} already there)`);
-}
-
-async function seedCalendar() {
-  let listing;
-  try {
-    listing = await google('/calendar/v3/users/me/calendarList?maxResults=250');
-  } catch (error) {
-    if (String(error instanceof Error ? error.message : error).includes('403')) {
-      throw new Error(
-        'Calendar HTTP 403: run "node scripts/connect-google.mjs --demo" and allow the calendar setup permissions',
-      );
-    }
-    throw error;
-  }
-  let calendar = (listing.items ?? []).find(
-    (entry) => String(entry.summary ?? '').trim().toLowerCase() === 'pinpoint demo',
+  // 2. The agent's draft reply, in the same thread, labelled pinpoint.
+  const foundDrafts = await google(
+    `/gmail/v1/users/me/drafts?q=${encodeURIComponent('label:pinpoint subject:"Acme contract"')}&maxResults=5`,
   );
-  if (!calendar) {
-    try {
-      calendar = await google('/calendar/v3/calendars', {
-        method: 'POST',
-        body: {
-          summary: 'Pinpoint demo',
-          description: 'Demo calendar for Pinpoint',
-          timeZone,
-        },
-      });
-    } catch (error) {
-      if (String(error instanceof Error ? error.message : error).includes('403')) {
-        throw new Error(
-          'Calendar HTTP 403: run "node scripts/connect-google.mjs --demo" and allow the calendar setup permissions',
-        );
-      }
-      throw error;
-    }
-  }
-  if (!calendar?.id) throw new Error('could not create the Pinpoint demo calendar');
-
-  const tuesday = nextWeekday(2);
-  const wednesday = addDays(tuesday, 1);
-  const events = [
-    {
-      summary: 'Deep work block',
-      start: at(tuesday, 10, 0),
-      end: at(tuesday, 12, 0),
-    },
-    {
-      summary: 'Dentist',
-      start: at(wednesday, 8, 30),
-      end: at(wednesday, 9, 30),
-    },
-    {
-      summary: '1:1 with Ken',
-      start: at(wednesday, 9, 0),
-      end: at(wednesday, 9, 30),
-    },
-  ];
-
-  const windowStart = new Date(at(tuesday, 0, 0)).toISOString();
-  const windowEnd = new Date(at(addDays(wednesday, 1), 0, 0)).toISOString();
-  const params = new URLSearchParams({
-    timeMin: windowStart,
-    timeMax: windowEnd,
-    singleEvents: 'true',
-    orderBy: 'startTime',
-    maxResults: '250',
-  });
-  const existingEvents = await google(
-    `/calendar/v3/calendars/${encodeURIComponent(calendar.id)}/events?${params.toString()}`,
-  );
-  const already = new Set(
-    (existingEvents.items ?? [])
-      .filter((event) => typeof event.start?.dateTime === 'string')
-      .map(
-        (event) =>
-          `${String(event.summary ?? '').trim().toLowerCase()}|${Date.parse(event.start.dateTime)}`,
-      ),
-  );
-
-  let created = 0;
-  let existing = 0;
-  for (const event of events) {
-    const key = `${event.summary.toLowerCase()}|${Date.parse(event.start)}`;
-    if (already.has(key)) {
-      existing += 1;
-      continue;
-    }
-    await google(`/calendar/v3/calendars/${encodeURIComponent(calendar.id)}/events`, {
+  let draftCreated = 0;
+  if (!Array.isArray(foundDrafts.drafts) || foundDrafts.drafts.length === 0) {
+    const raw = [
+      `To: "Priya Shah" <${priyaAddress}>`,
+      'Subject: Re: Acme contract - net-45 terms',
+      'MIME-Version: 1.0',
+      'Content-Type: text/plain; charset="UTF-8"',
+      'Content-Transfer-Encoding: 8bit',
+      '',
+      DRAFT_BODY,
+    ].join('\r\n');
+    const draft = await google('/gmail/v1/users/me/drafts', {
       method: 'POST',
       body: {
-        summary: event.summary,
-        start: { dateTime: event.start, timeZone },
-        end: { dateTime: event.end, timeZone },
+        message: {
+          raw: Buffer.from(raw, 'utf8').toString('base64url'),
+          ...(threadId ? { threadId } : {}),
+        },
       },
     });
-    created += 1;
+    const messageId = draft?.message?.id;
+    if (messageId) {
+      try {
+        await google(`/gmail/v1/users/me/messages/${encodeURIComponent(messageId)}/modify`, {
+          method: 'POST',
+          body: { addLabelIds: [label.id] },
+        });
+      } catch {
+        // The draft exists; a missing label only hides it from the query.
+      }
+    }
+    draftCreated = 1;
   }
 
   console.log(
-    `Calendar: "Pinpoint demo" ready (${created} new events, ${existing} already there)`,
+    `Gmail: Priya thread ${emailCreated ? 'created' : 'already there'}, ` +
+      `agent draft ${draftCreated ? 'created' : 'already there'} in label "pinpoint"`,
   );
 }
 
@@ -298,38 +225,151 @@ async function seedNotion() {
           String(block.child_page?.title ?? '').trim().toLowerCase() === 'pinpoint demo',
       )?.id ?? '';
   }
-  if (!demoId) {
-    console.log('Notion: Acme note skipped (run "node scripts/connect-notion.mjs" first)');
-    return;
-  }
+  if (!demoId) throw new Error('Pinpoint demo page not found; run "node scripts/connect-notion.mjs" first');
 
   const demoChildren = await notionChildren(token, demoId);
+
+  // Acme contract note (evidence for the net-45 flag).
   const note = demoChildren.find(
     (block) =>
       block.type === 'child_page' &&
       String(block.child_page?.title ?? '').trim().toLowerCase() === 'acme contract',
   );
-  if (note) {
-    console.log('Notion: Acme note already there');
-    return;
+  if (!note) {
+    await notion(token, 'POST', '/pages', {
+      parent: { type: 'page_id', page_id: demoId },
+      properties: {
+        title: { title: [{ type: 'text', text: { content: 'Acme contract' } }] },
+      },
+      children: [
+        {
+          object: 'block',
+          type: 'paragraph',
+          paragraph: { rich_text: [{ type: 'text', text: { content: NOTE_TEXT } }] },
+        },
+      ],
+    });
   }
 
-  await notion(token, 'POST', '/pages', {
-    parent: { type: 'page_id', page_id: demoId },
-    properties: {
-      title: { title: [{ type: 'text', text: { content: 'Acme contract' } }] },
-    },
-    children: [
-      {
-        object: 'block',
-        type: 'paragraph',
-        paragraph: {
-          rich_text: [{ type: 'text', text: { content: NOTE_TEXT } }],
+  // Docs database: Name + Status (Needs review / Changes requested / Approved).
+  let docsId = demoChildren.find(
+    (block) =>
+      block.type === 'child_database' &&
+      String(block.child_database?.title ?? '').trim().toLowerCase() === 'docs',
+  )?.id;
+  if (!docsId) {
+    const database = await notion(token, 'POST', '/databases', {
+      parent: { type: 'page_id', page_id: demoId },
+      title: [{ type: 'text', text: { content: 'Docs' } }],
+      initial_data_source: {
+        properties: {
+          Name: { title: {} },
+          Status: {
+            status: {
+              options: STATUS_OPTIONS.map((name, index) => ({
+                name,
+                color: ['yellow', 'red', 'green'][index] ?? 'default',
+              })),
+            },
+          },
         },
       },
-    ],
+    });
+    docsId = database.id;
+  }
+  if (!docsId) throw new Error('could not find or create the Docs database');
+
+  const schema = await docsSchema(token, docsId);
+  const launchText = launchBlocks();
+  const existing = await notion(token, 'POST', `/data_sources/${encodeURIComponent(schema.dataSourceId)}/query`, {
+    filter: {
+      property: schema.titleProperty,
+      title: { contains: 'Launch post' },
+    },
+    page_size: 5,
   });
-  console.log('Notion: Acme note created');
+  const page = Array.isArray(existing.results) ? existing.results[0] : undefined;
+  let pageState = 'already there';
+  if (!page?.id) {
+    await notion(token, 'POST', '/pages', {
+      parent: { type: 'data_source_id', data_source_id: schema.dataSourceId },
+      properties: {
+        [schema.titleProperty]: {
+          title: [{ type: 'text', text: { content: 'Launch post: Pinpoint 1.0 (draft)' } }],
+        },
+        [schema.statusProperty]:
+          schema.statusType === 'status'
+            ? { status: { name: 'Needs review' } }
+            : { select: { name: 'Needs review' } },
+      },
+      children: launchText.map((line) => ({
+        object: 'block',
+        type: 'paragraph',
+        paragraph: { rich_text: [{ type: 'text', text: { content: line } }] },
+      })),
+    });
+    pageState = 'created';
+  } else if (page.id) {
+    // Keep the demo repeatable after a live round trip.
+    try {
+      await notion(token, 'PATCH', `/pages/${encodeURIComponent(page.id)}`, {
+        properties: {
+          [schema.statusProperty]:
+            schema.statusType === 'status'
+              ? { status: { name: 'Needs review' } }
+              : { select: { name: 'Needs review' } },
+        },
+      });
+      pageState = 'already there, status reset to Needs review';
+    } catch {
+      pageState = 'already there';
+    }
+  }
+
+  console.log(`Notion: Acme note ${note ? 'already there' : 'created'}; launch page ${pageState}`);
+}
+
+/** Paragraphs copied from the launch-post fixture, so seeded pages match the deck. */
+function launchBlocks() {
+  try {
+    const fixture = JSON.parse(
+      fs.readFileSync(path.join(REPO_ROOT, 'demo', 'fixtures', 'launch-post.json'), 'utf8'),
+    );
+    const blocks = fixture?.source?.blocks;
+    if (Array.isArray(blocks)) {
+      return blocks
+        .map((block) => (typeof block?.text === 'string' ? block.text : ''))
+        .filter((line) => line.length > 0);
+    }
+  } catch {
+    // Fall through to the short built-in copy.
+  }
+  return [
+    'Pinpoint turns long AI replies into a short list of points you can settle from your glasses.',
+    'Available to every customer starting today.',
+  ];
+}
+
+async function docsSchema(token, docsId) {
+  const database = await notion(token, 'GET', `/databases/${encodeURIComponent(docsId)}`);
+  const sources = Array.isArray(database.data_sources) ? database.data_sources : [];
+  const source = sources.find((entry) => String(entry.name ?? '').toLowerCase() === 'docs') ?? sources[0];
+  const dataSourceId = source?.id ?? docsId;
+  const dataSource = await notion(token, 'GET', `/data_sources/${encodeURIComponent(dataSourceId)}`);
+  const properties = dataSource.properties ?? {};
+  const titleEntry = Object.entries(properties).find(([, value]) => value?.type === 'title');
+  const statusEntry =
+    Object.entries(properties).find(
+      ([name, value]) =>
+        name.toLowerCase() === 'status' && (value?.type === 'status' || value?.type === 'select'),
+    ) ?? Object.entries(properties).find(([, value]) => value?.type === 'status' || value?.type === 'select');
+  if (!titleEntry || !statusEntry) throw new Error('Docs database needs a title and a Status property');
+  return {
+    dataSourceId,
+    titleProperty: titleEntry[0],
+    statusProperty: statusEntry[0],
+    statusType: statusEntry[1].type === 'select' ? 'select' : 'status',
+  };
 }
 
 // --- Google helpers -------------------------------------------------------
@@ -354,8 +394,7 @@ async function google(apiPath, options = {}) {
     } catch {
       // Ignore non-JSON error pages.
     }
-    const label = apiPath.startsWith('/gmail') ? 'Gmail' : 'Calendar';
-    throw new Error(`${label} HTTP ${response.status}${code ? ` (${code})` : ''}`);
+    throw new Error(`Gmail HTTP ${response.status}${code ? ` (${code})` : ''}`);
   }
   return text.trim() === '' ? {} : JSON.parse(text);
 }
@@ -434,31 +473,6 @@ function saveToken() {
 function plusAddress(account, tag) {
   const at = account.lastIndexOf('@');
   return `${account.slice(0, at)}+${tag}${account.slice(at)}`;
-}
-
-function nextWeekday(weekday) {
-  const date = new Date();
-  date.setHours(0, 0, 0, 0);
-  let add = (weekday - date.getDay() + 7) % 7;
-  if (add === 0) add = 7;
-  date.setDate(date.getDate() + add);
-  return date;
-}
-
-function addDays(date, days) {
-  const next = new Date(date.getTime());
-  next.setDate(next.getDate() + days);
-  return next;
-}
-
-function at(date, hour, minute) {
-  const next = new Date(date.getTime());
-  next.setHours(hour, minute, 0, 0);
-  return `${next.getFullYear()}-${pad(next.getMonth() + 1)}-${pad(next.getDate())}T${pad(next.getHours())}:${pad(next.getMinutes())}:00`;
-}
-
-function pad(value) {
-  return String(value).padStart(2, '0');
 }
 
 // --- Notion helpers -------------------------------------------------------

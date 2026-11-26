@@ -7,7 +7,9 @@ import type {
   PointKind,
   ThreadAttention,
 } from '../../../../shared/contract.js';
+import { draftPoints } from './draft.js';
 import { errorMessage } from './errors.js';
+import { decoratePoints } from './flags.js';
 import { asDeck } from './schemas.js';
 import { isHighRiskText, makeGlance, safeFileName } from './text.js';
 import { naiveSplit } from './splitter/naive.js';
@@ -46,6 +48,19 @@ function normalizeOptions(raw: unknown): string[] | undefined {
     .filter((value, index, all) => value.length > 0 && all.indexOf(value) === index)
     .slice(0, 4);
   return options.length >= 2 ? options : undefined;
+}
+
+/** `flag` is one short glasses label: plain ASCII, <= 24 chars, never invented. */
+function normalizeFlag(raw: unknown): string | undefined {
+  const value = text(raw);
+  if (!value) return undefined;
+  const ascii = value.replace(/[^\x20-\x7e]/g, '').replace(/\s+/g, ' ').trim();
+  if (ascii.length === 0) return undefined;
+  return ascii.slice(0, 24).trim();
+}
+
+function appFor(thread: AttentionThread, source: AttentionSource): AttentionThread['app'] {
+  return thread.app ?? source.app;
 }
 
 function matchQuestion(
@@ -123,6 +138,8 @@ export function normalizePoints(
       ...(options && options.length >= 2 ? { options } : {}),
       ...(questionId ? { questionId } : {}),
       ...(riskHigh ? { risk: 'high' as const } : {}),
+      ...(normalizeFlag(candidate.flag) ? { flag: normalizeFlag(candidate.flag) } : {}),
+      ...(text(candidate.anchor) ? { anchor: text(candidate.anchor) } : {}),
     });
   }
 
@@ -216,9 +233,22 @@ export async function buildDeck(
   thread: AttentionThread,
   source: AttentionSource,
 ): Promise<Deck> {
+  const app = appFor(thread, source);
+  // A Gmail draft is reviewed one sentence at a time; no model is involved.
+  if (app === 'gmail') {
+    const points = decoratePoints(draftPoints(source.text), app, source);
+    return makeDeck(
+      thread,
+      source,
+      points,
+      defaultHeadline(thread, points.length),
+      points.length > 0 ? 'sentences' : 'fallback:naive',
+    );
+  }
   try {
     const split = await splitter.split({ thread, source });
-    const points = normalizePoints(split.points, source, thread.attention, { minPoints: 4 });
+    const normalized = normalizePoints(split.points, source, thread.attention, { minPoints: 4 });
+    const points = decoratePoints(normalized, app, source);
     return makeDeck(
       thread,
       source,
@@ -229,8 +259,17 @@ export async function buildDeck(
   } catch (error) {
     console.warn(`[deck] splitter threw, using naive split: ${errorMessage(error)}`);
     const naive = naiveSplit({ thread, source });
-    return makeDeck(thread, source, naive.points, naive.headline, 'fallback:naive');
+    const points = decoratePoints(naive.points, app, source);
+    return makeDeck(thread, source, points, naive.headline, 'fallback:naive');
   }
+}
+
+/** A deck for the glasses: block anchors stay on the server. */
+export function publicDeck(deck: Deck): Deck {
+  return {
+    ...deck,
+    points: deck.points.map(({ anchor: _anchor, ...point }) => point),
+  };
 }
 
 /** Turn a precomputed demo deck into a verified deck for this thread source. */
@@ -239,11 +278,13 @@ export function deckFromPrecomputed(
   thread: AttentionThread,
   source: AttentionSource,
 ): Deck {
+  const app = appFor(thread, source);
   let points = normalizePoints(precomputed.points, source, thread.attention, { minPoints: 0 });
   if (points.length === 0) {
     const naive = naiveSplit({ thread, source });
     points = naive.points;
   }
+  points = decoratePoints(points, app, source);
   return {
     threadId: thread.threadId,
     sourceMessageId: source.sourceMessageId,

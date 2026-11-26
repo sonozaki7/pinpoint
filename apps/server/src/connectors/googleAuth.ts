@@ -1,6 +1,6 @@
 // Google OAuth 2.0 for an installed (desktop) app, using the loopback redirect.
 // No googleapis dependency: the connect script performs consent, this module
-// keeps the token fresh for the Gmail and Calendar connectors.
+// keeps the token fresh for the Gmail connector.
 //
 // Tokens live only in <dataDir>/google-token.json (mode 0600); the downloaded
 // client JSON lives in <dataDir>/google-client.json. Both are gitignored.
@@ -11,25 +11,14 @@ import { ConnectorError, type AccessTokenProvider } from './types.js';
 import { safeErrorCode, type FetchLike } from './http.js';
 
 /**
- * Least-privilege scopes for the server:
- *  - gmail.modify        read + label + insert + send + mark read, without the
- *                        all-mail "permanently delete" scope
- *  - calendar.events     read/write events on the owner's calendars, without
- *                        calendar sharing/settings access
+ * Least-privilege scope for the server:
+ *  - gmail.modify        read, label, update drafts, send drafts and mark read,
+ *                        without the all-mail "permanently delete" scope
  *
- * Demo setup additionally needs two narrow scopes:
- *  - calendar.calendarlist.readonly  resolve the "Pinpoint demo" calendar by name
- *  - calendar.app.created            create that one secondary demo calendar
- * There is no narrower Google scope that can create a secondary calendar.
- * `calendar.events` does not cover calendarList.list, calendars.insert or the
- * freeBusy endpoint; free/busy is therefore derived from events.list.
+ * There is no calendar scope any more: Pinpoint only reviews work that is
+ * already waiting in Gmail or Notion.
  */
-export const GOOGLE_SCOPES = [
-  'https://www.googleapis.com/auth/gmail.modify',
-  'https://www.googleapis.com/auth/calendar.events',
-  'https://www.googleapis.com/auth/calendar.calendarlist.readonly',
-  'https://www.googleapis.com/auth/calendar.app.created',
-] as const;
+export const GOOGLE_SCOPES = ['https://www.googleapis.com/auth/gmail.modify'] as const;
 
 export const GOOGLE_SCOPE_STRING = GOOGLE_SCOPES.join(' ');
 
@@ -130,8 +119,8 @@ interface TokenRefreshPayload {
 
 /**
  * Keeps one Google access token fresh. Refresh is single-flight so a burst of
- * Gmail/Calendar calls cannot start several refreshes with the same refresh
- * token (Google may rotate it).
+ * Gmail calls cannot start several refreshes with the same refresh token
+ * (Google may rotate it).
  */
 export class GoogleAuth implements AccessTokenProvider {
   private token: GoogleToken;

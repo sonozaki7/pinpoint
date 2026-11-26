@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Prepare the Notion demo workspace. Finds or creates, under NOTION_NOTES_ROOT:
 //   - a "Pinpoint demo" page
-//   - a "Tasks" database (Name, Due date, Status)
-//   - an "Acme contract" note
+//   - a "Docs" database (Name, Status: Needs review / Changes requested / Approved)
+//   - an "Acme contract" note that records the net-45 terms
 // Prints only the ids to put in apps/server/.env. Never prints the token or
 // page contents.
 
@@ -17,6 +17,7 @@ const API = 'https://api.notion.com/v1';
 
 const NOTE_TEXT =
   'Acme contract: net-45 agreed with Priya on Nov 12; clause 12 to be narrowed';
+const STATUS_OPTIONS = ['Needs review', 'Changes requested', 'Approved'];
 
 try {
   process.loadEnvFile(ENV_FILE);
@@ -92,36 +93,34 @@ async function main() {
   if (!demoId) throw new Error('Could not find or create the Pinpoint demo page.');
 
   const demoChildren = await listChildren(demoId);
-  let tasksId = demoChildren.find(
+  let docsId = demoChildren.find(
     (block) =>
       block.type === 'child_database' &&
-      String(block.child_database?.title ?? '').trim().toLowerCase() === 'tasks',
+      String(block.child_database?.title ?? '').trim().toLowerCase() === 'docs',
   )?.id;
 
-  if (!tasksId) {
+  if (!docsId) {
     const database = await notion('POST', '/databases', {
       parent: { type: 'page_id', page_id: demoId },
-      title: [{ type: 'text', text: { content: 'Tasks' } }],
+      title: [{ type: 'text', text: { content: 'Docs' } }],
       initial_data_source: {
         properties: {
           Name: { title: {} },
-          'Due date': { date: {} },
           Status: {
             status: {
-              options: [
-                { name: 'To do', color: 'red' },
-                { name: 'In progress', color: 'yellow' },
-                { name: 'Done', color: 'green' },
-              ],
+              options: STATUS_OPTIONS.map((name, index) => ({
+                name,
+                color: ['yellow', 'red', 'green'][index] ?? 'default',
+              })),
             },
           },
         },
       },
     });
-    tasksId = database.id;
-    console.log('Created database: Tasks');
+    docsId = database.id;
+    console.log('Created database: Docs');
   }
-  if (!tasksId) throw new Error('Could not find or create the Tasks database.');
+  if (!docsId) throw new Error('Could not find or create the Docs database.');
 
   const note = demoChildren.find(
     (block) =>
@@ -148,7 +147,7 @@ async function main() {
   }
 
   console.log(`\nDone. Add these lines to ${ENV_FILE}:\n`);
-  console.log(`NOTION_TASKS_DB=${tasksId}`);
+  console.log(`NOTION_REVIEW_DB=${docsId}`);
   console.log(`NOTION_NOTES_ROOT=${demoId}`);
   console.log('\nThen run: node scripts/seed-demo.mjs');
 }

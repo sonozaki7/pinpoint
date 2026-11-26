@@ -13,6 +13,7 @@ import { PinpointService } from './core/service.js';
 import { createSplitter } from './core/splitter/index.js';
 import { createApp } from './http/app.js';
 import { createCloudApp } from './http/cloudApp.js';
+import { createSources } from './sources/index.js';
 import { createVoiceService } from './voice/service.js';
 import type { AttentionThread } from './core/types.js';
 
@@ -91,6 +92,10 @@ async function main(): Promise<void> {
   const decks = new DeckStore(env.dataDir);
   const reviews = new ReviewStore(env.dataDir);
   const voice = createVoiceService(env);
+  const { sources } = createSources(env, t3, { demo: env.mode === 'demo' });
+  console.info(
+    `[pinpoint] review sources: ${sources.map((source) => source.app).join(', ')}`,
+  );
 
   service = new PinpointService({
     env,
@@ -102,6 +107,7 @@ async function main(): Promise<void> {
     reviews,
     voice,
     precomputed: demo?.precomputed ?? deckFixture,
+    sources,
   });
 
   await service.start();

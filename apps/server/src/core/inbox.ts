@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Deck, InboxItem, ThreadAttention } from '../../../../shared/contract.js';
-import type { AttentionSource, AttentionThread, TelegramNotifier, T3Client } from './types.js';
+import type { AttentionSource, AttentionThread, TelegramNotifier } from './types.js';
 import type { Env } from './env.js';
 import type { DeckStore } from './decks.js';
 import { buildDeck, deckFromPrecomputed } from './decks.js';
@@ -9,6 +9,7 @@ import { errorMessage } from './errors.js';
 import type { ReviewStore } from './reviews.js';
 import { makeGlance, toAscii } from './text.js';
 import type { Splitter } from './splitter/types.js';
+import type { ReviewSource } from '../sources/types.js';
 
 const ATTENTION_RANK: Record<ThreadAttention, number> = {
   question: 0,
@@ -23,7 +24,8 @@ const LIVE_REFRESH_MS = 20_000;
 
 export interface InboxDeps {
   env: Env;
-  t3: T3Client;
+  /** Every configured review surface; T3 is always first. */
+  sources: ReviewSource[];
   telegram: TelegramNotifier;
   splitter: Splitter;
   decks: DeckStore;
@@ -47,7 +49,7 @@ interface CachedSource {
  */
 export class InboxService {
   private readonly env: Env;
-  private readonly t3: T3Client;
+  private readonly sources: ReviewSource[];
   private readonly telegram: TelegramNotifier;
   private readonly splitter: Splitter;
   private readonly decks: DeckStore;
@@ -59,8 +61,9 @@ export class InboxService {
   private readonly notifiedFile: string;
 
   private readonly threads = new Map<string, AttentionThread>();
+  private readonly threadSource = new Map<string, ReviewSource>();
   private threadsPromise: Promise<AttentionThread[]> | null = null;
-  private readonly sources = new Map<string, CachedSource>();
+  private readonly sourcesByThread = new Map<string, CachedSource>();
   private readonly sourcePromises = new Map<string, Promise<AttentionSource>>();
   private readonly builds = new Map<string, Promise<Deck>>();
   private queue: Promise<void> = Promise.resolve();
@@ -69,7 +72,7 @@ export class InboxService {
 
   constructor(deps: InboxDeps) {
     this.env = deps.env;
-    this.t3 = deps.t3;
+    this.sources = deps.sources;
     this.telegram = deps.telegram;
     this.splitter = deps.splitter;
     this.decks = deps.decks;
@@ -135,31 +138,64 @@ export class InboxService {
     return this.fetchSource(thread);
   }
 
+  /** Which source owns this thread; used by edit and send. */
+  sourceFor(threadId: string): ReviewSource | undefined {
+    return this.threadSource.get(threadId);
+  }
+
   private async refreshThreads(): Promise<AttentionThread[]> {
     if (this.threadsPromise) return this.threadsPromise;
     this.threadsPromise = (async () => {
-      try {
-        const list = await this.t3.listAttention();
-        for (const thread of list) this.threads.set(thread.threadId, thread);
-        return list;
-      } finally {
-        this.threadsPromise = null;
+      const results = await Promise.allSettled(
+        this.sources.map(async (source) => ({
+          source,
+          threads: await source.listAttention(),
+        })),
+      );
+      const list: AttentionThread[] = [];
+      const seen = new Set<string>();
+      const failures: unknown[] = [];
+      for (const result of results) {
+        if (result.status === 'rejected') {
+          failures.push(result.reason);
+          continue;
+        }
+        for (const thread of result.value.threads) {
+          // The same id from two sources is a configuration mistake; keep the first.
+          if (seen.has(thread.threadId)) continue;
+          seen.add(thread.threadId);
+          this.threads.set(thread.threadId, thread);
+          this.threadSource.set(thread.threadId, result.value.source);
+          list.push(thread);
+        }
       }
-    })();
+      if (results.length > 0 && results.every((result) => result.status === 'rejected')) {
+        throw failures[0] instanceof Error ? failures[0] : new Error('no review source is reachable');
+      }
+      if (failures.length > 0) {
+        console.warn(`[inbox] ${failures.length} review source(s) failed: ${errorMessage(failures[0])}`);
+      }
+      return list;
+    })().finally(() => {
+      this.threadsPromise = null;
+    });
     return this.threadsPromise;
   }
 
   private async fetchSource(thread: AttentionThread): Promise<AttentionSource> {
-    const cached = this.sources.get(thread.threadId);
+    const cached = this.sourcesByThread.get(thread.threadId);
     if (cached && Date.now() - cached.at < SOURCE_TTL_MS) return cached.source;
     const loading = this.sourcePromises.get(thread.threadId);
     if (loading) return loading;
 
-    const promise = this.t3
+    const source = this.threadSource.get(thread.threadId) ?? this.sources[0];
+    if (!source) throw new Error(`No review source for ${thread.threadId}`);
+    const promise = source
       .getSource(thread.threadId)
-      .then((source) => {
-        this.sources.set(thread.threadId, { source, at: Date.now() });
-        return source;
+      .then((detail) => {
+        const value = detail.source;
+        this.sourcesByThread.set(thread.threadId, { source: value, at: Date.now() });
+        return value;
       })
       .catch((error: unknown) => {
         if (cached) {
@@ -189,6 +225,8 @@ export class InboxService {
         point.quote === other.quote &&
         point.risk === other.risk &&
         point.questionId === other.questionId &&
+        point.flag === other.flag &&
+        point.anchor === other.anchor &&
         JSON.stringify(point.options ?? []) === JSON.stringify(other.options ?? [])
       );
     });
@@ -343,19 +381,25 @@ export class InboxService {
   private summary(thread: AttentionThread, deck: Deck | undefined): string {
     const drafts = deck?.points.filter((point) => point.kind === 'draft').length ?? 0;
     let base: string;
-    switch (thread.attention) {
-      case 'plan':
-        base = deck ? `plan, ${deck.points.length} steps` : 'plan';
-        break;
-      case 'question':
-        base = 'question';
-        break;
-      case 'failed':
-        base = 'run failed';
-        break;
-      case 'report':
-        base = deck ? (drafts > 0 ? `${drafts} drafts` : `${deck.points.length} points`) : 'report';
-        break;
+    if (thread.app === 'gmail') {
+      base = deck ? `${drafts} draft${drafts === 1 ? '' : 's'}` : 'draft';
+    } else if (thread.app === 'notion') {
+      base = deck ? `page, ${deck.points.length} points` : 'page review';
+    } else {
+      switch (thread.attention) {
+        case 'plan':
+          base = deck ? `plan, ${deck.points.length} steps` : 'plan';
+          break;
+        case 'question':
+          base = 'question';
+          break;
+        case 'failed':
+          base = 'run failed';
+          break;
+        case 'report':
+          base = deck ? (drafts > 0 ? `${drafts} drafts` : `${deck.points.length} points`) : 'report';
+          break;
+      }
     }
     return makeGlance(toAscii(base), 30);
   }
@@ -398,6 +442,7 @@ export class InboxService {
           deckReady: Boolean(deck),
           pointCount: deck?.points.length ?? 0,
           draftNotes: await this.reviews.noteCount(thread.threadId),
+          ...(thread.app ? { app: thread.app } : {}),
         };
       }),
     );

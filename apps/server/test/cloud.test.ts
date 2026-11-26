@@ -83,6 +83,7 @@ interface InboxBody {
     deckReady: boolean;
     pointCount: number;
     draftNotes: number;
+    app?: string;
   }[];
   updatedAt: string;
 }
@@ -146,7 +147,9 @@ describe('cloud environment', () => {
       SPLITTER_PROVIDER: 'anthropic',
       SPLITTER_MODEL: 'model',
       ANTHROPIC_API_KEY: 'do-not-read',
-      OPENROUTER_API_KEY: 'do-not-read',
+      NOTION_TOKEN: 'do-not-read',
+      NOTION_REVIEW_DB: 'do-not-read',
+      GMAIL_DRAFTS_QUERY: 'label:private',
       PINPOINT_ALLOWED_ORIGINS: 'https://evil.example',
     });
     expect(env.mode).toBe('cloud');
@@ -161,7 +164,9 @@ describe('cloud environment', () => {
     expect(env.telegramChatId).toBe('');
     expect(env.splitterProvider).toBe('fixture');
     expect(env.anthropicKey).toBe('');
-    expect(env.openrouterKey).toBe('');
+    expect(env.notionToken).toBe('');
+    expect(env.notionReviewDb).toBe('');
+    expect(env.gmailDraftsQuery).toBe('label:pinpoint');
     expect(env.allowedOrigins).toEqual([]);
   });
 });
@@ -250,13 +255,24 @@ describe('cloud HTTP surface', () => {
       expect(first.items.map((item) => item.threadId)).toEqual([
         'login-fix',
         'payment-upgrade',
-        'inbox-morning',
+        'launch-post',
+        'draft-priya',
       ]);
       expect(first.items.every((item) => item.deckReady)).toBe(true);
       expect(first.items.find((item) => item.threadId === 'login-fix')).toMatchObject({
         attention: 'plan',
         summary: 'plan, 7 steps',
         pointCount: 7,
+      });
+      expect(first.items.find((item) => item.threadId === 'launch-post')).toMatchObject({
+        app: 'notion',
+        summary: 'page, 7 points',
+        pointCount: 7,
+      });
+      expect(first.items.find((item) => item.threadId === 'draft-priya')).toMatchObject({
+        app: 'gmail',
+        summary: '6 drafts',
+        pointCount: 6,
       });
 
       const deck = await context.app.request('/api/deck/login-fix', {
@@ -266,6 +282,26 @@ describe('cloud HTTP surface', () => {
       const body = await json<{ points: unknown[]; splitter: string }>(deck);
       expect(body.points).toHaveLength(7);
       expect(body.splitter).toBe('fixture');
+
+      const draft = await context.app.request('/api/deck/draft-priya', {
+        headers: headers(),
+      });
+      const draftDeck = await json<{
+        points: { kind: string; quote: string; flag?: string }[];
+      }>(draft);
+      expect(draftDeck.points).toHaveLength(6);
+      expect(draftDeck.points.every((point) => point.kind === 'draft')).toBe(true);
+      expect(draftDeck.points.find((point) => point.flag)).toMatchObject({
+        flag: 'notes say net-45',
+      });
+
+      const page = await context.app.request('/api/deck/launch-post', {
+        headers: headers(),
+      });
+      const pageDeck = await json<{ points: { anchor?: string; flag?: string }[] }>(page);
+      expect(pageDeck.points.find((point) => point.flag)?.flag).toBe('check this');
+      // Block anchors are server-side only; the glasses deck must not carry them.
+      expect(pageDeck.points.every((point) => point.anchor === undefined)).toBe(true);
     } finally {
       await cleanup(context);
     }
@@ -289,13 +325,15 @@ describe('cloud HTTP surface', () => {
       expect(sent.status).toBe(200);
       expect((await inbox(context.app, DEVICE_A)).items.map((item) => item.threadId)).toEqual([
         'payment-upgrade',
-        'inbox-morning',
+        'launch-post',
+        'draft-priya',
       ]);
       // Device B still has its own untouched inbox.
       expect((await inbox(context.app, DEVICE_B)).items.map((item) => item.threadId)).toEqual([
         'login-fix',
         'payment-upgrade',
-        'inbox-morning',
+        'launch-post',
+        'draft-priya',
       ]);
 
       await vi.advanceTimersByTimeAsync(5_000);
@@ -309,7 +347,8 @@ describe('cloud HTTP surface', () => {
       expect(bStill.items.map((item) => item.threadId)).toEqual([
         'login-fix',
         'payment-upgrade',
-        'inbox-morning',
+        'launch-post',
+        'draft-priya',
       ]);
       expect(bStill.items.find((item) => item.threadId === 'login-fix')?.attention).toBe('plan');
     } finally {
@@ -374,10 +413,10 @@ describe('cloud HTTP surface', () => {
   it('returns an empty inbox after every sample thread has been sent', async () => {
     const context = await makeCloudContext();
     try {
-      for (const threadId of ['login-fix', 'payment-upgrade', 'inbox-morning']) {
+      for (const threadId of ['login-fix', 'payment-upgrade', 'launch-post', 'draft-priya']) {
         const response = await send(context.app, threadId);
         expect(response.status).toBe(200);
-        expect(await json(response)).toEqual({ ok: true, delivered: 'sample' });
+        expect(await json(response)).toMatchObject({ ok: true, delivered: 'sample' });
       }
       expect((await inbox(context.app)).items).toEqual([]);
     } finally {
@@ -411,18 +450,20 @@ describe('cloud sample send and agent reply', () => {
       let current = await inbox(context.app);
       expect(current.items.map((item) => item.threadId)).toEqual([
         'payment-upgrade',
-        'inbox-morning',
+        'launch-post',
+        'draft-priya',
       ]);
 
       await vi.advanceTimersByTimeAsync(4_999);
       current = await inbox(context.app);
-      expect(current.items).toHaveLength(2);
+      expect(current.items).toHaveLength(3);
 
       await vi.advanceTimersByTimeAsync(1);
       current = await inbox(context.app);
       expect(current.items.map((item) => item.threadId)).toEqual([
         'payment-upgrade',
-        'inbox-morning',
+        'launch-post',
+        'draft-priya',
         'login-fix',
       ]);
       const replyItem = current.items.find((item) => item.threadId === 'login-fix')!;
@@ -475,9 +516,9 @@ describe('cloud sample send and agent reply', () => {
       // Sending the sample reply just clears it; nothing comes back.
       const replySend = await send(context.app, 'login-fix');
       expect(replySend.status).toBe(200);
-      expect((await inbox(context.app)).items).toHaveLength(2);
+      expect((await inbox(context.app)).items).toHaveLength(3);
       await vi.advanceTimersByTimeAsync(10_000);
-      expect((await inbox(context.app)).items).toHaveLength(2);
+      expect((await inbox(context.app)).items).toHaveLength(3);
     } finally {
       await cleanup(context);
     }
@@ -514,6 +555,87 @@ describe('cloud sample send and agent reply', () => {
       await cleanup(context);
     }
   });
+
+  it('edits a Gmail draft sentence in place, saves it and sends a sample receipt', async () => {
+    const context = await makeCloudContext();
+    try {
+      const response = await context.app.request('/api/edit/draft-priya', {
+        method: 'POST',
+        headers: headers(DEVICE_A, { 'content-type': 'application/json' }),
+        body: JSON.stringify({ pointId: 'p2', text: 'Net-45, not net-60.' }),
+      });
+      expect(response.status).toBe(200);
+      expect(await json(response)).toMatchObject({
+        ok: true,
+        pointId: 'p2',
+        before: "We're happy to agree to net-60 payment terms.",
+        after: "We're happy to agree to net-45 payment terms.",
+        method: 'replace',
+      });
+
+      const saved = await context.app.request('/api/review/draft-priya', {
+        headers: headers(),
+      });
+      const draft = await json<{ notes: { pointId: string; after?: string }[] }>(saved);
+      expect(draft.notes).toHaveLength(1);
+      expect(draft.notes[0]).toMatchObject({
+        pointId: 'p2',
+        after: "We're happy to agree to net-45 payment terms.",
+      });
+
+      const sent = await send(context.app, 'draft-priya');
+      expect(sent.status).toBe(200);
+      const result = await json<{
+        ok: boolean;
+        delivered: string;
+        receipt?: { lines: { app: string; text: string; ok: boolean; link?: string }[] };
+      }>(sent);
+      expect(result).toMatchObject({ ok: true, delivered: 'sample' });
+      expect(result.receipt?.lines).toHaveLength(1);
+      expect(result.receipt?.lines[0]).toMatchObject({
+        app: 'gmail',
+        text: 'Sent to Priya (sample)',
+        ok: true,
+      });
+      expect(result.receipt?.lines[0].link).toContain('#drafts/');
+      expect((await inbox(context.app)).items.map((item) => item.threadId)).not.toContain(
+        'draft-priya',
+      );
+    } finally {
+      await cleanup(context);
+    }
+  });
+
+  it('returns a Notion comment and status receipt for the sample page', async () => {
+    const context = await makeCloudContext();
+    try {
+      await putNotes(context.app, 'launch-post', [
+        {
+          pointId: 'p4',
+          verdict: 'object',
+          text: 'Not everyone today. Say 10% today and everyone by Friday.',
+        },
+      ]);
+      const sent = await send(context.app, 'launch-post');
+      expect(sent.status).toBe(200);
+      const result = await json<{
+        ok: boolean;
+        delivered: string;
+        receipt?: { lines: { app: string; text: string; ok: boolean }[] };
+      }>(sent);
+      expect(result).toMatchObject({ ok: true, delivered: 'sample' });
+      expect(result.receipt?.lines.map((line) => line.text)).toEqual([
+        '1 comment on Launch post (sample)',
+        'Status: Changes requested (sample)',
+      ]);
+      expect(result.receipt?.lines.every((line) => line.app === 'notion')).toBe(true);
+      expect((await inbox(context.app)).items.map((item) => item.threadId)).not.toContain(
+        'launch-post',
+      );
+    } finally {
+      await cleanup(context);
+    }
+  });
 });
 
 describe('cloud sample reset', () => {
@@ -529,7 +651,8 @@ describe('cloud sample reset', () => {
       expect(initial.items.map((item) => item.threadId)).toEqual([
         'login-fix',
         'payment-upgrade',
-        'inbox-morning',
+        'launch-post',
+        'draft-priya',
       ]);
 
       await putNotes(context.app, 'payment-upgrade', [
@@ -537,7 +660,7 @@ describe('cloud sample reset', () => {
       ]);
       await send(context.app, 'login-fix');
       await vi.advanceTimersByTimeAsync(5_000);
-      expect((await inbox(context.app)).items).toHaveLength(3);
+      expect((await inbox(context.app)).items).toHaveLength(4);
 
       const reset = await context.app.request('/api/sample/reset', {
         method: 'POST',
@@ -550,7 +673,8 @@ describe('cloud sample reset', () => {
       expect(restored.items.map((item) => item.threadId)).toEqual([
         'login-fix',
         'payment-upgrade',
-        'inbox-morning',
+        'launch-post',
+        'draft-priya',
       ]);
       expect(restored.items.find((item) => item.threadId === 'login-fix')).toMatchObject({
         attention: 'plan',
@@ -570,7 +694,8 @@ describe('cloud sample reset', () => {
       expect((await inbox(context.app)).items.map((item) => item.threadId)).toEqual([
         'login-fix',
         'payment-upgrade',
-        'inbox-morning',
+        'launch-post',
+        'draft-priya',
       ]);
     } finally {
       await cleanup(context);

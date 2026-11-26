@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export type SplitterProviderName = 'opencode' | 'anthropic' | 'openrouter' | 'fixture';
+export type SplitterProviderName = 'opencode' | 'anthropic' | 'fixture';
 
 /** demo: local fixture showcase · live: this Mac's T3 Code · cloud: public sample workspace per device. */
 export type PinpointMode = 'demo' | 'live' | 'cloud';
@@ -33,10 +33,17 @@ export interface Env {
   splitterModel: string;
   anthropicKey: string;
   anthropicModel: string;
-  openrouterKey: string;
-  openrouterModel: string;
   telegramToken: string;
   telegramChatId: string;
+  /** Notion review source: integration token, review database and status property. */
+  notionToken: string;
+  notionReviewDb: string;
+  notionStatusProp: string;
+  notionNotesRoot: string;
+  /** Legacy mail listing query; the draft review uses gmailDraftsQuery. */
+  gmailQuery: string;
+  /** GMAIL_DRAFTS_QUERY: which drafts are waiting for review (default label:pinpoint). */
+  gmailDraftsQuery: string;
   whisperModel: string;
   /** whisper-cli threads (WHISPER_THREADS, default 4). */
   whisperThreads: number;
@@ -88,7 +95,7 @@ function str(source: NodeJS.ProcessEnv, key: string, fallback = ''): string {
 
 function provider(source: NodeJS.ProcessEnv, mode: 'demo' | 'live'): SplitterProviderName {
   const raw = str(source, 'SPLITTER_PROVIDER').toLowerCase();
-  if (raw === 'opencode' || raw === 'anthropic' || raw === 'openrouter' || raw === 'fixture') {
+  if (raw === 'opencode' || raw === 'anthropic' || raw === 'fixture') {
     return raw;
   }
   // Demo must run offline without opencode installed, so fixtures are the safe default there.
@@ -134,10 +141,14 @@ export function readEnv(source: NodeJS.ProcessEnv = process.env): Env {
     splitterModel: cloud ? 'fixture' : str(source, 'SPLITTER_MODEL', 'opencode-go/deepseek-v4.1-flash'),
     anthropicKey: cloud ? '' : str(source, 'ANTHROPIC_API_KEY'),
     anthropicModel: cloud ? '' : str(source, 'ANTHROPIC_MODEL', 'claude-sonnet-4-5'),
-    openrouterKey: cloud ? '' : str(source, 'OPENROUTER_API_KEY'),
-    openrouterModel: cloud ? '' : str(source, 'OPENROUTER_MODEL', 'anthropic/claude-sonnet-4.5'),
     telegramToken: cloud ? '' : str(source, 'TELEGRAM_BOT_TOKEN'),
     telegramChatId: cloud ? '' : str(source, 'TELEGRAM_CHAT_ID'),
+    notionToken: cloud ? '' : str(source, 'NOTION_TOKEN'),
+    notionReviewDb: cloud ? '' : str(source, 'NOTION_REVIEW_DB'),
+    notionStatusProp: cloud ? 'Status' : str(source, 'NOTION_STATUS_PROP', 'Status'),
+    notionNotesRoot: cloud ? '' : str(source, 'NOTION_NOTES_ROOT'),
+    gmailQuery: cloud ? '' : str(source, 'GMAIL_QUERY'),
+    gmailDraftsQuery: cloud ? 'label:pinpoint' : str(source, 'GMAIL_DRAFTS_QUERY', 'label:pinpoint'),
     whisperModel: str(source, 'WHISPER_MODEL'),
     whisperThreads,
     scriptedTranscripts: str(source, 'PINPOINT_SCRIPTED_TRANSCRIPTS'),

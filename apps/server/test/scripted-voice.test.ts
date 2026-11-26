@@ -40,6 +40,12 @@ describe('scripted transcripts file', () => {
       ],
       ['inbox-morning', 'p3', 'Make it Thursday, not Tuesday.'],
       ['login-fix', 'p4', "Don't sign everyone out. Just fix the broken logins."],
+      [
+        'launch-post',
+        'p4',
+        'Not everyone today. Say 10% today and everyone by Friday.',
+      ],
+      ['draft-priya', 'p2', 'Net-45, not net-60.'],
     ]);
   });
 

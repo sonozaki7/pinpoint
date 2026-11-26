@@ -4,7 +4,7 @@ import { findSplitPayload } from './json.js';
 import { naiveSplit } from './naive.js';
 import { buildSplitPrompt, normalizeHeadline } from './prompt.js';
 import { runOpencode } from './opencode.js';
-import { splitWithAnthropic, splitWithOpenRouter } from './httpProviders.js';
+import { splitWithAnthropic } from './httpProviders.js';
 import { rawPointSchema } from '../schemas.js';
 import { SplitterError, type RawSplit, type SplitInput, type Splitter } from './types.js';
 
@@ -17,8 +17,6 @@ function labelFor(provider: Env['splitterProvider'], model: string): string {
       return `opencode:${model.replace(/^opencode-go\//, '')}`;
     case 'anthropic':
       return `anthropic:${model}`;
-    case 'openrouter':
-      return `openrouter:${model}`;
     case 'fixture':
       return 'fixture';
   }
@@ -31,12 +29,7 @@ function fromModelText(text: string): { headline?: unknown; points: unknown[] } 
 /** Builds the splitter selected by SPLITTER_PROVIDER. Model failures fall back to naive splitting. */
 export function createSplitter(env: Env): Splitter {
   const provider = env.splitterProvider;
-  const model =
-    provider === 'anthropic'
-      ? env.anthropicModel
-      : provider === 'openrouter'
-        ? env.openrouterModel
-        : env.splitterModel;
+  const model = provider === 'anthropic' ? env.anthropicModel : env.splitterModel;
   const label = labelFor(provider, model);
 
   return {
@@ -61,10 +54,8 @@ export function createSplitter(env: Env): Splitter {
       try {
         if (provider === 'opencode') {
           text = await runOpencode(buildSplitPrompt(input), model);
-        } else if (provider === 'anthropic') {
-          text = await splitWithAnthropic(input, env.anthropicKey, model);
         } else {
-          text = await splitWithOpenRouter(input, env.openrouterKey, model);
+          text = await splitWithAnthropic(input, env.anthropicKey, model);
         }
       } catch (error) {
         return fallback(errorMessage(error));

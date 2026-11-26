@@ -1,6 +1,5 @@
-// LlmConnector fallback for the desk when OPENROUTER_API_KEY is not set.
-// Reuses the existing opencode CLI path (core/splitter/opencode.ts) unchanged;
-// it is not used in cloud mode.
+// LlmConnector for the desk. Reuses the existing opencode CLI path
+// (core/splitter/opencode.ts) unchanged; it is not used in cloud mode.
 
 import { ConnectorError, type LlmConnector } from './types.js';
 import { runOpencode } from '../core/splitter/opencode.js';

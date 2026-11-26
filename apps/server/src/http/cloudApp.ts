@@ -14,7 +14,7 @@ import { FixedWindowRateLimiter, type RateLimitDecision } from '../cloud/rateLim
 import type { CloudService } from '../cloud/service.js';
 import type { DeviceWorkspace } from '../cloud/workspace.js';
 import { HttpError, errorMessage } from '../core/errors.js';
-import { draftInputSchema } from '../core/schemas.js';
+import { draftInputSchema, editInputSchema } from '../core/schemas.js';
 import { MAX_CLOUD_JSON_BYTES, readBodyCapped, readJsonBody } from './body.js';
 
 export interface CloudAppDeps {
@@ -35,6 +35,7 @@ const ROUTE_TEMPLATES: [RegExp, string][] = [
   [/^\/api\/review\/[^/]+\/preview$/, '/api/review/:threadId/preview'],
   [/^\/api\/review\/[^/]+\/send$/, '/api/review/:threadId/send'],
   [/^\/api\/review\/[^/]+$/, '/api/review/:threadId'],
+  [/^\/api\/edit\/[^/]+$/, '/api/edit/:threadId'],
   [/^\/api\/phone\/[^/]+\/[^/]+$/, '/api/phone/:threadId/:pointId'],
 ];
 
@@ -183,6 +184,30 @@ export function createCloudApp(deps: CloudAppDeps): Hono<CloudVariables> {
   app.post('/api/review/:threadId/preview', (c) =>
     c.json(workspaceFor(c, cloud).preview(c.req.param('threadId'))),
   );
+
+  app.post('/api/edit/:threadId', async (c) => {
+    const raw = await readJsonBody(
+      c.req.raw,
+      MAX_CLOUD_JSON_BYTES,
+      'JSON body exceeds 64 KB',
+    );
+    const parsed = editInputSchema.safeParse(raw);
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      throw new HttpError(
+        400,
+        `Invalid edit body${issue ? `: ${issue.path.join('.')} ${issue.message}` : ''}`,
+        'bad_request',
+      );
+    }
+    return c.json(
+      await workspaceFor(c, cloud).edit(
+        c.req.param('threadId'),
+        parsed.data.pointId,
+        parsed.data.text,
+      ),
+    );
+  });
 
   app.post('/api/review/:threadId/send', async (c) =>
     c.json(await workspaceFor(c, cloud).send(c.req.param('threadId'))),
