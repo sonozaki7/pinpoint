@@ -1,20 +1,22 @@
 #!/usr/bin/env node
-// One-shot Telegram verification for the demo plan fixture `auth-refresh-fix`.
+// One-shot Telegram verification for the two plain-language demo threads.
 //
-// It drives the server's real Telegram code: the same transport, HTML renderer, quote
-// matcher, review formatter and topic store the server uses. In one run it:
+// It drives the real notifier (apps/server/src/telegram/index.ts) exactly as the server
+// does, so the run proves the whole design:
 //
-//   1. creates the topic for the thread (or reuses the stored one),
-//   2. posts the header and the full plan,
-//   3. posts the composed review (objection on point 4, note on point 6),
-//   4. posts each note as a quote-reply on the exact plan sentence,
-//   5. posts the "read on phone" marker for point 4,
-//   6. prints a t.me link for every message it posted.
+//   1. removes earlier Pinpoint test topics (auth-refresh-fix and the two fixtures),
+//   2. posts and pins the General-topic legend once,
+//   3. login-fix: card + silent full text, then a review with one change on point 4,
+//      one quote-reply per note, the summary, the reviewed card and a done topic icon,
+//   4. read-on-phone on point 4: a notifying quote-reply with the whole step paragraph,
+//   5. payment-upgrade: question card (option buttons), answer "Wait until Monday",
+//      quote-reply, summary, reviewed card,
+//   6. prints a t.me link for every message and reports quote fallbacks.
 //
 // Live run (needs the real bot, Node 22 and tsx):
 //   npx tsx --env-file=apps/server/.env scripts/telegram-verify.mjs
 //
-// Dry run (no token, no network, writes to the dry-run log and prints fake links):
+// Dry run (no token, no network, writes the dry-run log and prints fake links):
 //   npx tsx scripts/telegram-verify.mjs --dry-run
 //
 // Optional: --data-dir <path> (default: PINPOINT_DATA_DIR or apps/server/.data).
@@ -40,7 +42,8 @@ if (has('--help') || has('-h')) {
       '  npx tsx --env-file=apps/server/.env scripts/telegram-verify.mjs',
       '  npx tsx scripts/telegram-verify.mjs --dry-run',
       '',
-      'Posts the auth-refresh-fix topic, plan, review and quote-replies, then prints every link.',
+      'Runs login-fix (one change) and payment-upgrade (answer "Wait until Monday")',
+      'through the real notifier, then prints every message link.',
       'A live run needs TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in the environment or',
       'apps/server/.env. --dry-run never contacts Telegram.',
     ].join('\n'),
@@ -91,25 +94,18 @@ const effectiveChatId = chatId || '-1001234567890';
 async function loadIntegration() {
   const base = new URL('../apps/server/src/', import.meta.url);
   const importFile = (path) => import(new URL(path, base).href);
-  const [telegram, transport, store, format, composer] = await Promise.all([
+  const [telegram, store, transport, composer] = await Promise.all([
     importFile('telegram/index.ts'),
-    importFile('telegram/transport.ts'),
     importFile('telegram/store.ts'),
-    importFile('telegram/format.ts'),
+    importFile('telegram/transport.ts'),
     importFile('core/composer.ts'),
   ]);
   return {
+    createTelegramNotifier: telegram.createTelegramNotifier,
     findQuoteMatch: telegram.findQuoteMatch,
     messageLink: telegram.messageLink,
-    renderSourceParts: telegram.renderSourceParts,
-    splitPlainText: telegram.splitPlainText,
-    TelegramTransport: transport.TelegramTransport,
-    TelegramApiError: transport.TelegramApiError,
     JsonStateStore: store.JsonStateStore,
-    headerText: format.headerText,
-    reviewLine: format.reviewLine,
-    pointReplyText: format.pointReplyText,
-    topicName: format.topicName,
+    TelegramTransport: transport.TelegramTransport,
     composeReview: composer.composeReview,
   };
 }
@@ -135,70 +131,43 @@ try {
 }
 
 const {
+  createTelegramNotifier,
   findQuoteMatch,
   messageLink,
-  renderSourceParts,
-  splitPlainText,
-  TelegramTransport,
-  TelegramApiError,
   JsonStateStore,
-  headerText,
-  reviewLine,
-  pointReplyText,
-  topicName,
+  TelegramTransport,
   composeReview,
 } = integration;
 
-const fixturePath = new URL('../demo/fixtures/auth-refresh-fix.json', import.meta.url);
-const fixture = JSON.parse(await readFile(fixturePath, 'utf8'));
-const { thread, source, deck } = fixture;
-
-// The two notes the demo records for this plan, from demo/fixtures/transcripts.json.
-const transcripts = JSON.parse(
-  await readFile(new URL('../demo/fixtures/transcripts.json', import.meta.url), 'utf8'),
-);
-const transcriptFor = (pointId) => {
-  const entry = (transcripts.notes ?? []).find(
-    (note) => note.threadId === thread.threadId && note.pointId === pointId,
-  );
-  if (!entry?.text) throw new Error(`No demo transcript for ${thread.threadId} ${pointId}`);
-  return entry.text;
-};
-
-const notes = [
-  { pointId: 'p4', verdict: 'object', text: transcriptFor('p4') },
-  { pointId: 'p6', verdict: 'note', text: transcriptFor('p6') },
-];
-const draft = {
-  threadId: thread.threadId,
-  sourceMessageId: source.sourceMessageId,
-  notes,
-  seen: ['p4', 'p6'],
-  updatedAt: new Date().toISOString(),
-};
-const composed = composeReview(deck, draft);
-const point4 = deck.points.find((point) => point.id === 'p4');
-const point6 = deck.points.find((point) => point.id === 'p6');
-if (!point4 || !point6) throw new Error('The fixture deck is missing point 4 or point 6.');
-
-// Render the plan before posting anything, then prove both note quotes land on a real
-// message part. A missing quote would otherwise send a plain reply instead of a quote-reply.
-const planParts = renderSourceParts(source.text);
-const match4 = findQuoteMatch(planParts, point4.quote);
-const match6 = findQuoteMatch(planParts, point6.quote);
-if (!match4 || !match6) {
-  const missing = [!match4 && 'point 4', !match6 && 'point 6'].filter(Boolean).join(' and ');
-  console.error(`Refusing to post: the exact quote for ${missing} is not in the fixture plan text.`);
-  process.exit(1);
+async function loadFixture(name) {
+  const path = new URL(`../demo/fixtures/${name}.json`, import.meta.url);
+  return JSON.parse(await readFile(path, 'utf8'));
 }
 
-const store = new JsonStateStore(join(dataDir, 'telegram.json'));
-const transport = new TelegramTransport({
+const login = await loadFixture('login-fix');
+const payment = await loadFixture('payment-upgrade');
+
+// Prove both quotes land before posting anything; a missing quote would fall back to a
+// plain reply, which the run reports but should not happen with these fixtures.
+for (const fixture of [login, payment]) {
+  for (const point of fixture.deck.points) {
+    const parts = [{ plain: fixture.source.text }];
+    if (!findQuoteMatch(parts, point.quote)) {
+      console.error(
+        `Refusing to post: the quote for ${fixture.thread.threadId}/${point.id} is not in its source text.`,
+      );
+      process.exit(1);
+    }
+  }
+}
+
+const cleanupStore = new JsonStateStore(join(dataDir, 'telegram.json'));
+const cleanupTransport = new TelegramTransport({
   token,
   dryRun,
   logPath: join(dataDir, 'telegram-dryrun.log'),
   allocateId: () =>
-    store.update((state) => {
+    cleanupStore.update((state) => {
       const id = state.fakeNextId;
       state.fakeNextId = id + 1;
       return id;
@@ -206,157 +175,97 @@ const transport = new TelegramTransport({
   minIntervalMs: 1100,
 });
 
+const CLEANUP_THREADS = ['auth-refresh-fix', 'login-fix', 'payment-upgrade'];
+const removed = [];
+
+async function cleanupOldTopics() {
+  for (const threadId of CLEANUP_THREADS) {
+    const state = await cleanupStore.get();
+    const record = state.topics[threadId];
+    if (!record?.topicId) continue;
+    if (!dryRun) {
+      try {
+        await cleanupTransport.call('deleteForumTopic', {
+          chat_id: effectiveChatId,
+          message_thread_id: record.topicId,
+        });
+        removed.push(`${record.title} (topic ${record.topicId})`);
+      } catch (error) {
+        const description = error instanceof Error ? error.message : String(error);
+        if (!/TOPIC_ID_INVALID|thread not found|topic.*not found/i.test(description)) {
+          console.warn(`Could not delete ${record.title}: ${description}`);
+        }
+      }
+    }
+    await cleanupStore.update((next) => {
+      delete next.topics[threadId];
+    });
+  }
+
+  // The verification run proves the legend is posted and pinned. Remove the previous
+  // legend message (if any, fake or real) so the group ends with exactly one.
+  const state = await cleanupStore.get();
+  const previousLegend = state.generalMessageId;
+  if (!dryRun && previousLegend !== undefined) {
+    await cleanupTransport
+      .call('deleteMessage', { chat_id: effectiveChatId, message_id: previousLegend })
+      .catch(() => undefined);
+  }
+  await cleanupStore.update((next) => {
+    delete next.generalMessageId;
+    delete next.legendText;
+  });
+}
+
 const links = [];
+const initialCards = {};
 const addLink = (label, messageId, topicId) => {
-  links.push({ label, url: messageLink(effectiveChatId, messageId, topicId) });
-  return messageId;
+  const url = messageLink(effectiveChatId, messageId, topicId);
+  links.push({ label, url });
+  return url;
 };
 
-function saveRecord(mutate) {
-  return store.update((state) => {
-    const record = state.topics[thread.threadId];
-    if (!record) return undefined;
-    mutate(record);
-    record.updatedAt = new Date().toISOString();
-    return record;
-  });
-}
+const readState = async () =>
+  JSON.parse(await readFile(join(dataDir, 'telegram.json'), 'utf8'));
 
-async function ensureTopic() {
-  const state = await store.get();
-  const existing = state.topics[thread.threadId];
-  if (existing?.topicId) {
-    if (existing.title !== thread.title) {
-      await transport.call('editForumTopic', {
-        chat_id: effectiveChatId,
-        message_thread_id: existing.topicId,
-        name: topicName(thread.title),
-      });
-      await saveRecord((record) => {
-        record.title = thread.title;
-      });
-    }
-    return existing;
-  }
+const fallbacks = [];
+let notifier;
 
-  const created = await transport.call('createForumTopic', {
-    chat_id: effectiveChatId,
-    name: topicName(thread.title),
-  });
-  const record = {
-    threadId: thread.threadId,
-    chatId: effectiveChatId,
-    topicId: created.message_thread_id,
-    title: thread.title,
-    project: thread.project ?? '',
-    attention: thread.attention,
-    pointCount: 0,
-    sourceMessageIds: [],
-    parts: [],
+function buildAnswerDraft(fixture, pointId, option) {
+  return {
+    threadId: fixture.thread.threadId,
+    sourceMessageId: fixture.source.sourceMessageId,
+    notes: [{ pointId, verdict: 'answer', option }],
+    seen: [pointId],
     updatedAt: new Date().toISOString(),
   };
-  await store.update((state) => {
-    state.topics[thread.threadId] = { ...record };
-  });
-  return record;
 }
 
-async function ensureHeader(record) {
-  const text = headerText(thread.attention, deck.points.length);
-  const keyboard = {
-    inline_keyboard: [
-      [{ text: 'Agree all & continue', callback_data: `agree:${thread.threadId}` }],
-    ],
-  };
+notifier = createTelegramNotifier(
+  dryRun
+    ? { dataDir }
+    : { TELEGRAM_BOT_TOKEN: token, TELEGRAM_CHAT_ID: chatId, dataDir },
+  {
+    onAgreeAll: async (threadId) => {
+      console.log(`[verify] onAgreeAll called for ${threadId} (button path; unused in this run)`);
+    },
+    onAnswer: async (threadId, pointId, option) => {
+      // Same path as answering on the glasses: save the answer, then send the review.
+      const fixture = threadId === payment.thread.threadId ? payment : login;
+      const draft = buildAnswerDraft(fixture, pointId, option);
+      const composed = composeReview(fixture.deck, draft);
+      await notifier.onReviewSent(fixture.thread, fixture.deck, draft, composed.message);
+    },
+    onQuoteFallback: (info) => {
+      fallbacks.push(info);
+      console.warn(`[verify] quote refused, plain reply sent: ${info.reason}`);
+    },
+  },
+);
 
-  if (record.headerMessageId === undefined) {
-    const sent = await transport.call('sendMessage', {
-      chat_id: effectiveChatId,
-      message_thread_id: record.topicId,
-      text,
-      reply_markup: keyboard,
-    });
-    await saveRecord((next) => {
-      next.headerMessageId = sent.message_id;
-      next.headerText = text;
-      next.attention = thread.attention;
-      next.pointCount = deck.points.length;
-    });
-    return { messageId: sent.message_id, text };
-  }
-
-  if (record.headerText !== text) {
-    await transport.call('editMessageText', {
-      chat_id: effectiveChatId,
-      message_id: record.headerMessageId,
-      text,
-      reply_markup: keyboard,
-    });
-    await saveRecord((next) => {
-      next.headerText = text;
-      next.attention = thread.attention;
-      next.pointCount = deck.points.length;
-    });
-  }
-  return { messageId: record.headerMessageId, text };
-}
-
-async function ensurePlan(record) {
-  if (record.sourceMessageId === source.sourceMessageId && record.parts.length > 0) {
-    return record.parts;
-  }
-  const posted = [];
-  for (const part of planParts) {
-    const sent = await transport.call('sendMessage', {
-      chat_id: effectiveChatId,
-      message_thread_id: record.topicId,
-      text: part.html,
-      parse_mode: 'HTML',
-      disable_notification: true,
-      link_preview_options: { is_disabled: true },
-    });
-    posted.push({ messageId: sent.message_id, plain: part.plain });
-    await store.update((state) => {
-      const next = state.topics[thread.threadId];
-      if (!next) return;
-      next.parts = [...posted];
-      next.sourceMessageIds = posted.map((entry) => entry.messageId);
-      next.sourceMessageId = source.sourceMessageId;
-      next.updatedAt = new Date().toISOString();
-    });
-  }
-  return posted;
-}
-
-async function postQuote(topicId, targetMessageId, quote, text, fallbackMessageId) {
-  try {
-    const sent = await transport.call('sendMessage', {
-      chat_id: effectiveChatId,
-      message_thread_id: topicId,
-      text,
-      reply_parameters: {
-        message_id: targetMessageId,
-        quote,
-        allow_sending_without_reply: true,
-      },
-    });
-    return { messageId: sent.message_id, mode: 'quote' };
-  } catch (error) {
-    // Same fallback as the notifier: a quote that Telegram refuses still gets posted.
-    if (error instanceof TelegramApiError && error.code === 400 && /quote/i.test(error.description)) {
-      const sent = await transport.call('sendMessage', {
-        chat_id: effectiveChatId,
-        message_thread_id: topicId,
-        text,
-        reply_parameters: {
-          message_id: fallbackMessageId ?? targetMessageId,
-          allow_sending_without_reply: true,
-        },
-      });
-      return { messageId: sent.message_id, mode: 'plain-reply' };
-    }
-    throw error;
-  }
+function linkTopicCard(record, label) {
+  if (record?.headerMessageId === undefined) return;
+  addLink(label, record.headerMessageId, record.topicId);
 }
 
 async function main() {
@@ -365,107 +274,141 @@ async function main() {
       ? 'DRY RUN: nothing is sent to Telegram. Links below are fake and only show the order.'
       : 'LIVE RUN: posting to Telegram now.',
   );
-  console.log(`Thread: ${thread.title} (${thread.threadId}), ${deck.points.length} points`);
-  console.log(`Data:   ${dataDir}`);
+  console.log(`Data: ${dataDir}`);
   console.log('');
 
-  const topic = await ensureTopic();
-
-  const header = await ensureHeader(topic);
-  addLink(`Topic "${topicName(thread.title)}"`, topic.topicId);
-  addLink(`Header: ${header.text}`, header.messageId, topic.topicId);
-
-  const parts = await ensurePlan(topic);
-  parts.forEach((part, index) => {
-    addLink(`Plan text ${index + 1}/${parts.length}`, part.messageId, topic.topicId);
-  });
-
-  const reviewChunks = splitPlainText(composed.message.trim());
-  const reviewIds = [];
-  for (let index = 0; index < reviewChunks.length; index += 1) {
-    const chunk = reviewChunks[index];
-    const sent =
-      index === 0
-        ? await transport.call('sendMessage', {
-            chat_id: effectiveChatId,
-            message_thread_id: topic.topicId,
-            text: chunk,
-            reply_parameters: {
-              message_id: header.messageId,
-              allow_sending_without_reply: true,
-            },
-          })
-        : await transport.call('sendMessage', {
-            chat_id: effectiveChatId,
-            message_thread_id: topic.topicId,
-            text: chunk,
-          });
-    reviewIds.push(sent.message_id);
+  await cleanupOldTopics();
+  if (removed.length > 0) {
+    console.log('Removed earlier test topics:');
+    removed.forEach((entry) => console.log(`  - ${entry}`));
+    console.log('');
   }
-  await saveRecord((next) => {
-    next.reviewMessageId = reviewIds[0];
-  });
-  reviewIds.forEach((messageId, index) => {
+
+  // start() posts and pins the legend once, then long-polls for button taps.
+  await notifier.start();
+  const stateAfterStart = await readState();
+  if (stateAfterStart.generalMessageId !== undefined) {
+    addLink('General legend (pinned)', stateAfterStart.generalMessageId);
+  }
+
+  // ---- login-fix: plan review with one change on point 4 -------------------
+  await notifier.onAttention(login.thread, login.source, login.deck);
+  let state = await readState();
+  let record = state.topics[login.thread.threadId];
+  initialCards[login.thread.threadId] = record.headerText;
+  linkTopicCard(record, 'login-fix card');
+  record.parts.forEach((part, index) => {
     addLink(
-      reviewIds.length === 1 ? 'Composed review' : `Composed review ${index + 1}/${reviewIds.length}`,
-      messageId,
-      topic.topicId,
+      `login-fix full text ${index + 1}/${record.parts.length}`,
+      part.messageId,
+      record.topicId,
     );
   });
+  console.log(`login-fix card: ${JSON.stringify(record.headerText)}`);
+  console.log('');
 
-  const quoteResults = [];
-  for (const note of draft.notes) {
-    const point = deck.points.find((candidate) => candidate.id === note.pointId);
-    if (!point) continue;
-    const match = findQuoteMatch(parts, point.quote);
-    const target = match ? parts[match.partIndex] : undefined;
-    const text = reviewLine(point, note);
-    let result;
-    if (match && target) {
-      result = await postQuote(topic.topicId, target.messageId, match.quote, text, header.messageId);
-    } else {
-      const sent = await transport.call('sendMessage', {
-        chat_id: effectiveChatId,
-        message_thread_id: topic.topicId,
-        text,
-        reply_parameters: {
-          message_id: header.messageId,
-          allow_sending_without_reply: true,
-        },
-      });
-      result = { messageId: sent.message_id, mode: 'plain-reply' };
-    }
-    quoteResults.push({ point, text, ...result });
-    addLink(`Quote-reply on point ${point.index}`, result.messageId, topic.topicId);
+  const loginNotes = [
+    {
+      pointId: 'p4',
+      verdict: 'object',
+      text: "Don't sign everyone out. Just fix the broken logins.",
+    },
+  ];
+  const loginDraft = {
+    threadId: login.thread.threadId,
+    sourceMessageId: login.source.sourceMessageId,
+    notes: loginNotes,
+    seen: ['p4'],
+    updatedAt: new Date().toISOString(),
+  };
+  const loginReview = await notifier.onReviewSent(
+    login.thread,
+    login.deck,
+    loginDraft,
+    composeReview(login.deck, loginDraft).message,
+  );
+  for (const message of loginReview.messages ?? []) {
+    if (message.kind === 'card') continue;
+    addLink(
+      message.kind === 'note'
+        ? `login-fix change on ${message.pointId}`
+        : 'login-fix summary',
+      message.messageId,
+      record.topicId,
+    );
   }
 
-  const readText = pointReplyText(point4);
-  const readMatch = findQuoteMatch(parts, point4.quote);
-  const readTarget = readMatch ? parts[readMatch.partIndex] : undefined;
-  const readResult =
-    readMatch && readTarget
-      ? await postQuote(topic.topicId, readTarget.messageId, readMatch.quote, readText, header.messageId)
-      : { messageId: header.messageId, mode: 'plain-reply' };
-  addLink('Read-on-phone marker for point 4', readResult.messageId, topic.topicId);
+  const loginPoint4 = login.deck.points.find((point) => point.id === 'p4');
+  const read = await notifier.readOnPhone(login.thread, login.deck, loginPoint4);
+  if (read.messageId !== undefined) {
+    addLink('login-fix read-on-phone (point 4)', read.messageId, record.topicId);
+  }
 
+  // ---- payment-upgrade: question answered "Wait until Monday" --------------
+  await notifier.onAttention(payment.thread, payment.source, payment.deck);
+  state = await readState();
+  record = state.topics[payment.thread.threadId];
+  initialCards[payment.thread.threadId] = record.headerText;
+  linkTopicCard(record, 'payment-upgrade question card');
+  record.parts.forEach((part, index) => {
+    addLink(
+      `payment-upgrade full text ${index + 1}/${record.parts.length}`,
+      part.messageId,
+      record.topicId,
+    );
+  });
+  console.log(`payment-upgrade card: ${JSON.stringify(record.headerText)}`);
+  console.log('');
+
+  const paymentDraft = buildAnswerDraft(payment, 'p1', 'Wait until Monday');
+  const paymentReview = await notifier.onReviewSent(
+    payment.thread,
+    payment.deck,
+    paymentDraft,
+    composeReview(payment.deck, paymentDraft).message,
+  );
+  for (const message of paymentReview.messages ?? []) {
+    if (message.kind === 'card') continue;
+    addLink(
+      message.kind === 'note'
+        ? `payment-upgrade answer on ${message.pointId}`
+        : 'payment-upgrade summary',
+      message.messageId,
+      record.topicId,
+    );
+  }
+
+  const finalState = await readState();
   console.log('Posted, in order:');
   links.forEach((entry, index) => {
     console.log(`${String(index + 1).padStart(2)}. ${entry.label}`);
     console.log(`    ${entry.url}`);
   });
+  console.log('');
+  console.log('Final store:');
+  for (const fixture of [login, payment]) {
+    const saved = finalState.topics[fixture.thread.threadId];
+    console.log(
+      `  ${fixture.thread.threadId}: topic ${saved.topicId}, status ${saved.status}, card ${saved.headerMessageId}, ${saved.parts.length} full-text message(s)`,
+    );
+  }
+  console.log(`  legend message: ${finalState.generalMessageId ?? 'none'}`);
+  console.log('');
+  console.log('Initial card text (before the review):');
+  for (const fixture of [login, payment]) {
+    console.log(`  ${fixture.thread.threadId}:`);
+    String(initialCards[fixture.thread.threadId] ?? '')
+      .split('\n')
+      .forEach((line) => console.log(`    ${line}`));
+  }
+  console.log('');
+  console.log(
+    fallbacks.length === 0
+      ? 'Quote replies: all accepted by Telegram (attached to the exact sentences).'
+      : `Quote replies: ${fallbacks.length} refused, posted as plain replies. Reason: ${fallbacks[0]?.reason}`,
+  );
 
-  console.log('');
-  console.log('Review text:');
-  composed.message.split('\n').forEach((line) => console.log(`  ${line}`));
-  console.log('');
-  console.log('Quote-replies:');
-  for (const entry of quoteResults) {
-    const verdict = entry.mode === 'quote' ? 'exact quote' : 'plain reply (quote refused)';
-    console.log(`  point ${entry.point.index}: ${verdict}`);
-  }
-  if (quoteResults.some((entry) => entry.mode !== 'quote')) {
-    console.log('One or more quote-replies fell back to a plain reply. Check the plan text above.');
-  }
+  await notifier.stop();
 
   if (dryRun) {
     console.log('');
@@ -480,5 +423,6 @@ try {
 } catch (error) {
   const message = error instanceof Error ? error.message : String(error);
   console.error(`Telegram verification failed: ${message}`);
+  await notifier?.stop().catch(() => undefined);
   process.exit(1);
 }

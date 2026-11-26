@@ -57,6 +57,53 @@ export function stripMarkdown(text: string): string {
     .trim();
 }
 
+/**
+ * The paragraph (blank-line separated block) that contains the exact quote, from a
+ * message's visible text. Used by "Read on phone" to show the whole step, not just
+ * the quoted sentence. When the block is a list, the one item containing the quote is
+ * returned (without its bullet/number), not the whole list.
+ */
+export function paragraphContaining(plain: string, quote: string): string | undefined {
+  if (!quote) return undefined;
+  const blocks = plain.split(/\n\s*\n/);
+  for (const block of blocks) {
+    const text = block.trim();
+    if (!matches(text, quote)) continue;
+    const item = listItemContaining(text, quote);
+    return item ?? text;
+  }
+  return undefined;
+}
+
+const LIST_ITEM = /^\s*(?:[-*+•]|\d+[.)])\s+/;
+
+function listItemContaining(block: string, quote: string): string | undefined {
+  const lines = block.split('\n');
+  if (!lines.some((line) => LIST_ITEM.test(line))) return undefined;
+
+  const items: string[] = [];
+  let current: string[] = [];
+  for (const line of lines) {
+    if (LIST_ITEM.test(line)) {
+      if (current.length > 0) items.push(current.join('\n').trim());
+      current = [line];
+    } else if (current.length > 0) {
+      current.push(line);
+    }
+  }
+  if (current.length > 0) items.push(current.join('\n').trim());
+
+  const hit = items.find((item) => item.includes(quote)) ?? items.find((item) => matches(item, quote));
+  return hit?.replace(LIST_ITEM, '').trim();
+}
+
+function matches(text: string, quote: string): boolean {
+  if (text.includes(quote)) return true;
+  const words = quote.split(/\s+/).filter(Boolean);
+  if (words.length < 2) return false;
+  return new RegExp(words.map(escapeRegExp).join('\\s+')).test(text);
+}
+
 function findExact(parts: ReadonlyArray<{ plain: string }>, quote: string): QuoteMatch | undefined {
   for (let index = 0; index < parts.length; index += 1) {
     const plain = parts[index]?.plain ?? '';

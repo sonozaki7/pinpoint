@@ -1,13 +1,58 @@
 # Telegram setup (5–10 minutes)
 
 Pinpoint uses one private Telegram group with **Topics** on as its "desk". Each agent
-thread (a reply, a plan, a question, a failed run) gets its own topic in that group:
+task (a plan, a question, a report, a failed run) gets its own topic named after the
+thread. The topic list shows the state at a glance:
 
-1. A header message: `Needs you · plan · 7 points`, with an **Agree all & continue** button.
-2. The full agent reply, formatted (code blocks, bold, links), split across messages.
-3. When you send a review from the glasses, the composed review appears as a reply to the
-   header, and each objection/note appears as a **quote-reply** on the exact sentence it
-   refers to.
+- ❗️ **needs you** — the agent is waiting for a review or an answer
+- ✅ **reviewed or agreed** — nothing is waiting
+- ‼️ **failed** — the run stopped with an error
+
+Telegram's built-in topic-icon list has no yellow circle or warning triangle, so ❗️ and
+‼️ stand in. If a bot ever cannot set a custom icon, the name is prefixed with
+🟡 / ✅ / ⚠️ instead (the module remembers that and keeps using prefixes).
+
+Inside each topic:
+
+1. **The card**, first message, the only message that notifies when the agent needs you:
+
+   ```
+   🟡 Needs you: plan, 7 steps
+   login-fix · acme-shop
+
+   1. Reproduce the bug with two open tabs
+   2. Add a test that fails on the bug
+   ...
+   4. ⚠️ Sign out every customer once
+   ...
+   Review it on your G2, or:
+   ```
+
+   Buttons: **✅ Agree all** and **📄 Read full plan** (a link to the full text
+   message). A question card also shows its options as buttons when the server wires
+   the answer hook (see the team section).
+2. **The full agent text**, silent (no notification), rendered quote-safe. Texts longer
+   than about 600 characters collapse into one expandable block on the phone.
+3. **When you send a review from the glasses**, everything is silent:
+   - one quote-reply per note on the exact sentence, body only, for example
+     `❌ Your change: Don't sign everyone out. Just fix the broken logins.`,
+     `📝 Your note: ...`, `💬 Your answer: ...`;
+   - one summary, for example
+     `✅ Sent to the agent from your G2: 1 change, 6 agreed`;
+   - the card's first line becomes `✅ Reviewed from G2: 1 change sent`, its buttons
+     are removed, and the topic icon turns ✅.
+4. **Read on phone** from the glasses posts one message that notifies:
+   `📖 Step 4: you opened this from your glasses`, as a quote-reply on the sentence,
+   followed by the whole paragraph that contains that sentence.
+
+The first topic in the group is **General**. It holds one pinned legend:
+
+```
+How Pinpoint Desk works: each agent task gets a topic.
+❗️ needs you · ✅ reviewed · ‼️ failed.
+Review on your G2 (scroll with the ring, tap to talk, double-tap to send) or tap ✅ Agree all here.
+Your notes appear attached to the exact sentences.
+```
 
 Without a token the server runs in **dry-run**: it writes every intended Telegram call to
 `apps/server/.data/telegram-dryrun.log` and returns fake links, so tests and the demo work
@@ -34,7 +79,7 @@ If a token ever leaks, send `/revoke` to @BotFather and use the new one.
 
 ## 2. Create a private group and turn on Topics
 
-Topics (forum mode) is what gives each thread a separate conversation inside one group.
+Topics (forum mode) is what gives each task a separate conversation inside one group.
 
 1. Telegram → **New Group** → name it `Pinpoint Desk`.
    A new group needs at least one other member; pick any contact, then remove them after
@@ -45,7 +90,7 @@ Topics (forum mode) is what gives each thread a separate conversation inside one
    group name → **Administrators** → **Add Administrator** → search `@pinpoint_desk_bot`
    → enable **Manage Topics** (leave the other permissions at their defaults) → save.
 
-The "Manage Topics" right is what allows the bot to create a new topic for each thread.
+The "Manage Topics" right is what allows the bot to create topics and set their icons.
 Without it, topic creation fails with `not enough rights to create a forum topic`.
 
 ## 3. Find the group's chat id
@@ -103,20 +148,24 @@ TELEGRAM_CHAT_ID=-1001234567890123
 1. Start the server (`npm run dev` in `apps/server`).
 2. `GET /api/health` should report Telegram as `ok` (it reports `dry-run` when the token
    is empty, and `error` if a call fails).
-3. Trigger a thread so it enters the inbox. In Telegram you should see:
-   - a new topic named after the thread (for example `auth-refresh-fix`);
-   - the header `Needs you · plan · 7 points` with the **Agree all & continue** button;
-   - the full agent reply, split into a few silent messages.
-4. Tap **Agree all & continue**: the button disappears, the header becomes
-   `✓ Agreed on phone · plan · 7 points`, and the review is sent to T3.
-5. Send a review from the glasses. The review appears as a reply to the header, and each
-   objection/note appears as a quote-reply under the sentence it refers to.
-6. Use **Read on phone** in the glasses menu. It posts `Point 4 — from your glasses` as a
-   quote-reply and opens a link like
-   `https://t.me/c/1234567890123/57?thread=42` (42 is the topic, 57 the message).
+3. On the first start the bot posts and pins the legend in **General**.
+4. Trigger a thread so it enters the inbox. In Telegram you should see:
+   - a new topic named after the thread, with the ❗️ icon;
+   - the card `🟡 Needs you: plan, 7 steps` with **✅ Agree all** and
+     **📄 Read full plan**;
+   - the full agent text below it, silent and collapsed when long.
+5. Tap **✅ Agree all**: the buttons disappear, the card becomes
+   `✅ Agreed from Telegram`, and the review is sent to T3.
+6. Send a review from the glasses. Each note appears as a silent quote-reply under the
+   sentence it refers to, followed by the summary, and the card becomes
+   `✅ Reviewed from G2: 1 change sent`.
+7. Use **Read on phone** in the glasses menu. It posts a notifying
+   `📖 Step 4: you opened this from your glasses` reply with the whole step paragraph and
+   opens a link like `https://t.me/c/1234567890123/57?thread=42` (42 is the topic, 57 the
+   message).
 
 The mapping between threads, topics and message ids is stored in
-`apps/server/.data/telegram.json`. Deleting that file (and optionally the topic in
+`apps/server/.data/telegram.json`. Deleting that file (and optionally the topics in
 Telegram) resets the integration; nothing else is persisted.
 
 ## 6. Dry-run (no bot needed)
@@ -125,12 +174,30 @@ Leave `TELEGRAM_BOT_TOKEN` empty. Every call the module would make is appended a
 line to `apps/server/.data/telegram-dryrun.log`:
 
 ```json
-{"at":"2026-11-24T01:00:00.000Z","method":"createForumTopic","params":{"chat_id":"-1001234567890","name":"auth-refresh-fix"}}
-{"at":"2026-11-24T01:00:00.100Z","method":"sendMessage","params":{"chat_id":"-1001234567890","message_thread_id":1000,"text":"Needs you · plan · 7 points","reply_markup":{"inline_keyboard":[[{"text":"Agree all & continue","callback_data":"agree:thread-abc"}]]}}}
+{"at":"2026-11-24T01:00:00.000Z","method":"sendMessage","params":{"chat_id":"-1001234567890","text":"How Pinpoint Desk works: ...","disable_notification":true}}
+{"at":"2026-11-24T01:00:00.100Z","method":"pinChatMessage","params":{"chat_id":"-1001234567890","message_id":1000,"disable_notification":true}}
+{"at":"2026-11-24T01:00:00.200Z","method":"getForumTopicIconStickers","params":{}}
+{"at":"2026-11-24T01:00:00.300Z","method":"createForumTopic","params":{"chat_id":"-1001234567890","name":"auth-refresh-fix","icon_custom_emoji_id":"..."}}
+{"at":"2026-11-24T01:00:00.400Z","method":"sendMessage","params":{"chat_id":"-1001234567890","message_thread_id":1001,"text":"🟡 Needs you: plan, 7 points\n...","reply_markup":{"inline_keyboard":[[{"text":"✅ Agree all","callback_data":"agree:thread-abc"}]]}}}
 ```
 
 Links returned in dry-run look real (`https://t.me/c/1234567890/1001?thread=1000`) but do
 not open anything. This is also how the automated tests run.
+
+`scripts/telegram-verify.mjs` runs both plain-language fixtures through the real notifier.
+
+```bash
+# no network
+npx tsx scripts/telegram-verify.mjs --dry-run
+
+# live group (needs token and chat id)
+npx tsx --env-file=apps/server/.env scripts/telegram-verify.mjs
+```
+
+The live run first removes the earlier Pinpoint test topics (`auth-refresh-fix`,
+`login-fix`, `payment-upgrade`) from the group, posts the legend once, then rebuilds both
+topics and prints a link for every message. `--data-dir <path>` uses a separate store and
+builds nothing on top of the server's real one.
 
 ---
 
@@ -144,6 +211,8 @@ not open anything. This is also how the automated tests run.
 | `401 Unauthorized` | Token is wrong, revoked, or has stray spaces | Regenerate with @BotFather `/token` (or `/revoke`) and update `.env` |
 | `429 Too Many Requests: retry after N` | More than about one message per second in the chat | Handled automatically (waits `N` seconds and retries); repeated 429s mean something is sending in a burst |
 | `400 Bad Request: QUOTE_TEXT_INVALID` | The quote is no longer an exact substring of the source message | Handled automatically by falling back to a plain reply; if frequent, the deck's quotes drifted from the source (splitter quote check) |
+| Topic names start with 🟡 / ✅ / ⚠️ | Telegram refused a custom topic icon | Expected fallback; the module stopped trying icons for this process. Restart to retry |
+| No "Agree all" buttons | The card was already reviewed, or the message was edited by hand | Send a new attention message; the card is rebuilt on the next agent message |
 | Button spins forever | The server is not polling callbacks, or the review could not be sent to T3 | Confirm the server started the notifier (`start()`); check the server log for `onAgreeAll failed` |
 | Nothing appears in Telegram | Token empty (dry-run), or bot not restarted after editing `.env` | Check `/api/health`; restart the server |
 
@@ -156,7 +225,10 @@ not open anything. This is also how the automated tests run.
   `429` responses using Telegram's `retry_after`.
 - **Quotes must be exact.** A quote-reply only works when the quoted text is an exact
   substring of the target message. The module maps each quote to the split part that
-  contains it and falls back to a plain reply when Telegram refuses.
+  contains it and falls back to a plain reply when Telegram refuses. The fallback is
+  reported through the `onQuoteFallback` hook (and a server warning).
+- **Notifications.** Only the card and the read-on-phone message notify. The full text,
+  every review note, the summary and the legend are silent (`disable_notification`).
 - **Threads live in memory of the group.** The bot cannot read older chats or messages it
   did not receive; everything it needs is in the topics it created and in
   `.data/telegram.json`.
@@ -175,21 +247,31 @@ which returns `{ mode, onAttention, onReviewSent, readOnPhone, start, stop }`:
 ```ts
 const telegram = createTelegramNotifier(env, {
   onAgreeAll: (threadId) => t3.sendReview(threadId, '✓ Reviewed on phone: all points agreed. Continue.'),
+  // Optional: makes question cards show option buttons. Wire it to the same path the
+  // glasses use: save an answer note, then send the review.
+  onAnswer: async (threadId, pointId, option) => {
+    // Persist the answer through the review store, then service.send(threadId).
+    console.log(`answer ${threadId}/${pointId}: ${option}`);
+  },
 });
 
+await telegram.start(); // posts/pins the legend once, then long-polls the buttons
 await telegram.onAttention(thread, { sourceMessageId, text }, deck);
-const { link } = await telegram.onReviewSent(thread, deck, draft, composedMessage);
+const { link, messages } = await telegram.onReviewSent(thread, deck, draft, composedMessage);
+// messages: one entry per card/note/summary with its deep link
 await telegram.readOnPhone(thread, deck, point);
-await telegram.start(); // long polling for the "Agree all" button only
 ```
 
-Everything is escaped before it reaches Telegram's HTML parser; long paragraphs collapse
-into expandable quotes, code fences become `<pre><code>`, markdown tables are sent
-monospaced, and messages never exceed Telegram's 4096-character limit.
-
-The module also accepts the server's parsed config object directly, so the loader can pass
-`env` unchanged: it reads `telegramToken` / `TELEGRAM_BOT_TOKEN`, `telegramChatId` /
-`TELEGRAM_CHAT_ID`, and `dataDir` (`PINPOINT_DATA_DIR`).
+- `onReviewSent` returns `{ link, messages }`: `link` points at the summary; `messages`
+  lists the card, one entry per note (with `pointId`) and the summary.
+- `readOnPhone` returns `{ link, messageId }`.
+- `onQuoteFallback` receives `{ quote, text, reason }` whenever Telegram refuses a quote.
+- Everything is escaped before it reaches Telegram's HTML parser; long text collapses into
+  an expandable blockquote, code fences become `<pre><code>`, markdown tables are sent
+  monospaced, and messages never exceed Telegram's 4096-character limit.
+- The module also accepts the server's parsed config object directly, so the loader can
+  pass `env` unchanged: it reads `telegramToken` / `TELEGRAM_BOT_TOKEN`,
+  `telegramChatId` / `TELEGRAM_CHAT_ID`, and `dataDir` (`PINPOINT_DATA_DIR`).
 
 **Wiring.** The agree-all hook receives the **thread id string**
 (`onAgreeAll(threadId)`). The server's `AgreeAllHook` accepts either the id or the thread

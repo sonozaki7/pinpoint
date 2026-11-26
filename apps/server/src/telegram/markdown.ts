@@ -14,6 +14,16 @@ export interface RenderedPart {
 export const MAX_PART_CHARS = 3900;
 /** Paragraphs longer than this many visible characters collapse on the phone. */
 export const LONG_SECTION_CHARS = 400;
+/** Agent replies longer than this collapse into one expandable block. */
+export const LONG_FULL_TEXT_CHARS = 600;
+
+/** Wrap each part's HTML in one expandable blockquote; visible text stays identical. */
+export function wrapExpandable(parts: ReadonlyArray<RenderedPart>): RenderedPart[] {
+  return parts.map((part) => ({
+    html: `<blockquote expandable>${part.html}</blockquote>`,
+    plain: part.plain,
+  }));
+}
 
 interface Unit {
   html: string;
@@ -37,6 +47,12 @@ export interface RenderOptions {
    * links and block quotes stay, because Telegram accepts quotes from those.
    */
   quoteSafe?: boolean;
+  /**
+   * Collapse paragraphs longer than LONG_SECTION_CHARS into their own expandable
+   * blockquote (default). The full-text message turns this off and wraps the whole
+   * body once instead, so the phone shows one collapsed block, not many.
+   */
+  collapseLong?: boolean;
 }
 
 export function markdownToHtml(markdown: string, options: RenderOptions = {}): string {
@@ -234,6 +250,7 @@ function parseBlocks(markdown: string): Block[] {
 
 function renderBlock(block: Block, maxChars: number, options: RenderOptions = {}): Unit[] {
   const quoteSafe = options.quoteSafe === true;
+  const collapseLong = options.collapseLong !== false;
   switch (block.kind) {
     case 'code':
       return renderCode(block.text, block.lang, maxChars);
@@ -269,12 +286,12 @@ function renderBlock(block: Block, maxChars: number, options: RenderOptions = {}
       return [{ html: quoteSafe ? '────────' : '<b>────────</b>', plain: '────────' }];
     case 'paragraph':
     default: {
-      const rendered = renderParagraph(block.text, quoteSafe);
+      const rendered = renderParagraph(block.text, quoteSafe, collapseLong);
       // Re-split large paragraphs from their visible text (formatting was already
       // applied to the unsplit paragraph, so only escaping is needed here).
       return splitOversized(rendered, maxChars, (text) => {
         const html =
-          text.length > LONG_SECTION_CHARS
+          collapseLong && text.length > LONG_SECTION_CHARS
             ? `<blockquote expandable>${escapeHtml(text)}</blockquote>`
             : escapeHtml(text);
         return { html, plain: text };
@@ -283,10 +300,10 @@ function renderBlock(block: Block, maxChars: number, options: RenderOptions = {}
   }
 }
 
-function renderParagraph(text: string, quoteSafe = false): Unit {
+function renderParagraph(text: string, quoteSafe = false, collapseLong = true): Unit {
   const inner = inlineToHtml(text, quoteSafe);
   const plain = htmlToPlain(inner);
-  if (plain.length > LONG_SECTION_CHARS) {
+  if (collapseLong && plain.length > LONG_SECTION_CHARS) {
     return { html: `<blockquote expandable>${inner}</blockquote>`, plain };
   }
   return { html: inner, plain };

@@ -4,6 +4,7 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import type { ThreadAttention } from '../../../../shared/contract.js';
+import type { TopicStatus } from './format.js';
 
 export interface StoredPart {
   messageId: number;
@@ -19,13 +20,26 @@ export interface TopicRecord {
   /** Display-only; copied from the thread so the agree-all hook can receive the whole ref. */
   project?: string;
   attention: ThreadAttention;
+  /** Topic icon/name state: needs you, done, failed. */
+  status?: TopicStatus;
   pointCount: number;
+  /** The card is the first message in the topic. Old field names kept for state compatibility. */
   headerMessageId?: number;
   headerText?: string;
+  /** Card body kept so callbacks can rebuild it without the deck. */
+  cardTitleLine?: string;
+  cardLines?: string[];
+  /** Question options shown as buttons; set only for an active question card. */
+  answerPointId?: string;
+  answerOptions?: string[];
+  /** Signature of the current reply keyboard, so it is not edited twice. */
+  cardKeyboardKey?: string;
   sourceMessageId?: string;
   sourceMessageIds: number[];
   parts: StoredPart[];
   reviewMessageId?: number;
+  summaryMessageId?: number;
+  reviewedAt?: string;
   agreedAt?: string;
   updatedAt: string;
 }
@@ -33,6 +47,9 @@ export interface TopicRecord {
 export interface TelegramState {
   version: 1;
   topics: Record<string, TopicRecord>;
+  /** Message id of the pinned "How Pinpoint Desk works" legend in the General topic. */
+  generalMessageId?: number;
+  legendText?: string;
   /** Next fake message id used by dry-run (kept so ids never repeat across restarts). */
   fakeNextId: number;
 }

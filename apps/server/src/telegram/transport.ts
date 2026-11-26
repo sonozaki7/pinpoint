@@ -98,7 +98,14 @@ export class TelegramTransport {
           body: JSON.stringify(params),
         });
       } catch (error) {
-        throw new TelegramApiError(method, 0, `network error: ${errorMessage(error)}`);
+        // A dropped connection is usually transient. Retry with a short backoff instead
+        // of losing a note or a card to one failed fetch.
+        const networkError = new TelegramApiError(method, 0, `network error: ${errorMessage(error)}`);
+        if (attempt < maxRetries) {
+          await sleep(Math.min(1000 * 2 ** attempt, 5000));
+          continue;
+        }
+        throw networkError;
       }
 
       const body = (await response.json().catch(() => undefined)) as TelegramResponse | undefined;
@@ -127,9 +134,23 @@ export class TelegramTransport {
       case 'createForumTopic':
         return { message_thread_id: await this.config.allocateId(), name: params.name };
       case 'sendMessage':
-      case 'editMessageText':
         return { message_id: await this.config.allocateId(), chat: { id: params.chat_id } };
+      case 'editMessageText':
+        return { message_id: params.message_id, chat: { id: params.chat_id } };
+      case 'getForumTopicIconStickers':
+        return [
+          { emoji: '❗️', custom_emoji_id: '1001' },
+          { emoji: '✅', custom_emoji_id: '1002' },
+          { emoji: '‼️', custom_emoji_id: '1003' },
+        ];
+      case 'getChat':
+        return { id: params.chat_id, title: 'Pinpoint Desk', is_forum: true };
       case 'answerCallbackQuery':
+      case 'pinChatMessage':
+      case 'unpinChatMessage':
+      case 'editMessageReplyMarkup':
+      case 'editForumTopic':
+      case 'deleteForumTopic':
         return true;
       case 'getMe':
         return { id: 1000001, is_bot: true, first_name: 'Pinpoint', username: 'pinpoint_bot' };
