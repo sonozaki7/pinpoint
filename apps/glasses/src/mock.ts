@@ -1,9 +1,10 @@
 import type {
   AgentStatus, AppId, AskResult, Deck, EditResult, Health, InboxItem, Note, PreviewResult, Receipt,
-  ReviewDraft, SendResult, TaskResult, ThreadAttention,
+  ReviewDraft, SendResult, TaskResult,
 } from "../../../shared/contract";
 import { askText, splitSentences, type AskSentence } from "../../../shared/ask";
 import { applyEdit, EDIT_FAILED } from "../../../shared/edit";
+import { sortInbox } from "../../../shared/inbox-order";
 import { formatNeedsSummary, inboxSummary, needsYouCount } from "../../../shared/summary";
 import { DEFAULT_PERSONA, type SamplePersona } from "./model";
 import {
@@ -152,18 +153,6 @@ export function createDemoInbox(): InboxItem[] {
 /** The mixed inbox (?mock=1): agent work next to a Notion page and a mail draft. */
 export function createBudgetInbox(): InboxItem[] {
   return inboxFor([...FIXTURES, ...BUDGET_FIXTURES]);
-}
-
-const ATTENTION_ORDER: Record<ThreadAttention, number> = { question: 0, plan: 1, failed: 2, report: 3 };
-
-export function sortInbox(items: readonly InboxItem[]): InboxItem[] {
-  return [...items].sort((a, b) => {
-    // "Since you looked" is news, not work: it sits after everything that needs you.
-    const news = Number(a.kind === "catch-up") - Number(b.kind === "catch-up");
-    if (news !== 0) return news;
-    const kind = ATTENTION_ORDER[a.attention] - ATTENTION_ORDER[b.attention];
-    return kind !== 0 ? kind : b.updatedAt.localeCompare(a.updatedAt);
-  });
 }
 
 export const MOCK_TRANSCRIPT = "No, keep the existing sessions and migrate them instead.";

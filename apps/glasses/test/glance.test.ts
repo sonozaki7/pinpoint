@@ -740,6 +740,52 @@ test("wear: glasses on after off lands on the inbox with status and 'Since you l
   assert.equal(device.state.welcome, false);
 });
 
+test("wear: a cloud inbox with the catch-up last still lands on it, found by kind", async () => {
+  const demo = (await new MockPinpointApi({ extended: true }).inbox()).items;
+  const catchUp = demo.find((item) => item.kind === "catch-up");
+  assert.ok(catchUp);
+  const cloudItems = [...demo.filter((item) => item.kind !== "catch-up"), catchUp];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async () => new Response(JSON.stringify({ items: cloudItems, updatedAt: "2026-11-27T10:00:00.000Z" }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  })) as typeof fetch;
+  try {
+    // The same path Pinpoint Cloud data takes: HTTP inbox, then adoptInbox.
+    const api = new HttpPinpointApi("https://pinpoint-api.qolso.com", {
+      device: async () => "11111111-1111-4111-8111-111111111111",
+      token: async () => null,
+    });
+    const inbox = await api.inbox();
+    let state = adoptInbox(initialState({ demo: false, loading: false }), inbox.items, {
+      demo: false,
+      offline: false,
+      status: null,
+    });
+    assert.equal(state.inbox.at(-1)?.kind, "catch-up", "the cloud sends news last");
+    state = wearChanged(state, true).state; // the first report only says where the glasses are
+    state = wearChanged(state, false).state;
+    const result = wearChanged(state, true);
+    assert.equal(result.effect?.type, "wear-refresh");
+    state = result.state;
+    const page = pageFor(state, 1_000);
+    assert.equal(state.screen, "inbox");
+    assert.equal(page.subtitle, "Since you looked · 3 updates · 1 needs you");
+    assert.match(page.list?.at(-1) ?? "", /^(?:Agent {2})?Since you looked {2}3 updates · 1 needs you$/);
+    assert.equal(page.listFocus, 0);
+    // The last row still opens the catch-up list, by its kind rather than its index.
+    state = { ...state, inboxFocus: state.inbox.length - 1 };
+    const opened = press(state, 1_000);
+    assert.equal(opened.effect?.type, "open");
+    if (opened.effect?.type === "open") {
+      assert.equal(opened.effect.index, state.inbox.length - 1);
+      assert.equal(state.inbox[opened.effect.index]?.kind, "catch-up");
+    }
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
 test("wear: taking the glasses off mid-recording drops the recording, nothing is sent", async () => {
   const device = await Device.boot();
   device.focusInbox("login-fix");

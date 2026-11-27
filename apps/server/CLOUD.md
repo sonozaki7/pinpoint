@@ -57,11 +57,13 @@ and keep it in SDK storage.
 
 Each UUID gets a private sample workspace:
 
-- Inbox order comes from `demo/sample/workspace.json` for the chosen story:
-  `mixed` by default (login-fix, saturday-plan, flight-price, landlord-reply,
+- Inbox order is the shared rule every Pinpoint surface uses
+  (`shared/inbox-order.ts`): question, plan, failed, report, newest first within
+  a kind, and unseen "Since you looked" lines last because they are news, not
+  work. `demo/sample/workspace.json` lists the threads of each story: `mixed`
+  by default (login-fix, saturday-plan, flight-price, landlord-reply,
   launch-post), or `developer` / `everyday` via `X-Pinpoint-Sample`. Decks are
-  the verified fixture decks, so every thread is ready immediately, and unseen
-  "Since you looked" lines appear first.
+  the verified fixture decks, so every thread is ready immediately.
 - Saving a review, sending it, the inbox status and the sample agent's reply are
   all scoped to that UUID. Sending a review removes the thread; after
   `PINPOINT_SAMPLE_REPLY_MS` (default 5000 ms) the agent replies under the same

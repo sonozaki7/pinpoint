@@ -425,13 +425,14 @@ describe('Since you looked (desk)', () => {
     { threadId: 'thr-b', title: 'deps', kind: 'question' as const, text: 'Which version should I pin?', key: 'k2', at: now },
   ];
 
-  it('adds one catch-up item first, one line per update with its threadRef, and send marks them seen', async () => {
+  it('adds one catch-up item after the work (news, not work), one line per update with its threadRef, and send marks them seen', async () => {
     const desk = await makeDeskService({ updates });
     try {
       const body = (await (await desk.app.request('/api/inbox', { headers: { 'x-pinpoint-device': DEVICE } })).json()) as InboxResponse;
-      const first = body.items[0]!;
-      expect(first).toMatchObject({ threadId: 'catch-up', title: 'Since you looked', kind: 'catch-up', pointCount: 2, needsYou: 1 });
-      expect(first.summary.length).toBeLessThanOrEqual(30);
+      const last = body.items.at(-1)!;
+      expect(last).toMatchObject({ threadId: 'catch-up', title: 'Since you looked', kind: 'catch-up', pointCount: 2, needsYou: 1 });
+      expect(body.items.slice(0, -1).some((item) => item.kind === 'catch-up')).toBe(false);
+      expect(last.summary.length).toBeLessThanOrEqual(30);
       const deck = (await (await desk.app.request('/api/deck/catch-up', { headers: { 'x-pinpoint-device': DEVICE } })).json()) as {
         points: { glance: string; threadRef?: string; flag?: string; why?: string }[];
       };
@@ -441,7 +442,7 @@ describe('Since you looked (desk)', () => {
 
       // Another device still sees its own catch-up.
       const other = (await (await desk.app.request('/api/inbox', { headers: { 'x-pinpoint-device': DEVICE_2 } })).json()) as InboxResponse;
-      expect(other.items[0]!.threadId).toBe('catch-up');
+      expect(other.items.at(-1)!.threadId).toBe('catch-up');
 
       const sent = await post(desk.app, '/api/review/catch-up/send', {}, { 'x-pinpoint-device': DEVICE });
       expect(sent.status).toBe(200);
@@ -451,7 +452,7 @@ describe('Since you looked (desk)', () => {
       // A new update shows up alone.
       desk.t3.updates = [...updates, { threadId: 'thr-c', title: 'flaky-e2e', kind: 'replied' as const, text: 'Green again.', key: 'k3', at: now }];
       const again = (await (await desk.app.request('/api/inbox', { headers: { 'x-pinpoint-device': DEVICE } })).json()) as InboxResponse;
-      expect(again.items[0]).toMatchObject({ kind: 'catch-up', pointCount: 1 });
+      expect(again.items.at(-1)).toMatchObject({ kind: 'catch-up', pointCount: 1 });
     } finally {
       await desk.done();
     }
@@ -491,24 +492,24 @@ function cloudHeaders(persona?: string, device = DEVICE): Record<string, string>
 }
 
 describe('cloud personas, status, catch-up and everyday fixtures', () => {
-  it('serves the three personas in the specified order, each with a catch-up row first', async () => {
+  it('serves the three personas in the shared inbox order, each with a catch-up row last', async () => {
     const cloud = await makeCloud();
     try {
       const expected: Record<string, string[]> = {
-        developer: ['login-fix', 'payment-upgrade', 'launch-post', 'draft-priya'],
-        everyday: ['saturday-plan', 'flight-price', 'landlord-reply', 'school-newsletter'],
-        mixed: ['login-fix', 'saturday-plan', 'flight-price', 'landlord-reply', 'launch-post'],
+        developer: ['payment-upgrade', 'login-fix', 'draft-priya', 'launch-post'],
+        everyday: ['flight-price', 'saturday-plan', 'landlord-reply', 'school-newsletter'],
+        mixed: ['flight-price', 'login-fix', 'saturday-plan', 'launch-post', 'landlord-reply'],
       };
       for (const [persona, ids] of Object.entries(expected)) {
         const body = (await (await cloud.app.request('/api/inbox', { headers: cloudHeaders(persona) })).json()) as InboxResponse;
-        expect(body.items[0]).toMatchObject({ threadId: 'catch-up', kind: 'catch-up' });
-        expect(body.items.slice(1).map((item) => item.threadId)).toEqual(ids);
+        expect(body.items.at(-1)).toMatchObject({ threadId: 'catch-up', kind: 'catch-up' });
+        expect(body.items.slice(0, -1).map((item) => item.threadId)).toEqual(ids);
         expect(body.status).toMatchObject({ needYou: ids.length });
         expect(body.status!.working).toBeGreaterThanOrEqual(0);
         for (const item of body.items) expect(item.summary.length).toBeLessThanOrEqual(30);
       }
       const defaultBody = (await (await cloud.app.request('/api/inbox', { headers: cloudHeaders() })).json()) as InboxResponse;
-      expect(defaultBody.items.slice(1).map((item) => item.threadId)).toEqual(expected.mixed);
+      expect(defaultBody.items.slice(0, -1).map((item) => item.threadId)).toEqual(expected.mixed);
     } finally {
       await cloud.done();
     }
@@ -558,7 +559,7 @@ describe('cloud personas, status, catch-up and everyday fixtures', () => {
       expect(body.items.some((item) => item.kind === 'catch-up')).toBe(false);
       // Another device is unaffected.
       const other = (await (await cloud.app.request('/api/inbox', { headers: cloudHeaders('developer', DEVICE_2) })).json()) as InboxResponse;
-      expect(other.items[0]!.kind).toBe('catch-up');
+      expect(other.items.at(-1)!.kind).toBe('catch-up');
       // A catch-up line's thread can be opened.
       const ref = deck.points[0]!.threadRef!;
       expect((await cloud.app.request(`/api/deck/${ref}`, { headers: cloudHeaders('developer') })).status).toBe(200);

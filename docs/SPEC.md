@@ -66,7 +66,7 @@ See `shared/contract.ts`. Summary: `InboxItem`, `Deck` (list of `Point`), `Note`
 | Method & path | Returns | Notes |
 |---|---|---|
 | `GET /api/health` | `{ ok, mode, t3, telegram, splitter }` | |
-| `GET /api/inbox` | `{ items: InboxItem[], updatedAt }` | Sorted: question, plan, failed, report; newest first within a kind. |
+| `GET /api/inbox` | `{ items: InboxItem[], updatedAt }` | Sorted: question, plan, failed, report; newest first within a kind; the read-only catch-up row last (news, not work). |
 | `GET /api/deck/:threadId` | `Deck` | Built on demand if missing (splitter), cached by `sourceMessageId`. 202 `{pending:true}` while building. |
 | `PUT /api/review/:threadId` | `ReviewDraft` | Autosave notes and seen points. |
 | `POST /api/review/:threadId/preview` | `PreviewResult` | Composed message + 2-line preview. |

@@ -12,6 +12,7 @@ import type {
   ReviewDraft,
   SendResult,
 } from '../../../../shared/contract.js';
+import { sortInbox } from '../../../../shared/inbox-order.js';
 import {
   CATCH_UP_ID,
   CATCH_UP_TITLE,
@@ -231,7 +232,7 @@ export class PinpointService {
       working: counts?.working ?? 0,
       doneToday: counts?.doneToday ?? 0,
     };
-    const items: InboxItem[] = catchUp ? [catchUpItem(catchUp), ...base.items] : base.items;
+    const items = sortInbox(catchUp ? [...base.items, catchUpItem(catchUp)] : base.items);
     return { items, status, updatedAt: base.updatedAt };
   }
 

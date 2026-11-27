@@ -1,5 +1,5 @@
 {
-  "_comment": "Pinpoint Cloud sample workspace. Threads are fixtures from demo/fixtures (and demo/sample/threads), listed in inbox order per persona. The X-Pinpoint-Sample header picks the persona: mixed (default, real G2), developer or everyday. `status` is the sample glance line (agents running, done today); needs-you is counted from the inbox.",
+  "_comment": "Pinpoint Cloud sample workspace. Threads are fixtures from demo/fixtures (and demo/sample/threads), listed per persona; the shared sortInbox (shared/inbox-order.ts) decides the order on every surface. The X-Pinpoint-Sample header picks the persona: mixed (default, real G2), developer or everyday. `status` is the sample glance line (agents running, done today); needs-you is counted from the inbox.",
   "personas": {
     "mixed": [
       "login-fix",

@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Deck, InboxItem, ThreadAttention } from '../../../../shared/contract.js';
+import type { Deck, InboxItem } from '../../../../shared/contract.js';
 import type { AttentionSource, AttentionThread, TelegramNotifier } from './types.js';
 import type { NotesConnector } from '../connectors/types.js';
 import type { Env } from './env.js';
@@ -8,18 +8,12 @@ import type { DeckStore } from './decks.js';
 import { buildDeck, deckFromPrecomputed } from './decks.js';
 import { errorMessage } from './errors.js';
 import { needsYouCount } from './evidence.js';
+import { sortInbox } from '../../../../shared/inbox-order.js';
 import { inboxSummary } from '../../../../shared/summary.js';
 import type { ReviewStore } from './reviews.js';
 import { clearChanges, RevisionTracker } from './revisions.js';
 import type { Splitter } from './splitter/types.js';
 import type { ReviewSource } from '../sources/types.js';
-
-const ATTENTION_RANK: Record<ThreadAttention, number> = {
-  question: 0,
-  plan: 1,
-  failed: 2,
-  report: 3,
-};
 
 const SOURCE_TTL_MS = 5_000;
 const NOTIFY_RETRY_MS = 5 * 60_000;
@@ -503,15 +497,6 @@ export class InboxService {
       }),
     );
 
-    items.sort((a, b) => {
-      const rank = ATTENTION_RANK[a.attention] - ATTENTION_RANK[b.attention];
-      if (rank !== 0) return rank;
-      const timeA = Date.parse(a.updatedAt) || 0;
-      const timeB = Date.parse(b.updatedAt) || 0;
-      if (timeA !== timeB) return timeB - timeA;
-      return a.title.localeCompare(b.title);
-    });
-
-    return { items, updatedAt: new Date().toISOString() };
+    return { items: sortInbox(items), updatedAt: new Date().toISOString() };
   }
 }

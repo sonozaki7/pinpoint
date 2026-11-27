@@ -11,6 +11,7 @@ import type {
   SendResult,
   TaskResult,
 } from '../../../../shared/contract.js';
+import { sortInbox } from '../../../../shared/inbox-order.js';
 import type { LlmConnector } from '../connectors/types.js';
 import {
   buildCatchUp,
@@ -266,7 +267,7 @@ export class SampleDeviceWorkspace implements DeviceWorkspace {
     if (catchUp) {
       const count = catchUp.entries.length;
       const needs = catchUp.entries.filter((entry) => entry.needsYou).length;
-      items.unshift({
+      items.push({
         threadId: CATCH_UP_ID,
         title: CATCH_UP_TITLE,
         project: catchUp.thread.project,
@@ -280,7 +281,7 @@ export class SampleDeviceWorkspace implements DeviceWorkspace {
         ...(needs > 0 ? { needsYou: needs } : {}),
       });
     }
-    return { items, status, updatedAt: new Date().toISOString() };
+    return { items: sortInbox(items), status, updatedAt: new Date().toISOString() };
   }
 
   getDeck(threadId: string): Deck {

@@ -253,15 +253,15 @@ describe('cloud HTTP surface', () => {
     }
   });
 
-  it('lists the sample workspace in file order with ready fixture decks', async () => {
+  it('lists the sample workspace in the shared inbox order with ready fixture decks', async () => {
     const context = await makeCloudContext();
     try {
       const first = await inbox(context.app);
       expect(first.items.map((item) => item.threadId)).toEqual([
-        'login-fix',
         'payment-upgrade',
-        'launch-post',
+        'login-fix',
         'draft-priya',
+        'launch-post',
       ]);
       expect(first.items.every((item) => item.deckReady)).toBe(true);
       expect(first.items.find((item) => item.threadId === 'login-fix')).toMatchObject({
@@ -330,32 +330,37 @@ describe('cloud HTTP surface', () => {
       expect(sent.status).toBe(200);
       expect((await inbox(context.app, DEVICE_A)).items.map((item) => item.threadId)).toEqual([
         'payment-upgrade',
-        'launch-post',
         'draft-priya',
+        'launch-post',
       ]);
       // Device B still has its own untouched inbox.
       expect((await inbox(context.app, DEVICE_B)).items.map((item) => item.threadId)).toEqual([
-        'login-fix',
         'payment-upgrade',
-        'launch-post',
+        'login-fix',
         'draft-priya',
+        'launch-post',
       ]);
 
       await vi.advanceTimersByTimeAsync(5_000);
       const aReply = await inbox(context.app, DEVICE_A);
       // Objecting to a plan step brings the plan back revised, only that step marked changed.
-      expect(aReply.items.at(-1)).toMatchObject({
-        threadId: 'login-fix',
+      expect(aReply.items.map((item) => item.threadId)).toEqual([
+        'payment-upgrade',
+        'login-fix',
+        'draft-priya',
+        'launch-post',
+      ]);
+      expect(aReply.items.find((item) => item.threadId === 'login-fix')).toMatchObject({
         attention: 'plan',
         summary: '7 steps · 1 needs you',
         changed: 1,
       });
       const bStill = await inbox(context.app, DEVICE_B);
       expect(bStill.items.map((item) => item.threadId)).toEqual([
-        'login-fix',
         'payment-upgrade',
-        'launch-post',
+        'login-fix',
         'draft-priya',
+        'launch-post',
       ]);
       expect(bStill.items.find((item) => item.threadId === 'login-fix')?.attention).toBe('plan');
     } finally {
@@ -457,8 +462,8 @@ describe('cloud sample send and agent reply', () => {
       let current = await inbox(context.app);
       expect(current.items.map((item) => item.threadId)).toEqual([
         'payment-upgrade',
-        'launch-post',
         'draft-priya',
+        'launch-post',
       ]);
 
       await vi.advanceTimersByTimeAsync(4_999);
@@ -469,9 +474,9 @@ describe('cloud sample send and agent reply', () => {
       current = await inbox(context.app);
       expect(current.items.map((item) => item.threadId)).toEqual([
         'payment-upgrade',
-        'launch-post',
-        'draft-priya',
         'login-fix',
+        'draft-priya',
+        'launch-post',
       ]);
       const replyItem = current.items.find((item) => item.threadId === 'login-fix')!;
       expect(replyItem).toMatchObject({
@@ -656,10 +661,10 @@ describe('cloud sample reset', () => {
     try {
       const initial = await inbox(context.app);
       expect(initial.items.map((item) => item.threadId)).toEqual([
-        'login-fix',
         'payment-upgrade',
-        'launch-post',
+        'login-fix',
         'draft-priya',
+        'launch-post',
       ]);
 
       await putNotes(context.app, 'payment-upgrade', [
@@ -678,10 +683,10 @@ describe('cloud sample reset', () => {
 
       const restored = await inbox(context.app);
       expect(restored.items.map((item) => item.threadId)).toEqual([
-        'login-fix',
         'payment-upgrade',
-        'launch-post',
+        'login-fix',
         'draft-priya',
+        'launch-post',
       ]);
       expect(restored.items.find((item) => item.threadId === 'login-fix')).toMatchObject({
         attention: 'plan',
@@ -699,10 +704,10 @@ describe('cloud sample reset', () => {
       expect(secondReset.status).toBe(204);
       await vi.advanceTimersByTimeAsync(10_000);
       expect((await inbox(context.app)).items.map((item) => item.threadId)).toEqual([
-        'login-fix',
         'payment-upgrade',
-        'launch-post',
+        'login-fix',
         'draft-priya',
+        'launch-post',
       ]);
     } finally {
       await cleanup(context);
