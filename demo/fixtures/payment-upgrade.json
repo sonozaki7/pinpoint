@@ -43,7 +43,9 @@
           "Upgrade now",
           "Upgrade in a test shop"
         ],
-        "questionId": "q_payments_v5"
+        "questionId": "q_payments_v5",
+        "flag": "your call",
+        "why": "The big weekend sale starts Friday"
       },
       {
         "id": "p2",

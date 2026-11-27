@@ -1,13 +1,21 @@
 import type { Point } from '../../../../shared/contract.js';
+import {
+  CHANGED_WHY,
+  groundedWhy,
+  heuristicFor,
+  type EvidenceContext,
+  type RiskHeuristic,
+} from './evidence.js';
 import type { SourceBlock, SourceEvidence } from './types.js';
 import { oneLine } from './text.js';
 
 /**
- * Evidence-backed point flags (contract `Point.flag`, <= 24 ASCII chars).
+ * Evidence-backed point flags (contract `Point.flag`, <= 24 ASCII chars, and
+ * `Point.why`, <= 60 ASCII chars).
  *
- * A flag is only set when the server can point at something: a linked note
- * that disagrees on a number/amount/term, or a claim in a Notion page of the
- * kind that is worth a second look ("every customer", "today", a price).
+ * A flag is only kept when the server can point at something: a linked note
+ * that disagrees on a number/amount/term, a source claim matching a named risk
+ * heuristic, or a model-supplied why that survives the grounding check.
  */
 
 export interface FlagCandidate {
@@ -82,11 +90,15 @@ export function numberMentions(text: string): Map<string, string[]> {
   return found;
 }
 
-/**
- * A sentence that disagrees with a linked note on a number gets a flag naming
- * the note's value: "notes say net-45". No note, no conflict, no flag.
- */
-export function evidenceFlag(quote: string, notes: SourceEvidence['notes']): string | undefined {
+interface EvidenceConflict {
+  preferred: string;
+  note: { title: string; text: string; url?: string };
+}
+
+function evidenceConflict(
+  quote: string,
+  notes: SourceEvidence['notes'],
+): EvidenceConflict | undefined {
   if (!notes || notes.length === 0) return undefined;
   const sentence = numberMentions(quote);
   if (sentence.size === 0) return undefined;
@@ -99,22 +111,61 @@ export function evidenceFlag(quote: string, notes: SourceEvidence['notes']): str
       const conflict = values.find((value) => !known.includes(value));
       if (!conflict) continue;
       const preferred = known.find((value) => value !== conflict) ?? known[0]!;
-      return clipFlag(`notes say ${preferred}`);
+      return { preferred, note };
     }
   }
   return undefined;
 }
 
-const RISKY_CLAIM =
-  /\b(?:every|all)\s+(?:customer|user|client|team|person|people|account)\b|\btoday\b|\b(?:always|never|guaranteed?|100%)\b|\$\s?\d|\bfree\s+forever\b/i;
+/**
+ * A sentence that disagrees with a linked note on a number gets a flag naming
+ * the note's value: "notes say net-45". No note, no conflict, no flag.
+ */
+export function evidenceFlag(quote: string, notes: SourceEvidence['notes']): string | undefined {
+  const conflict = evidenceConflict(quote, notes);
+  return conflict ? clipFlag(`notes say ${conflict.preferred}`) : undefined;
+}
 
-/** Notion pages: a sweeping claim or a price is worth a check, not a rewrite. */
+/** The one-line evidence under that flag, naming the linked note. */
+export function evidenceWhy(quote: string, notes: SourceEvidence['notes']): string | undefined {
+  const conflict = evidenceConflict(quote, notes);
+  if (!conflict) return undefined;
+  const title = oneLine(conflict.note.title).trim();
+  const named =
+    title.length > 0 ? `${title} says ${conflict.preferred}` : `the linked note says ${conflict.preferred}`;
+  return clipWhy(named);
+}
+
+const RISKY_CLAIM =
+  /\b(?:every|all)\s+(?:customer|user|client|team|person|people|account)\b|\b(?:available|live|launch|launching|release|releasing|rollout|roll out)\b[^.!?\n]*\btoday\b|\$\s?\d|\b(?:guaranteed?|free\s+forever)\b/i;
+
+/** Notion pages: a sweeping rollout or price claim is worth a check, not a rewrite. */
 export function riskyClaimFlag(quote: string): string | undefined {
   return RISKY_CLAIM.test(quote) ? 'check this' : undefined;
 }
 
+/** The named heuristic that justifies a deterministic check. */
+export function riskyClaimWhy(quote: string): string | undefined {
+  return heuristicFor(quote);
+}
+
 export function clipFlag(value: string): string {
   return oneLine(value).replace(/[^\x20-\x7e]/g, '').slice(0, 24).trim();
+}
+
+export function clipWhy(value: string): string {
+  return oneLine(value).replace(/[^\x20-\x7e]/g, '').slice(0, 60).trim();
+}
+
+const HEURISTIC_FLAG: Record<RiskHeuristic, string> = {
+  "can't be undone": "can't be undone",
+  'affects every customer': 'affects everyone',
+  'money or date commitment': 'money or date',
+  'external promise': 'external promise',
+};
+
+function heuristicFlag(heuristic: RiskHeuristic | undefined): string | undefined {
+  return heuristic ? HEURISTIC_FLAG[heuristic] : undefined;
 }
 
 /** Set `anchor` to the first source block whose text contains the quote. */
@@ -141,23 +192,69 @@ export function blockForQuote(
   return best && best.score >= 0.6 ? best.block : undefined;
 }
 
-/** Apply source-specific flags and anchors to normalized points. */
+/**
+ * Apply source-specific flags, evidence lines and anchors to normalized points.
+ * A model flag whose why cannot be grounded is dropped, never shown.
+ */
 export function decoratePoints(
   points: Point[],
   app: string | undefined,
-  source: { blocks?: SourceBlock[]; evidence?: SourceEvidence },
+  source: { text: string; blocks?: SourceBlock[]; evidence?: SourceEvidence; history?: { role: string; text: string }[] },
 ): Point[] {
+  const context: EvidenceContext = {
+    sourceText: source.text,
+    ...(source.evidence?.notes ? { notes: source.evidence.notes } : {}),
+    ...(source.history ? { history: source.history } : {}),
+  };
+
   return points.map((point) => {
     const next: Point = { ...point };
-    if (!next.flag) {
-      const flag =
-        app === 'gmail'
-          ? evidenceFlag(next.quote, source.evidence?.notes)
-          : app === 'notion'
-            ? riskyClaimFlag(next.quote)
-            : undefined;
-      if (flag) next.flag = clipFlag(flag);
+    let flag = next.flag;
+    let why = next.why ? groundedWhy(next.why, context) : undefined;
+
+    // A model flag is kept only with grounded evidence. When the model forgot
+    // the why, a named heuristic for the quote may stand in for it.
+    if (flag && !why) {
+      const heuristic = heuristicFor(next.quote);
+      if (heuristic) why = heuristic;
     }
+    if (flag && !why) flag = undefined;
+
+    // Deterministic fallbacks. A linked note that disagrees on a number, day or
+    // term comes first (Gmail, Notion and T3 alike), then a risky rollout claim
+    // (Notion) or an irreversible step (T3 plans).
+    if (!flag) {
+      const conflict = evidenceFlag(next.quote, source.evidence?.notes);
+      if (conflict) {
+        flag = conflict;
+        why = evidenceWhy(next.quote, source.evidence?.notes);
+      } else if (app === 'notion') {
+        const found = riskyClaimFlag(next.quote);
+        if (found) {
+          flag = found;
+          why = riskyClaimWhy(next.quote);
+        }
+      } else if (app !== 'gmail' && next.risk === 'high') {
+        const heuristic = heuristicFor(next.quote);
+        const found = heuristicFlag(heuristic);
+        if (found && heuristic) {
+          flag = found;
+          why = heuristic;
+        }
+      }
+    }
+
+    if (flag) {
+      next.flag = clipFlag(flag);
+      if (why) next.why = clipWhy(why);
+      else delete next.flag;
+    } else {
+      delete next.flag;
+      delete next.why;
+    }
+
+    if (next.changed && !next.why) next.why = CHANGED_WHY;
+
     if (app === 'notion' && !next.anchor) {
       const block = blockForQuote(next.quote, source.blocks);
       if (block) next.anchor = block.id;

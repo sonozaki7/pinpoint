@@ -1,9 +1,36 @@
 {
-  "_comment": "Threads in the Pinpoint Cloud sample workspace, in inbox order (newest first). Plain-language on purpose: judges and first-time users see these on their own G2.",
-  "threads": [
-    "login-fix",
-    "payment-upgrade",
-    "launch-post",
-    "draft-priya"
-  ]
+  "_comment": "Pinpoint Cloud sample workspace. Threads are fixtures from demo/fixtures (and demo/sample/threads), listed in inbox order per persona. The X-Pinpoint-Sample header picks the persona: mixed (default, real G2), developer or everyday. `status` is the sample glance line (agents running, done today); needs-you is counted from the inbox.",
+  "personas": {
+    "mixed": [
+      "login-fix",
+      "saturday-plan",
+      "landlord-reply",
+      "launch-post"
+    ],
+    "developer": [
+      "login-fix",
+      "payment-upgrade",
+      "launch-post",
+      "draft-priya"
+    ],
+    "everyday": [
+      "saturday-plan",
+      "landlord-reply",
+      "school-newsletter"
+    ]
+  },
+  "status": {
+    "mixed": {
+      "working": 2,
+      "doneToday": 5
+    },
+    "developer": {
+      "working": 3,
+      "doneToday": 7
+    },
+    "everyday": {
+      "working": 1,
+      "doneToday": 4
+    }
+  }
 }

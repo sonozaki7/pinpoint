@@ -1,0 +1,125 @@
+{
+  "thread": {
+    "threadId": "school-newsletter",
+    "title": "PTA newsletter, December (draft)",
+    "project": "Notion",
+    "attention": "report",
+    "updatedAt": "2026-11-27T08:30:00.000Z",
+    "app": "notion"
+  },
+  "source": {
+    "sourceMessageId": "notion-pta-newsletter-1",
+    "kind": "reply",
+    "app": "notion",
+    "text": "Dear families, here is what is happening at the school this December.\n\nThe winter bake sale is on Friday, December 12.\n\nIt runs from 10:00 to 14:00 in the school gym, and all the money goes to new library books for every class.\n\nWe are looking for parents to bring cakes, cookies or bread. Please sign up at the front office by December 5, and write on the sheet if your baking contains nuts.\n\nClass photo day moves to Tuesday, December 9, so please send your child in the school uniform.\n\nThe winter concert is on Thursday, December 18, at 15:00 in the hall. Brothers, sisters and grandparents are all welcome, and there will be tea afterwards.\n\nSchool closes for the holidays on Friday, December 19, and opens again on Monday, January 5.\n\nThank you, as always, for everything you do for our children and our school.",
+    "blocks": [
+      {
+        "id": "blk-pta-1",
+        "text": "Dear families, here is what is happening at the school this December."
+      },
+      {
+        "id": "blk-pta-2",
+        "text": "The winter bake sale is on Friday, December 12."
+      },
+      {
+        "id": "blk-pta-3",
+        "text": "It runs from 10:00 to 14:00 in the school gym, and all the money goes to new library books for every class."
+      },
+      {
+        "id": "blk-pta-4",
+        "text": "We are looking for parents to bring cakes, cookies or bread. Please sign up at the front office by December 5, and write on the sheet if your baking contains nuts."
+      },
+      {
+        "id": "blk-pta-5",
+        "text": "Class photo day moves to Tuesday, December 9, so please send your child in the school uniform."
+      },
+      {
+        "id": "blk-pta-6",
+        "text": "The winter concert is on Thursday, December 18, at 15:00 in the hall. Brothers, sisters and grandparents are all welcome, and there will be tea afterwards."
+      },
+      {
+        "id": "blk-pta-7",
+        "text": "School closes for the holidays on Friday, December 19, and opens again on Monday, January 5."
+      },
+      {
+        "id": "blk-pta-8",
+        "text": "Thank you, as always, for everything you do for our children and our school."
+      }
+    ],
+    "evidence": {
+      "notes": [
+        {
+          "title": "Bake sale plan",
+          "text": "Bake sale plan: Saturday the 13th, 10:00 to 14:00, school gym. Confirmed with the principal on Nov 24.",
+          "url": "https://www.notion.so/pinpoint-bake-sale-plan"
+        }
+      ]
+    },
+    "target": {
+      "name": "PTA newsletter",
+      "link": "https://www.notion.so/pinpoint-pta-newsletter"
+    }
+  },
+  "deck": {
+    "threadId": "school-newsletter",
+    "sourceMessageId": "notion-pta-newsletter-1",
+    "title": "PTA newsletter, December (draft)",
+    "attention": "report",
+    "headline": "PTA newsletter, December: 7 points",
+    "points": [
+      {
+        "id": "p1",
+        "index": 1,
+        "kind": "claim",
+        "glance": "Winter news from the PTA",
+        "quote": "Dear families, here is what is happening at the school this December."
+      },
+      {
+        "id": "p2",
+        "index": 2,
+        "kind": "claim",
+        "glance": "Bake sale: Friday, December 12",
+        "quote": "The winter bake sale is on Friday, December 12.",
+        "flag": "note says Saturday",
+        "why": "Bake sale plan says Saturday the 13th"
+      },
+      {
+        "id": "p3",
+        "index": 3,
+        "kind": "claim",
+        "glance": "Bake sale 10:00 to 14:00, gym",
+        "quote": "It runs from 10:00 to 14:00 in the school gym, and all the money goes to new library books for every class."
+      },
+      {
+        "id": "p4",
+        "index": 4,
+        "kind": "claim",
+        "glance": "Parents sign up to bake by Dec 5",
+        "quote": "We are looking for parents to bring cakes, cookies or bread."
+      },
+      {
+        "id": "p5",
+        "index": 5,
+        "kind": "claim",
+        "glance": "Class photo day: Tuesday, Dec 9",
+        "quote": "Class photo day moves to Tuesday, December 9, so please send your child in the school uniform."
+      },
+      {
+        "id": "p6",
+        "index": 6,
+        "kind": "claim",
+        "glance": "Winter concert: Thursday, Dec 18",
+        "quote": "The winter concert is on Thursday, December 18, at 15:00 in the hall."
+      },
+      {
+        "id": "p7",
+        "index": 7,
+        "kind": "claim",
+        "glance": "Holidays: Dec 19 to Jan 5",
+        "quote": "School closes for the holidays on Friday, December 19, and opens again on Monday, January 5."
+      }
+    ],
+    "createdAt": "2026-11-27T08:30:07.000Z",
+    "splitter": "fixture"
+  }
+}

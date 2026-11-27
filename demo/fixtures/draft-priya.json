@@ -48,7 +48,8 @@
         "kind": "draft",
         "glance": "Net-60 payment terms",
         "quote": "We're happy to agree to net-60 payment terms.",
-        "flag": "notes say net-45"
+        "flag": "notes say net-45",
+        "why": "Acme contract note: net-45 agreed Nov 12"
       },
       {
         "id": "p3",

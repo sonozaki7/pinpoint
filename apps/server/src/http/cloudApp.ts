@@ -1,8 +1,9 @@
+import { createHash } from 'node:crypto';
 import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { getConnInfo } from '@hono/node-server/conninfo';
-import { DEVICE_HEADER, TOKEN_HEADER, type PairResult } from '../../../../shared/contract.js';
+import { DEVICE_HEADER, SAMPLE_HEADER, TOKEN_HEADER, type PairResult } from '../../../../shared/contract.js';
 import { normalizeDeviceId, deviceHash } from '../cloud/device.js';
 import {
   DeskOfflineError,
@@ -21,7 +22,8 @@ import { FixedWindowRateLimiter, type RateLimitDecision } from '../cloud/rateLim
 import type { CloudService } from '../cloud/service.js';
 import type { DeviceWorkspace } from '../cloud/workspace.js';
 import { HttpError, errorMessage } from '../core/errors.js';
-import { draftInputSchema, editInputSchema } from '../core/schemas.js';
+import { askInputSchema, draftInputSchema, editInputSchema, taskInputSchema } from '../core/schemas.js';
+import { parsePersona } from '../cloud/sample.js';
 import {
   RELAY_MAX_BYTES,
   isDeviceToken,
@@ -51,6 +53,8 @@ const ROUTE_TEMPLATES: [RegExp, string][] = [
   [/^\/api\/review\/[^/]+\/send$/, '/api/review/:threadId/send'],
   [/^\/api\/review\/[^/]+$/, '/api/review/:threadId'],
   [/^\/api\/edit\/[^/]+$/, '/api/edit/:threadId'],
+  [/^\/api\/ask\/[^/]+$/, '/api/ask/:threadId'],
+  [/^\/api\/task$/, '/api/task'],
   [/^\/api\/phone\/[^/]+\/[^/]+$/, '/api/phone/:threadId/:pointId'],
 ];
 
@@ -94,7 +98,7 @@ function tokenHeader(c: Context): string | null {
 }
 
 function workspaceFor(c: Context<CloudVariables>, cloud: CloudService): DeviceWorkspace {
-  return cloud.workspaceFor(c.get('deviceId'));
+  return cloud.workspaceFor(c.get('deviceId'), parsePersona(c.req.header(SAMPLE_HEADER)));
 }
 
 function relayError(error: unknown): HttpError {
@@ -134,6 +138,7 @@ async function relayToDesk(
     path: c.req.path,
     query: url.search.startsWith('?') ? url.search.slice(1) : url.search,
     ...(c.req.header('content-type') ? { contentType: c.req.header('content-type')! } : {}),
+    device: createHash('sha256').update(c.get('deviceId')).digest('hex').slice(0, 16),
     bodyBase64: body.toString('base64'),
   };
 
@@ -202,7 +207,7 @@ export function createCloudApp(deps: CloudAppDeps): Hono<CloudVariables> {
     cors({
       origin: '*',
       allowMethods: ['GET', 'PUT', 'POST', 'DELETE', 'OPTIONS'],
-      allowHeaders: ['Content-Type', 'X-Pinpoint-Device', 'X-Pinpoint-Token'],
+      allowHeaders: ['Content-Type', 'X-Pinpoint-Device', 'X-Pinpoint-Token', 'X-Pinpoint-Sample'],
       maxAge: 600,
     }),
   );
@@ -344,6 +349,41 @@ export function createCloudApp(deps: CloudAppDeps): Hono<CloudVariables> {
         parsed.data.text,
       ),
     );
+  });
+
+  app.post('/api/ask/:threadId', async (c) => {
+    const raw = await readJsonBody(
+      c.req.raw,
+      MAX_CLOUD_JSON_BYTES,
+      'JSON body exceeds 64 KB',
+    );
+    const parsed = askInputSchema.safeParse(raw);
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      throw new HttpError(
+        400,
+        `Invalid question${issue ? `: ${issue.path.join('.')} ${issue.message}` : ''}`,
+        'bad_request',
+      );
+    }
+    const llm = cloud.askUsesModel(c.get('deviceId'));
+    return c.json(
+      await workspaceFor(c, cloud).ask(c.req.param('threadId'), parsed.data.question, { llm }),
+    );
+  });
+
+  app.post('/api/task', async (c) => {
+    const raw = await readJsonBody(
+      c.req.raw,
+      MAX_CLOUD_JSON_BYTES,
+      'JSON body exceeds 64 KB',
+    );
+    const parsed = taskInputSchema.safeParse(raw);
+    if (!parsed.success) {
+      throw new HttpError(400, 'Invalid task: text is required', 'bad_request');
+    }
+    const result = await workspaceFor(c, cloud).task(parsed.data.text);
+    return c.json(result, result.ok ? 200 : 429);
   });
 
   app.post('/api/review/:threadId/send', async (c) =>

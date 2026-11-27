@@ -1,0 +1,47 @@
+{
+  "_comment": "'Since you looked' lines of the cloud sample, per persona. Each line is at most 44 ASCII chars; threadRef is the thread a tap opens (demo/fixtures or demo/sample/threads).",
+  "developer": [
+    {
+      "threadRef": "login-fix",
+      "line": "login-fix: agent replied, migrating sessions"
+    },
+    {
+      "threadRef": "deps-upgrade",
+      "line": "deps-upgrade: done, PR opened"
+    },
+    {
+      "threadRef": "flaky-e2e",
+      "line": "flaky-e2e: tests are green again"
+    }
+  ],
+  "everyday": [
+    {
+      "threadRef": "groceries",
+      "line": "groceries: ordered for Sunday"
+    },
+    {
+      "threadRef": "flight-price",
+      "line": "flight-price: price dropped, needs you",
+      "needsYou": true
+    },
+    {
+      "threadRef": "tax-receipts",
+      "line": "tax-receipts: sorted into 4 folders"
+    }
+  ],
+  "mixed": [
+    {
+      "threadRef": "login-fix",
+      "line": "login-fix: agent replied, migrating sessions"
+    },
+    {
+      "threadRef": "groceries",
+      "line": "groceries: ordered for Sunday"
+    },
+    {
+      "threadRef": "flight-price",
+      "line": "flight-price: price dropped, needs you",
+      "needsYou": true
+    }
+  ]
+}

@@ -10,6 +10,12 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:4390:8787"
+    # Optional, server-only secrets (never synced, never in the repo): only DEEPSEEK_API_KEY
+    # (and optionally PINPOINT_ASK_DAILY_CAP) is read, and only to phrase Ask answers.
+    # Missing file = Ask answers with the exact source sentence, no model. Needs Compose >= 2.24.
+    env_file:
+      - path: /srv/apps/pinpoint-cloud/secrets.env
+        required: false
     environment:
       # `cloud` is the production mode. The first end-to-end check before cloud
       # mode landed ran with PINPOINT_MODE=demo (override at deploy time).

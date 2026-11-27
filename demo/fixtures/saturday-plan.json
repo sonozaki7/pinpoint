@@ -1,0 +1,69 @@
+{
+  "thread": {
+    "threadId": "saturday-plan",
+    "title": "Saturday with the kids: Ueno",
+    "project": "Weekend",
+    "attention": "plan",
+    "updatedAt": "2026-11-27T08:20:00.000Z"
+  },
+  "source": {
+    "sourceMessageId": "01JDSAMPLESATURDAYPLAN0001",
+    "kind": "plan",
+    "text": "## Plan: Saturday with the kids in Ueno\n\nHere is the day I'd plan for you and the kids. I picked places that are close together, so nobody has to walk far, and everything fits between a slow breakfast and a normal bedtime. The forecast is 9°C and windy at noon. The rain holds off until the evening. The total is a rough estimate for tickets, lunch and the train for two adults and two kids, and I haven't booked anything.\n\n1. Leave at 9:00 and take the Ginza line to Ueno. It is one direct ride of about 25 minutes from your station, with no changes, so the kids can sit the whole way.\n2. Ueno Zoo from 9:30 to 12:00. The pandas are calmest in the morning, and tickets are free for children under 12.\n3. Picnic lunch on the park lawn after the zoo. I'd pack rice balls and fruit from the shop near your station and eat on the big lawn by the fountain.\n4. The science museum from 13:30 to 15:30. It has a hands-on room that suits ages 6 to 10, and it is warm and dry inside.\n5. Ice cream on the way back, and home by 17:00, so there is time for a bath and a calm dinner.\n6. The total cost is about ¥6,400: ¥2,400 for tickets, ¥3,200 for the train and lunch, and ¥800 for the ice cream.\n\nWhat I need from you: an OK on the plan, or changes to any step. I'll book nothing until you approve it, and I'll post the final times in this thread the evening before."
+  },
+  "deck": {
+    "threadId": "saturday-plan",
+    "sourceMessageId": "01JDSAMPLESATURDAYPLAN0001",
+    "title": "Saturday with the kids: Ueno",
+    "attention": "plan",
+    "headline": "Saturday with the kids: Ueno",
+    "points": [
+      {
+        "id": "p1",
+        "index": 1,
+        "kind": "step",
+        "glance": "9:00 Ginza line to Ueno",
+        "quote": "Leave at 9:00 and take the Ginza line to Ueno."
+      },
+      {
+        "id": "p2",
+        "index": 2,
+        "kind": "step",
+        "glance": "Zoo, 9:30 to 12:00",
+        "quote": "Ueno Zoo from 9:30 to 12:00."
+      },
+      {
+        "id": "p3",
+        "index": 3,
+        "kind": "step",
+        "glance": "Picnic lunch on the park lawn",
+        "quote": "Picnic lunch on the park lawn after the zoo.",
+        "flag": "too cold for a picnic",
+        "why": "The plan says 9C and windy at noon"
+      },
+      {
+        "id": "p4",
+        "index": 4,
+        "kind": "step",
+        "glance": "Science museum, 13:30 to 15:30",
+        "quote": "The science museum from 13:30 to 15:30."
+      },
+      {
+        "id": "p5",
+        "index": 5,
+        "kind": "step",
+        "glance": "Ice cream, home by 17:00",
+        "quote": "Ice cream on the way back, and home by 17:00, so there is time for a bath and a calm dinner."
+      },
+      {
+        "id": "p6",
+        "index": 6,
+        "kind": "claim",
+        "glance": "About 6,400 yen in total",
+        "quote": "The total cost is about ¥6,400: ¥2,400 for tickets, ¥3,200 for the train and lunch, and ¥800 for the ice cream."
+      }
+    ],
+    "createdAt": "2026-11-27T08:20:09.000Z",
+    "splitter": "fixture"
+  }
+}

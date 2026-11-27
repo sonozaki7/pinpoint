@@ -61,7 +61,7 @@ describe('HTTP API (demo mode)', () => {
       'report',
     ]);
     const plan = body.items.find((item) => item.threadId === 'auth-refresh-fix')!;
-    expect(plan.summary).toBe('plan, 7 steps');
+    expect(plan.summary).toBe('7 steps · 1 needs you');
     expect(plan.deckReady).toBe(true);
     expect(plan.pointCount).toBe(7);
     expect(plan.draftNotes).toBe(0);

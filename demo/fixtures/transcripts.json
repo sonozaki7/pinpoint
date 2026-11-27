@@ -30,6 +30,31 @@
       "threadId": "draft-priya",
       "pointId": "p2",
       "text": "Net-45, not net-60."
+    },
+    {
+      "threadId": "payment-upgrade",
+      "pointId": "p1",
+      "text": "Wait until Monday, after the sale."
+    },
+    {
+      "threadId": "saturday-plan",
+      "pointId": "p3",
+      "text": "Skip the picnic, it'll be cold. Find an indoor lunch near the zoo."
+    },
+    {
+      "threadId": "landlord-reply",
+      "pointId": "p2",
+      "text": "Three percent, not five percent."
+    },
+    {
+      "threadId": "school-newsletter",
+      "pointId": "p2",
+      "text": "Saturday the 13th, not Friday the 12th."
+    },
+    {
+      "threadId": "flight-price",
+      "pointId": "p1",
+      "text": "Book it now."
     }
   ]
 }

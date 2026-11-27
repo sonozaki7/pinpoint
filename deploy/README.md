@@ -17,7 +17,8 @@ The container listens on `127.0.0.1:4390`; nginx terminates TLS and proxies to i
 
 The image bakes whisper.cpp `v1.9.6` and `ggml-base.en.bin` (pinned commit, sha256
 checked at build). Runtime is Node 22 slim, non-root uid 10001, read-only root
-filesystem with a `/tmp` tmpfs and the `/data` volume. Cloud mode needs no secrets.
+filesystem with a `/tmp` tmpfs and the `/data` volume. Cloud mode needs no secrets; one optional
+secret (a DeepSeek key) turns on model-phrased Ask answers, see below.
 
 ## Deploy
 
@@ -32,6 +33,30 @@ files), appends one audit line on the server if `PINPOINT_AUDIT_LOG` is set, run
 `docker compose -p pinpoint-cloud -f deploy/compose.yml up -d --build` on the
 server, then polls `https://pinpoint-api.qolso.com/api/health` (falls back to the
 SSH loopback for the first deploy, before DNS existed).
+
+## Optional: DeepSeek key for Ask (server-only secrets file)
+
+Without a key, Ask in the cloud answers with the exact source sentence (retrieval, no model). With a key,
+DeepSeek (`deepseek-flash`) may choose among the top three retrieved sentences and phrase a short answer.
+The quote is always an exact sentence; a phrasing that adds a number or name is rejected. Limits: 20 model
+answers per device per minute, then a daily cap across all devices (default 2000, `PINPOINT_ASK_DAILY_CAP`);
+past either one Ask still answers with the exact sentence. Cloud never reads any other secret.
+
+The file lives outside the synced repo copy's tracked files and is never uploaded by `deploy.sh`
+(it syncs with `tar`, no delete, and skips `.env*`). One-time, by the lead:
+
+```bash
+ssh $PINPOINT_DEPLOY_HOST 'sudo install -m 600 -o root -g root /dev/null /srv/apps/pinpoint-cloud/secrets.env'
+# put the key in without echoing it, e.g. from your own machine's apps/server/.env:
+grep '^DEEPSEEK_API_KEY=' apps/server/.env | ssh $PINPOINT_DEPLOY_HOST 'sudo tee /srv/apps/pinpoint-cloud/secrets.env >/dev/null'
+# optional cap: echo 'PINPOINT_ASK_DAILY_CAP=2000' | ssh ... 'sudo tee -a /srv/apps/pinpoint-cloud/secrets.env'
+./deploy/deploy.sh                       # compose reads the file when it recreates the container
+ssh $PINPOINT_DEPLOY_HOST 'docker logs pinpoint-cloud 2>&1 | grep "ask="'   # ask=deepseek:deepseek-flash cap 2000/day
+```
+
+`secrets.env` is `KEY=value` lines (Compose `env_file`, needs Compose 2.24+; the entry is `required: false`, so
+deploys work without it). To rotate or remove the key, edit or delete the file and run `deploy.sh` again.
+Do not print the file or put the key in a command line.
 
 ## Enable HTTPS (once, after DNS)
 

@@ -9,7 +9,7 @@
 export interface DeviceStoreOptions<T> {
   maxDevices: number;
   ttlMs: number;
-  create: () => T;
+  create: (id: string) => T;
   dispose?: (value: T) => void;
   now?: () => number;
 }
@@ -23,7 +23,7 @@ export class DeviceStore<T> {
   private readonly entries = new Map<string, Entry<T>>();
   private readonly maxDevices: number;
   private readonly ttlMs: number;
-  private readonly create: () => T;
+  private readonly create: (id: string) => T;
   private readonly dispose?: (value: T) => void;
   private readonly now: () => number;
 
@@ -59,7 +59,7 @@ export class DeviceStore<T> {
       this.remove(id);
     }
 
-    const value = this.create();
+    const value = this.create(id);
     this.entries.set(id, { value, lastSeen: now });
     this.enforceCap();
     return value;

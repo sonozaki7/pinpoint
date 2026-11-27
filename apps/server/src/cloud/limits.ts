@@ -26,3 +26,6 @@ export const CLOUD_VOICE_CONCURRENCY = 2;
 
 /** How long a queued voice request waits for a free whisper slot. */
 export const CLOUD_VOICE_QUEUE_MS = 20_000;
+
+/** Model-phrased Ask answers per device per minute; beyond it the exact sentence is returned unphrased. */
+export const CLOUD_ASK_LLM_PER_MINUTE = 20;

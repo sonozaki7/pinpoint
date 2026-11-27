@@ -76,9 +76,34 @@ function failure(): SentenceEdit {
   return { ok: false, error: EDIT_FAILED };
 }
 
+const ONES: Record<string, number> = {
+  zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9,
+  ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16,
+  seventeen: 17, eighteen: 18, nineteen: 19,
+};
+const TENS: Record<string, number> = {
+  twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90,
+};
+
+/**
+ * Speech turns "3%" into "three percent". Drafts write "3%", so a note like
+ * "Three percent, not five percent" is rewritten to "3%, not 5%" before the
+ * grammar looks for the old phrase in the sentence.
+ */
+export function spokenPercents(note: string): string {
+  const tens = Object.keys(TENS).join('|');
+  const ones = Object.keys(ONES).join('|');
+  const re = new RegExp(`\\b(?:((?:${tens})(?:[- ](?:one|two|three|four|five|six|seven|eight|nine))?)|(${ones}))\\s+(?:percent|per cent)\\b`, 'gi');
+  return note.replace(re, (_match, compound: string | undefined, single: string | undefined) => {
+    if (single) return `${ONES[single.toLowerCase()]}%`;
+    const [first, second] = (compound ?? '').toLowerCase().split(/[- ]/);
+    return `${(TENS[first ?? ''] ?? 0) + (second ? (ONES[second] ?? 0) : 0)}%`;
+  });
+}
+
 export async function editSentence(input: EditSentenceInput): Promise<SentenceEdit> {
   const before = oneLine(input.before);
-  const note = oneLine(input.note);
+  const note = spokenPercents(oneLine(input.note));
   if (before.length === 0) return failure();
   if (note.length === 0) return failure();
 

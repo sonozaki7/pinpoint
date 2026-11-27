@@ -1,9 +1,11 @@
 import type {
+  AgentStatus,
   AppId,
   Deck,
   Point,
   Receipt,
   ReviewDraft,
+  TaskResult,
   ThreadAttention,
 } from '../../../../shared/contract.js';
 
@@ -48,6 +50,8 @@ export interface AttentionSource {
   app?: AppId;
   blocks?: SourceBlock[];
   evidence?: SourceEvidence;
+  /** Earlier messages in the same thread; user instructions are valid evidence for a flag. */
+  history?: { role: 'user' | 'assistant'; text: string }[];
   target?: SourceTarget;
 }
 
@@ -68,12 +72,30 @@ export interface SendOptions {
   sourcePlanId?: string;
 }
 
+/** One thing an agent did that the user has not looked at yet (catch-up input). */
+export interface AgentUpdate {
+  threadId: string;
+  title: string;
+  kind: 'replied' | 'question' | 'plan' | 'failed';
+  /** The agent's latest message; evidence for a short summary, never shown as is. */
+  text: string;
+  /** Changes whenever the agent says something new in this thread. */
+  key: string;
+  at: string;
+}
+
 /** SPEC §6. Implemented in src/t3, loaded dynamically by src/core/loaders.ts. */
 export interface T3Client {
   listAttention(): Promise<AttentionThread[]>;
   getSource(threadId: string): Promise<AttentionSource>;
   sendMessage(threadId: string, text: string, options?: SendOptions): Promise<void>;
   answerQuestion(threadId: string, requestId: string, answers: Record<string, string>): Promise<void>;
+  /** Glance status from thread states (allowed projects only): agents running, and done today. */
+  status?(): Promise<Pick<AgentStatus, 'working' | 'doneToday'>>;
+  /** Agent updates inside the allowed projects since `sinceMs` (epoch ms), newest first. */
+  activity?(sinceMs: number): Promise<AgentUpdate[]>;
+  /** Start a real agent thread in the first allowed project (voice hand-off). */
+  startTask?(input: { text: string; title: string }): Promise<TaskResult>;
 }
 
 /**

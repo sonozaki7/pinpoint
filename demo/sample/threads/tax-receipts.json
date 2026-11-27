@@ -1,0 +1,53 @@
+{
+  "thread": {
+    "threadId": "tax-receipts",
+    "title": "tax-receipts",
+    "project": "Home",
+    "attention": "report",
+    "updatedAt": "2026-11-27T07:30:00.000Z"
+  },
+  "source": {
+    "sourceMessageId": "sample-tax-receipts-1",
+    "kind": "reply",
+    "text": "I sorted 23 receipts from this year into four folders. Medical has 6 receipts, travel has 9, and work costs have 6. Two receipts had no date, so they are in a fourth folder for you to check later. Nothing was deleted or renamed."
+  },
+  "deck": {
+    "threadId": "tax-receipts",
+    "sourceMessageId": "sample-tax-receipts-1",
+    "title": "tax-receipts",
+    "attention": "report",
+    "headline": "Tax receipts sorted",
+    "points": [
+      {
+        "id": "p1",
+        "index": 1,
+        "kind": "claim",
+        "glance": "23 receipts sorted into 4 folders",
+        "quote": "I sorted 23 receipts from this year into four folders."
+      },
+      {
+        "id": "p2",
+        "index": 2,
+        "kind": "claim",
+        "glance": "Medical 6, travel 9, work 6",
+        "quote": "Medical has 6 receipts, travel has 9, and work costs have 6."
+      },
+      {
+        "id": "p3",
+        "index": 3,
+        "kind": "claim",
+        "glance": "2 receipts have no date",
+        "quote": "Two receipts had no date, so they are in a fourth folder for you to check later."
+      },
+      {
+        "id": "p4",
+        "index": 4,
+        "kind": "claim",
+        "glance": "Nothing deleted or renamed",
+        "quote": "Nothing was deleted or renamed."
+      }
+    ],
+    "createdAt": "2026-11-27T07:30:00.000Z",
+    "splitter": "fixture"
+  }
+}

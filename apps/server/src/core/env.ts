@@ -31,6 +31,16 @@ export interface Env {
   allowedOrigins: string[];
   splitterProvider: SplitterProviderName;
   splitterModel: string;
+  /** DeepSeek API key (desk reviewer brain; cloud uses it only to phrase Ask answers). */
+  deepseekKey: string;
+  deepseekModel: string;
+  /** Cloud ask cost guard: global LLM answers per UTC day (default 2,000). */
+  askDailyCap: number;
+  /** Voice hand-off: provider/model for `t3 thread start` (both or neither; default = the project's). */
+  taskProvider: string;
+  taskModel: string;
+  /** Cloud sample: delay before a simulated hand-off task shows its result (PINPOINT_SAMPLE_TASK_MS). */
+  sampleTaskMs: number;
   anthropicKey: string;
   anthropicModel: string;
   telegramToken: string;
@@ -127,6 +137,10 @@ export function readEnv(source: NodeJS.ProcessEnv = process.env): Env {
   const whisperThreads = Number.isFinite(rawThreads)
     ? Math.min(32, Math.max(1, rawThreads))
     : 4;
+  const rawTaskMs = Number.parseInt(str(source, 'PINPOINT_SAMPLE_TASK_MS', '6000'), 10);
+  const sampleTaskMs = Number.isFinite(rawTaskMs) && rawTaskMs >= 0 ? rawTaskMs : 6_000;
+  const rawAskCap = Number.parseInt(str(source, 'PINPOINT_ASK_DAILY_CAP', '2000'), 10);
+  const askDailyCap = Number.isFinite(rawAskCap) ? Math.max(0, rawAskCap) : 2_000;
 
   return {
     mode,
@@ -139,6 +153,15 @@ export function readEnv(source: NodeJS.ProcessEnv = process.env): Env {
     allowedOrigins: cloud ? [] : list(source, 'PINPOINT_ALLOWED_ORIGINS'),
     splitterProvider: cloud ? 'fixture' : provider(source, mode),
     splitterModel: cloud ? 'fixture' : str(source, 'SPLITTER_MODEL', 'opencode-go/deepseek-v4.1-flash'),
+    // The cloud server deliberately reads only this one model key, so Ask can
+    // phrase an answer when the daily budget allows it. No other desk secret
+    // is loaded in cloud mode.
+    deepseekKey: str(source, 'DEEPSEEK_API_KEY'),
+    deepseekModel: str(source, 'DEEPSEEK_MODEL', 'deepseek-flash'),
+    askDailyCap,
+    taskProvider: cloud ? '' : str(source, 'PINPOINT_TASK_PROVIDER'),
+    taskModel: cloud ? '' : str(source, 'PINPOINT_TASK_MODEL'),
+    sampleTaskMs,
     anthropicKey: cloud ? '' : str(source, 'ANTHROPIC_API_KEY'),
     anthropicModel: cloud ? '' : str(source, 'ANTHROPIC_MODEL', 'claude-sonnet-4-5'),
     telegramToken: cloud ? '' : str(source, 'TELEGRAM_BOT_TOKEN'),

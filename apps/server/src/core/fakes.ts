@@ -1,7 +1,8 @@
-import type { Deck, Point, Receipt, ReviewDraft } from '../../../../shared/contract.js';
+import type { AgentStatus, Deck, Point, Receipt, ReviewDraft, TaskResult } from '../../../../shared/contract.js';
 import type { Fixture } from './builtinFixtures.js';
 import { cloneFixtures } from './builtinFixtures.js';
 import type {
+  AgentUpdate,
   AttentionSource,
   AttentionThread,
   SendOptions,
@@ -13,6 +14,10 @@ import type {
 export class FakeT3Client implements T3Client {
   readonly sent: { threadId: string; text: string; sourcePlanId?: string }[] = [];
   readonly answered: { threadId: string; requestId: string; answers: Record<string, string> }[] = [];
+  readonly tasks: { text: string; title: string }[] = [];
+  /** Tests set these to drive the glance status and the catch-up from "T3 thread activity". */
+  statusValue: Pick<AgentStatus, 'working' | 'doneToday'> = { working: 2, doneToday: 3 };
+  updates: AgentUpdate[] = [];
   private readonly fixtures: Fixture[];
 
   constructor(fixtures: Fixture[] = []) {
@@ -31,6 +36,25 @@ export class FakeT3Client implements T3Client {
 
   async getSource(threadId: string): Promise<AttentionSource> {
     return { ...this.sourceFor(threadId) };
+  }
+
+  async status(): Promise<Pick<AgentStatus, 'working' | 'doneToday'>> {
+    return { ...this.statusValue };
+  }
+
+  async activity(sinceMs: number): Promise<AgentUpdate[]> {
+    return this.updates.filter((update) => Date.parse(update.at) >= sinceMs);
+  }
+
+  async startTask(input: { text: string; title: string }): Promise<TaskResult> {
+    this.tasks.push({ ...input });
+    console.info(`[t3 demo] task "${input.title}" (nothing was started)`);
+    return {
+      ok: true,
+      threadId: `demo-task-${this.tasks.length}`,
+      title: input.title,
+      agent: 'Demo agent',
+    };
   }
 
   async sendMessage(threadId: string, text: string, options?: SendOptions): Promise<void> {

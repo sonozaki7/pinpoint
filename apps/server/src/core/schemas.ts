@@ -91,6 +91,9 @@ export const pointSchema = z.object({
   questionId: z.string().optional(),
   risk: z.enum(['low', 'high']).optional(),
   flag: z.string().max(24).optional(),
+  why: z.string().max(60).optional(),
+  changed: z.boolean().optional(),
+  threadRef: z.string().optional(),
   anchor: z.string().optional(),
 });
 
@@ -130,6 +133,8 @@ export const rawPointSchema = z.object({
   questionId: z.string().optional(),
   risk: z.string().optional(),
   flag: z.string().optional(),
+  why: z.string().optional(),
+  needsYou: z.boolean().optional(),
 });
 
 export const splitterResponseSchema = z.object({
@@ -160,9 +165,20 @@ export function asInbox(value: unknown): InboxItem | null {
       pointCount: z.number(),
       draftNotes: z.number(),
       app: appSchema.optional(),
+      needsYou: z.number().optional(),
+      changed: z.number().optional(),
+      kind: z.enum(['review', 'catch-up']).optional(),
     })
     .safeParse(value);
   return parsed.success ? (parsed.data as InboxItem) : null;
 }
+
+export const taskInputSchema = z.object({
+  text: z.string().trim().min(1).max(2_000),
+});
+
+export const askInputSchema = z.object({
+  question: z.string().trim().min(1).max(300),
+});
 
 export type NoteInput = Note;

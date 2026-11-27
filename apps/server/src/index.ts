@@ -2,6 +2,7 @@ import { serve } from '@hono/node-server';
 import type { Server } from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { DeepseekLlmConnector } from './connectors/deepseek.js';
 import { attachDeskSocket } from './cloud/deskSocketServer.js';
 import { CLOUD_MAX_DEVICES } from './cloud/limits.js';
 import { loadSampleWorkspace } from './cloud/sample.js';
@@ -33,7 +34,12 @@ async function runCloud(env: Env): Promise<void> {
   // straight from demo fixtures, so a device opens its deck instantly.
   const sample = loadSampleWorkspace(env);
   const voice = createVoiceService(env);
-  const cloud = new CloudService({ env, sample, voice });
+  // The one model key the cloud holds: it only phrases Ask answers, within the
+  // per-device and daily caps. No key, or a spent cap, means exact sentences.
+  const llm = env.deepseekKey
+    ? new DeepseekLlmConnector({ apiKey: env.deepseekKey, model: env.deepseekModel })
+    : undefined;
+  const cloud = new CloudService({ env, sample, voice, ...(llm ? { llm } : {}) });
   const app = createCloudApp({ cloud });
   const server = serve({ fetch: app.fetch, port: env.port, hostname: env.host });
   // Desk WebSockets share the HTTP server; nginx/Cloudflare pass the upgrade.
@@ -42,6 +48,7 @@ async function runCloud(env: Env): Promise<void> {
   console.info(
     `[pinpoint] listening on http://${env.host}:${env.port} mode=cloud version=${env.serverVersion} ` +
       `workspace=sample devices<=${CLOUD_MAX_DEVICES} state=memory (restart wipes it) splitter=fixture ` +
+      `ask=${llm ? `${llm.name} cap ${env.askDailyCap}/day` : 'retrieval only'} ` +
       `voice=whisper pairing=desk`,
   );
 
@@ -114,13 +121,16 @@ export async function startLocal(env: Env): Promise<LocalRuntime> {
     console.warn(`[pinpoint] Telegram notifier unavailable: ${redactSecrets(telegramLoaded.reason)}`);
   }
 
-  const splitter = createSplitter(env);
   const decks = new DeckStore(env.dataDir);
   const reviews = new ReviewStore(env.dataDir);
   const voice = createVoiceService(env);
-  const { sources } = createSources(env, t3, { demo: env.mode === 'demo' });
+  const { sources, connectors } = createSources(env, t3, { demo: env.mode === 'demo' });
+  // One reviewer model for sorting, evidence, Ask and the edit fallback:
+  // DeepSeek when its key is set, otherwise the opencode CLI. Demo uses none.
+  const llm = connectors.llm;
+  const splitter = createSplitter(env, llm ? { llm } : {});
   console.info(
-    `[pinpoint] review sources: ${sources.map((source) => source.app).join(', ')}`,
+    `[pinpoint] review sources: ${sources.map((source) => source.app).join(', ')}; model=${llm?.name ?? 'none'}`,
   );
 
   service = new PinpointService({
@@ -134,6 +144,8 @@ export async function startLocal(env: Env): Promise<LocalRuntime> {
     voice,
     precomputed: demo?.precomputed ?? deckFixture,
     sources,
+    ...(llm ? { llm } : {}),
+    ...(connectors.notes ? { notes: connectors.notes } : {}),
   });
 
   await service.start();

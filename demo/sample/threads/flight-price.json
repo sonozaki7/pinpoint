@@ -1,0 +1,73 @@
+{
+  "thread": {
+    "threadId": "flight-price",
+    "title": "flight-price",
+    "project": "Travel",
+    "attention": "question",
+    "updatedAt": "2026-11-27T08:10:00.000Z"
+  },
+  "source": {
+    "sourceMessageId": "sample-flight-price-1",
+    "kind": "question",
+    "text": "The flight to Osaka on December 20 dropped to ¥18,400, down from ¥24,900 last week. The airline holds this fare until tonight at 21:00. Prices on this route usually go back up before a holiday weekend. Book it now, or keep waiting for a lower price?",
+    "question": {
+      "requestId": "req-flight-price",
+      "questions": [
+        {
+          "id": "q_flight",
+          "question": "Book it now, or keep waiting for a lower price?",
+          "options": [
+            "Book it now",
+            "Keep waiting"
+          ]
+        }
+      ]
+    }
+  },
+  "deck": {
+    "threadId": "flight-price",
+    "sourceMessageId": "sample-flight-price-1",
+    "title": "flight-price",
+    "attention": "question",
+    "headline": "Flight price dropped: book now?",
+    "points": [
+      {
+        "id": "p1",
+        "index": 1,
+        "kind": "question",
+        "glance": "Book the cheaper flight now?",
+        "quote": "Book it now, or keep waiting for a lower price?",
+        "options": [
+          "Book it now",
+          "Keep waiting"
+        ],
+        "questionId": "q_flight",
+        "flag": "your call",
+        "why": "Fare held until tonight at 21:00"
+      },
+      {
+        "id": "p2",
+        "index": 2,
+        "kind": "claim",
+        "glance": "Osaka flight: 18,400 yen, was 24,900",
+        "quote": "The flight to Osaka on December 20 dropped to ¥18,400, down from ¥24,900 last week."
+      },
+      {
+        "id": "p3",
+        "index": 3,
+        "kind": "claim",
+        "glance": "Fare held until tonight at 21:00",
+        "quote": "The airline holds this fare until tonight at 21:00."
+      },
+      {
+        "id": "p4",
+        "index": 4,
+        "kind": "claim",
+        "glance": "Prices usually rise before holidays",
+        "quote": "Prices on this route usually go back up before a holiday weekend."
+      }
+    ],
+    "createdAt": "2026-11-27T08:10:00.000Z",
+    "splitter": "fixture"
+  }
+}

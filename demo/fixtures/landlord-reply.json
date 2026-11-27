@@ -1,0 +1,86 @@
+{
+  "thread": {
+    "threadId": "landlord-reply",
+    "title": "Re: lease renewal",
+    "project": "Gmail",
+    "attention": "report",
+    "updatedAt": "2026-11-27T08:50:00.000Z",
+    "app": "gmail"
+  },
+  "source": {
+    "sourceMessageId": "gmail-draft-landlord-1",
+    "kind": "reply",
+    "app": "gmail",
+    "text": "Hi Tanaka-san,\n\nThank you for your letter about the lease renewal. We're happy to accept the 5% rent increase from April. Please send the new lease and I will sign it this week. We would like the renewal to run for two years. The apartment is in good shape, and we have no repairs to report. I can drop off the signed copy on Saturday morning if that works for you.\n\nBest regards,\nMika",
+    "evidence": {
+      "notes": [
+        {
+          "title": "Lease renewal",
+          "text": "Lease renewal: Tanaka-san agreed by phone on Nov 20 to a 3% rent increase from April.",
+          "url": "https://www.notion.so/pinpoint-lease-renewal"
+        }
+      ]
+    },
+    "target": {
+      "name": "Tanaka-san",
+      "recipient": "Tanaka-san",
+      "subject": "Re: lease renewal",
+      "link": "https://mail.google.com/mail/u/0/#drafts/pinpoint-draft-landlord"
+    }
+  },
+  "deck": {
+    "threadId": "landlord-reply",
+    "sourceMessageId": "gmail-draft-landlord-1",
+    "title": "Re: lease renewal",
+    "attention": "report",
+    "headline": "Draft to your landlord: 6 sentences",
+    "points": [
+      {
+        "id": "p1",
+        "index": 1,
+        "kind": "draft",
+        "glance": "Thanks for the renewal letter",
+        "quote": "Thank you for your letter about the lease renewal."
+      },
+      {
+        "id": "p2",
+        "index": 2,
+        "kind": "draft",
+        "glance": "Accepts a 5% rent increase",
+        "quote": "We're happy to accept the 5% rent increase from April.",
+        "flag": "note says 3%",
+        "why": "Your note: 3% agreed by phone on Nov 20"
+      },
+      {
+        "id": "p3",
+        "index": 3,
+        "kind": "draft",
+        "glance": "Send the new lease to sign",
+        "quote": "Please send the new lease and I will sign it this week."
+      },
+      {
+        "id": "p4",
+        "index": 4,
+        "kind": "draft",
+        "glance": "Renewal for two years",
+        "quote": "We would like the renewal to run for two years."
+      },
+      {
+        "id": "p5",
+        "index": 5,
+        "kind": "draft",
+        "glance": "No repairs to report",
+        "quote": "The apartment is in good shape, and we have no repairs to report."
+      },
+      {
+        "id": "p6",
+        "index": 6,
+        "kind": "draft",
+        "glance": "Drop off signed copy Saturday",
+        "quote": "I can drop off the signed copy on Saturday morning if that works for you."
+      }
+    ],
+    "createdAt": "2026-11-27T08:50:03.000Z",
+    "splitter": "fixture"
+  }
+}

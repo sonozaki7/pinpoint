@@ -46,6 +46,11 @@ describe('scripted transcripts file', () => {
         'Not everyone today. Say 10% today and everyone by Friday.',
       ],
       ['draft-priya', 'p2', 'Net-45, not net-60.'],
+      ['payment-upgrade', 'p1', 'Wait until Monday, after the sale.'],
+      ['saturday-plan', 'p3', "Skip the picnic, it'll be cold. Find an indoor lunch near the zoo."],
+      ['landlord-reply', 'p2', 'Three percent, not five percent.'],
+      ['school-newsletter', 'p2', 'Saturday the 13th, not Friday the 12th.'],
+      ['flight-price', 'p1', 'Book it now.'],
     ]);
   });
 

@@ -2,12 +2,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Deck, InboxItem, ThreadAttention } from '../../../../shared/contract.js';
 import type { AttentionSource, AttentionThread, TelegramNotifier } from './types.js';
+import type { NotesConnector } from '../connectors/types.js';
 import type { Env } from './env.js';
 import type { DeckStore } from './decks.js';
 import { buildDeck, deckFromPrecomputed } from './decks.js';
 import { errorMessage } from './errors.js';
+import { formatNeedsSummary, needsYouCount } from './evidence.js';
 import type { ReviewStore } from './reviews.js';
-import { makeGlance, toAscii } from './text.js';
+import { clearChanges, RevisionTracker } from './revisions.js';
 import type { Splitter } from './splitter/types.js';
 import type { ReviewSource } from '../sources/types.js';
 
@@ -30,6 +32,9 @@ export interface InboxDeps {
   splitter: Splitter;
   decks: DeckStore;
   reviews: ReviewStore;
+  revisions?: RevisionTracker;
+  /** Optional Notion search: linked notes are evidence for a flag, never content. */
+  notes?: NotesConnector;
   precomputed?: Map<string, Deck>;
 }
 
@@ -54,6 +59,9 @@ export class InboxService {
   private readonly splitter: Splitter;
   private readonly decks: DeckStore;
   private readonly reviews: ReviewStore;
+  private readonly revisions: RevisionTracker;
+  private readonly notes?: NotesConnector;
+  private readonly notesCache = new Map<string, AttentionSource>();
   private readonly precomputed?: Map<string, Deck>;
   private readonly notified = new Set<string>();
   private readonly notifyFailures = new Map<string, number>();
@@ -77,6 +85,8 @@ export class InboxService {
     this.splitter = deps.splitter;
     this.decks = deps.decks;
     this.reviews = deps.reviews;
+    this.revisions = deps.revisions ?? new RevisionTracker();
+    this.notes = deps.notes;
     this.precomputed = deps.precomputed;
     this.notifiedFile = path.join(deps.env.dataDir, 'notified.json');
   }
@@ -226,10 +236,40 @@ export class InboxService {
         point.risk === other.risk &&
         point.questionId === other.questionId &&
         point.flag === other.flag &&
+        point.why === other.why &&
+        point.changed === other.changed &&
         point.anchor === other.anchor &&
         JSON.stringify(point.options ?? []) === JSON.stringify(other.options ?? [])
       );
     });
+  }
+
+  /**
+   * Add linked notes to a desk thread before the reviewer sees it. The search
+   * query is the thread title, the notes are evidence only, and a failed search
+   * simply means no note-backed flag.
+   */
+  private async enrichSource(thread: AttentionThread, source: AttentionSource): Promise<AttentionSource> {
+    if (!this.notes || source.app !== 't3' || (source.evidence?.notes?.length ?? 0) > 0) {
+      return source;
+    }
+    const key = `${thread.threadId}\u0000${source.sourceMessageId}`;
+    const cached = this.notesCache.get(key);
+    if (cached) return cached;
+    let notes: { title: string; text: string; url?: string }[] = [];
+    try {
+      const hits = await this.notes.search(thread.title, 3);
+      notes = hits
+        .filter((hit) => hit.text.trim().length > 0)
+        .slice(0, 3)
+        .map((hit) => ({ title: hit.title, text: hit.text, ...(hit.url ? { url: hit.url } : {}) }));
+    } catch {
+      notes = [];
+    }
+    const enriched: AttentionSource =
+      notes.length > 0 ? { ...source, evidence: { ...source.evidence, notes } } : source;
+    this.notesCache.set(key, enriched);
+    return enriched;
   }
 
   /** Demo fixture decks always win over an older on-disk copy. */
@@ -242,7 +282,10 @@ export class InboxService {
       const precomputed = this.precomputed.get(thread.threadId);
       const source = sources.get(thread.threadId);
       if (!precomputed || !source) continue;
-      const fresh = deckFromPrecomputed(precomputed, thread, source);
+      const fresh = this.revisions.annotate(
+        thread.threadId,
+        deckFromPrecomputed(precomputed, thread, source),
+      );
       const cached = this.decks.getForThread(thread.threadId);
       if (!cached || !this.sameDeck(cached, fresh)) this.decks.put(fresh);
     }
@@ -276,10 +319,12 @@ export class InboxService {
 
     const run = this.queue.then(async () => {
       const runStarted = Date.now();
+      const enriched = await this.enrichSource(thread, source);
       const precomputed = this.precomputed?.get(thread.threadId);
-      const deck = precomputed
-        ? deckFromPrecomputed(precomputed, thread, source)
-        : await buildDeck(this.splitter, thread, source);
+      const built = precomputed
+        ? deckFromPrecomputed(precomputed, thread, enriched)
+        : await buildDeck(this.splitter, thread, enriched);
+      const deck = this.revisions.annotate(thread.threadId, built);
       this.decks.put(deck);
       console.info(
         `[inbox] deck for ${thread.title}: ${deck.points.length} points via ${deck.splitter} in ${Date.now() - runStarted}ms`,
@@ -315,7 +360,10 @@ export class InboxService {
     const source = await this.fetchSource(thread);
     if (this.precomputed?.has(thread.threadId)) {
       const precomputed = this.precomputed.get(thread.threadId)!;
-      const fresh = deckFromPrecomputed(precomputed, thread, source);
+      const fresh = this.revisions.annotate(
+        thread.threadId,
+        deckFromPrecomputed(precomputed, thread, source),
+      );
       const cached = this.decks.getForThread(thread.threadId);
       if (!cached || !this.sameDeck(cached, fresh)) this.decks.put(fresh);
       void this.maybeNotify(thread, source, fresh);
@@ -398,15 +446,16 @@ export class InboxService {
 
   private summary(thread: AttentionThread, deck: Deck | undefined): string {
     const drafts = deck?.points.filter((point) => point.kind === 'draft').length ?? 0;
+    const points = deck?.points.length ?? 0;
     let base: string;
     if (thread.app === 'gmail') {
-      base = deck ? `draft, ${drafts} line${drafts === 1 ? '' : 's'}` : 'draft';
+      base = deck ? `${drafts} line${drafts === 1 ? '' : 's'}` : 'draft';
     } else if (thread.app === 'notion') {
-      base = deck ? `page, ${deck.points.length} points` : 'page review';
+      base = deck ? `${points} points` : 'page review';
     } else {
       switch (thread.attention) {
         case 'plan':
-          base = deck ? `plan, ${deck.points.length} steps` : 'plan';
+          base = deck ? `${points} steps` : 'plan';
           break;
         case 'question':
           base = 'question';
@@ -415,11 +464,18 @@ export class InboxService {
           base = 'run failed';
           break;
         case 'report':
-          base = deck ? (drafts > 0 ? `${drafts} drafts` : `${deck.points.length} points`) : 'report';
+          base = deck ? (drafts > 0 ? `${drafts} draft${drafts === 1 ? '' : 's'}` : `${points} points`) : 'report';
           break;
       }
     }
-    return makeGlance(toAscii(base), 30);
+    return formatNeedsSummary(base, needsYouCount(deck?.points));
+  }
+
+  /** The review was sent: remember its deck and clear its "changed" marks. */
+  markReviewed(deck: Deck): void {
+    const clean = clearChanges(deck);
+    this.revisions.remember(clean);
+    this.decks.put(clean);
   }
 
   /** GET /api/inbox. Also warms missing decks and posts pending Telegram alerts. */
@@ -450,6 +506,8 @@ export class InboxService {
           });
         }
         if (source && deck) void this.maybeNotify(thread, source, deck);
+        const needs = needsYouCount(deck?.points);
+        const changed = deck?.points.filter((point) => point.changed).length ?? 0;
         return {
           threadId: thread.threadId,
           title: thread.title,
@@ -461,6 +519,8 @@ export class InboxService {
           pointCount: deck?.points.length ?? 0,
           draftNotes: await this.reviews.noteCount(thread.threadId),
           ...(thread.app ? { app: thread.app } : {}),
+          ...(needs > 0 ? { needsYou: needs } : {}),
+          ...(changed > 0 ? { changed } : {}),
         };
       }),
     );

@@ -18,8 +18,8 @@ import {join} from 'node:path';
 
 // --- Contract (SPEC §6; owned by src/core/types.ts) -----------------------
 
-import type {ThreadAttention} from '../../../../shared/contract.js';
-import type {AttentionSource, AttentionThread, SendOptions, T3Client} from '../core/types.js';
+import type {AgentStatus, TaskResult, ThreadAttention} from '../../../../shared/contract.js';
+import type {AgentUpdate, AttentionSource, AttentionThread, SendOptions, T3Client} from '../core/types.js';
 
 export type {AttentionSource, AttentionThread, ThreadAttention, T3Client};
 
@@ -496,6 +496,86 @@ export function resolveProjectAllowlist(
 }
 
 
+// --- Glance status, activity and hand-off (read-only helpers) ---------------
+
+/** Used only when the project has no default model and PINPOINT_TASK_PROVIDER/MODEL are unset. */
+const TASK_FALLBACK_PROVIDER = 'codex';
+const TASK_FALLBACK_MODEL = 'gpt-6-luna';
+const WORKING_STATUSES = new Set(['running', 'queued', 'starting', 'in_progress', 'working']);
+const DONE_STATUSES = new Set(['idle', 'completed']);
+const ACTIVITY_THREADS = 12;
+
+function startOfLocalDay(nowMs: number): number {
+  const day = new Date(nowMs);
+  day.setHours(0, 0, 0, 0);
+  return day.getTime();
+}
+
+function isOpenThread(thread: ShellThread): boolean {
+  return thread.archivedAt == null && thread.deletedAt == null && !isSubagentChild(thread);
+}
+
+/**
+ * Agents running and agents done today, from thread states alone. Settled
+ * threads count as done when they were settled today. Needs-you comes from the
+ * inbox, not from here.
+ */
+export function statusFromSnapshot(
+  threads: readonly ShellThread[],
+  nowMs: number,
+): Pick<AgentStatus, 'working' | 'doneToday'> {
+  const midnight = startOfLocalDay(nowMs);
+  let working = 0;
+  let doneToday = 0;
+  for (const thread of threads) {
+    if (!isOpenThread(thread)) continue;
+    const waiting =
+      thread.pendingRuntimeRequest != null || thread.hasActionableProposedPlan === true;
+    if (WORKING_STATUSES.has(thread.status) && !isSettled(thread)) {
+      working += 1;
+      continue;
+    }
+    if (waiting) continue;
+    const settledAt = parseTime(thread.settledAt);
+    const updatedAt = parseTime(thread.updatedAt);
+    if (isSettled(thread) ? (settledAt ?? updatedAt ?? 0) >= midnight : DONE_STATUSES.has(thread.status) && (updatedAt ?? 0) >= midnight) {
+      doneToday += 1;
+    }
+  }
+  return {working, doneToday};
+}
+
+/** What the T3 CLI printed for a new thread: the first id-looking field, plus the agent if named. */
+export function parseStartedThread(output: string): {threadId?: string; agent?: string} {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(output.trim().split('\n').filter(Boolean).at(-1) ?? '');
+  } catch {
+    const match = /\b(mcp:[0-9a-f-]{8,}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b/i.exec(output);
+    return match ? {threadId: match[1]!} : {};
+  }
+  const record = (parsed && typeof parsed === 'object' ? parsed : {}) as Record<string, unknown>;
+  const nested = (record.thread && typeof record.thread === 'object' ? record.thread : {}) as Record<string, unknown>;
+  const pick = (...values: unknown[]): string | undefined =>
+    values.find((value): value is string => typeof value === 'string' && value.length > 0);
+  const selection = (record.modelSelection ?? nested.modelSelection) as Record<string, unknown> | undefined;
+  return {
+    ...(pick(record.threadId, record.id, nested.id, nested.threadId)
+      ? {threadId: pick(record.threadId, record.id, nested.id, nested.threadId)!}
+      : {}),
+    ...(pick(record.provider, record.providerName, selection?.provider ?? selection?.instanceId)
+      ? {agent: pick(record.provider, record.providerName, selection?.provider ?? selection?.instanceId)!}
+      : {}),
+  };
+}
+
+function agentLabel(provider: string | undefined): string | undefined {
+  if (!provider) return undefined;
+  if (/codex|openai/i.test(provider)) return 'Codex';
+  if (/claude|anthropic/i.test(provider)) return 'Claude';
+  return provider.slice(0, 24);
+}
+
 /**
  * Create a client from environment variables.
  *
@@ -690,7 +770,15 @@ export function createT3Client(
 
   async function getSource(threadId: string): Promise<T3Source> {
     await assertAllowedThread(threadId);
-    return sourceFromProjection(await getThread(threadId));
+    const projection = await getThread(threadId);
+    const source = sourceFromProjection(projection);
+    // Earlier user instructions are legitimate evidence for a flag. Only the
+    // last few are needed to ground one short why line.
+    const history = (projection.messages ?? [])
+      .filter((message) => message.role === 'user' && message.text.trim().length > 0)
+      .slice(-6)
+      .map((message) => ({ role: 'user' as const, text: message.text.trim().slice(0, 2_000) }));
+    return history.length > 0 ? { ...source, history } : source;
   }
 
   async function sendMessage(threadId: string, text: string, options?: SendOptions): Promise<void> {
@@ -745,6 +833,99 @@ export function createT3Client(
       requestId,
       answers: normalizeAnswers(questions, answers),
     });
+  }
+
+  async function status(): Promise<Pick<AgentStatus, 'working' | 'doneToday'>> {
+    const snapshot = await getShell();
+    const allowedIds = await allowedProjectIds(snapshot);
+    const scoped = (snapshot.threads ?? []).filter((thread) => allowedIds.has(thread.projectId));
+    return statusFromSnapshot(scoped, now());
+  }
+
+  async function activity(sinceMs: number): Promise<AgentUpdate[]> {
+    const snapshot = await getShell();
+    const allowedIds = await allowedProjectIds(snapshot);
+    const nowMs = now();
+    const candidates = (snapshot.threads ?? [])
+      .filter((thread) => allowedIds.has(thread.projectId))
+      .filter((thread) => isOpenThread(thread) && !isSettled(thread) && !isSnoozed(thread, nowMs))
+      .filter((thread) => (parseTime(thread.updatedAt) ?? 0) >= sinceMs)
+      .sort((a, b) => (parseTime(b.updatedAt) ?? 0) - (parseTime(a.updatedAt) ?? 0))
+      .slice(0, ACTIVITY_THREADS);
+
+    const updates: AgentUpdate[] = [];
+    for (let index = 0; index < candidates.length; index += 6) {
+      const batch = candidates.slice(index, index + 6);
+      const latest = await Promise.all(
+        batch.map((thread) => normalizeLatest(thread.latestVisibleMessage) ?? latestFor(thread)),
+      );
+      batch.forEach((thread, offset) => {
+        const message = latest[offset] ?? null;
+        let kind: AgentUpdate['kind'] | null = null;
+        if (thread.pendingRuntimeRequest?.kind === 'user_input') kind = 'question';
+        else if (thread.hasActionableProposedPlan === true) kind = 'plan';
+        else if (thread.status === 'failed') kind = 'failed';
+        else if (DONE_STATUSES.has(thread.status) && message?.role === 'assistant') kind = 'replied';
+        if (kind === null) return;
+        updates.push({
+          threadId: thread.id,
+          title: thread.title || 'Untitled thread',
+          kind,
+          text: message?.role === 'assistant' ? message.text : '',
+          key: `${thread.id}:${message?.id || thread.updatedAt}:${kind}`,
+          at: message?.updatedAt || thread.updatedAt,
+        });
+      });
+    }
+    return updates;
+  }
+
+  /** `t3 thread start <project> - --title ... --json`, in the first allowed project. */
+  async function startTask(input: {text: string; title: string}): Promise<TaskResult> {
+    const text = input.text.trim();
+    if (text.length === 0) return {ok: false, error: 'Nothing to hand off.'};
+    const snapshot = await getShell();
+    const {ids} = resolveProjectAllowlist(snapshot, projectAllowlist);
+    // First allowed project, in the order T3_PROJECTS names them.
+    let projectId: string | undefined;
+    for (const entry of projectAllowlist) {
+      const match = resolveProjectAllowlist(snapshot, [entry]).ids;
+      const first = [...match][0];
+      if (first && ids.has(first)) {
+        projectId = first;
+        break;
+      }
+    }
+    if (!projectId) return {ok: false, error: 'No allowed project to start the task in.'};
+
+    const base = ['thread', 'start', projectId, '-', '--title', input.title, '--json'];
+    let provider = firstEnv(env, 'PINPOINT_TASK_PROVIDER', 'taskProvider');
+    let model = firstEnv(env, 'PINPOINT_TASK_MODEL', 'taskModel');
+    const run = (withModel: boolean) =>
+      runCli(
+        cliPath,
+        withModel && provider && model ? [...base, '--provider', provider, '--model', model] : base,
+        text,
+        Math.max(timeoutMs, 30_000),
+      );
+    let output = await run(true);
+    if (output.code !== 0 && !(provider && model)) {
+      // The project has no default model: fall back to Codex, which every T3 install here offers.
+      provider = TASK_FALLBACK_PROVIDER;
+      model = TASK_FALLBACK_MODEL;
+      output = await run(true);
+    }
+    if (output.code !== 0) {
+      return {ok: false, error: "Couldn't start the task. Try again."};
+    }
+    shellCache = null;
+    const started = parseStartedThread(output.stdout);
+    return {
+      ok: true,
+      ...(started.threadId ? {threadId: started.threadId} : {}),
+      title: input.title,
+      agent: agentLabel(provider ?? started.agent) ?? 'Agent',
+    };
   }
 
   // --- WebSocket dispatch (same path as the T3 web app) ---
@@ -835,7 +1016,7 @@ export function createT3Client(
     });
   }
 
-  return {listAttention, getSource, sendMessage, answerQuestion};
+  return {listAttention, getSource, sendMessage, answerQuestion, status, activity, startTask};
 }
 
 function describeRpcFailure(exit: {cause?: unknown} | undefined): string {
@@ -898,5 +1079,41 @@ async function sendViaCli(
       // The CLI may exit before reading stdin; the close handler reports the failure.
     });
     child.stdin?.end(text);
+  });
+}
+
+/** Run the t3 CLI with the message on stdin. Never throws; output is bounded. */
+async function runCli(
+  cliPath: string,
+  args: string[],
+  stdin: string,
+  timeoutMs: number,
+): Promise<{code: number; stdout: string}> {
+  return new Promise((resolve) => {
+    let stdout = '';
+    let settled = false;
+    let child: ReturnType<typeof spawn>;
+    const finish = (code: number) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve({code, stdout});
+    };
+    const timer = setTimeout(() => {
+      child?.kill('SIGTERM');
+      finish(124);
+    }, timeoutMs);
+    try {
+      child = spawn(cliPath, args, {stdio: ['pipe', 'pipe', 'ignore']});
+    } catch {
+      return finish(127);
+    }
+    child.stdout?.on('data', (chunk: Buffer) => {
+      if (stdout.length < 20_000) stdout += chunk.toString('utf8');
+    });
+    child.on('error', () => finish(127));
+    child.on('close', (code) => finish(code ?? 1));
+    child.stdin?.on('error', () => undefined);
+    child.stdin?.end(stdin);
   });
 }

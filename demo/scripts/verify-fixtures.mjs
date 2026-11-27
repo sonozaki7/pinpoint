@@ -5,7 +5,7 @@
 //
 // Usage: node demo/scripts/verify-fixtures.mjs [--dir demo/fixtures] [--quiet]
 
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -18,12 +18,18 @@ const argValue = (name, fallback) => {
   return i >= 0 && args[i + 1] ? args[i + 1] : fallback;
 };
 const quiet = args.includes("--quiet");
+const customDir = args.includes("--dir");
 const dir = resolve(repo, argValue("--dir", "demo/fixtures"));
+// Sample-only threads (cloud "Since you looked" targets) are checked with the same rules.
+const sampleThreadsDir = resolve(repo, "demo/sample/threads");
 
 const MAX_GLANCE = 44;
 const MAX_OPTION = 24;
 const MAX_QUOTE = 200;
 const MIN_WORDS = 250;
+const MIN_WORDS_NOTION = 100;
+const MIN_WORDS_SAMPLE = 40;
+const MAX_WHY = 60;
 const MAX_WORDS = 700;
 const ATTENTION = new Set(["question", "plan", "failed", "report"]);
 const KINDS = new Set(["step", "claim", "question", "risk", "draft"]);
@@ -62,12 +68,19 @@ function checkOptions(where, options) {
   }
 }
 
-const files = readdirSync(dir)
-  .filter((name) => name.endsWith(".json"))
-  .filter((name) => name !== "transcripts.json") // scripted voice notes, not a thread fixture
-  .sort()
-  .map((name) => join(dir, name))
-  .filter((path) => statSync(path).isFile());
+const listFiles = (folder, sample) =>
+  readdirSync(folder)
+    .filter((name) => name.endsWith(".json"))
+    .filter((name) => name !== "transcripts.json") // scripted voice notes, not a thread fixture
+    .sort()
+    .map((name) => ({ path: join(folder, name), sample }))
+    .filter((entry) => statSync(entry.path).isFile());
+
+const files = [
+  ...listFiles(dir, false),
+  ...(!customDir && existsSync(sampleThreadsDir) ? listFiles(sampleThreadsDir, true) : []),
+];
+const threadsById = new Map(); // threadId -> { thread, source, deck }
 
 if (files.length === 0) {
   console.error(`no fixtures in ${dir}`);
@@ -77,7 +90,7 @@ if (files.length === 0) {
 const seenThreads = new Set();
 const seenSources = new Set();
 
-for (const path of files) {
+for (const { path, sample: sampleOnly } of files) {
   const label = relative(repo, path);
   let fixture;
   try {
@@ -114,7 +127,7 @@ for (const path of files) {
   if (check(`${label} source`, text.length > 0, "text missing")) {
     const count = words(text);
     // A Gmail draft is short by design: one point per sentence, not a long report.
-    const minWords = thread.app === "gmail" ? 60 : MIN_WORDS;
+    const minWords = sampleOnly ? MIN_WORDS_SAMPLE : thread.app === "gmail" ? 60 : thread.app === "notion" ? MIN_WORDS_NOTION : MIN_WORDS;
     check(`${label} source`, count >= minWords && count <= MAX_WORDS, `text is ${count} words (expected ${minWords}-${MAX_WORDS})`);
   }
   if (source.kind === "question") {
@@ -133,6 +146,8 @@ for (const path of files) {
   } else {
     check(`${label} source`, source.question === undefined, `question block on a non-question source (kind ${source.kind})`);
   }
+
+  threadsById.set(thread.threadId, { thread, source, deck });
 
   // deck
   check(`${label} deck`, deck.threadId === thread.threadId, `deck.threadId ${deck.threadId} != thread.threadId ${thread.threadId}`);
@@ -166,6 +181,21 @@ for (const path of files) {
       check(where, isAscii(point.flag), `flag is not plain ASCII: "${point.flag}"`);
     }
 
+    if (point?.why !== undefined) {
+      check(where, point.flag !== undefined, "why without a flag");
+      check(where, typeof point.why === "string" && point.why.length > 0 && point.why.length <= MAX_WHY,
+        `why is ${String(point.why).length} chars (max ${MAX_WHY}): "${point.why}"`);
+      check(where, isAscii(String(point.why)), `why is not plain ASCII: "${point.why}"`);
+      // Grounded: every number in the why appears in the source, a linked note or is a named heuristic.
+      const evidence = [text, ...(source.evidence?.notes ?? []).map((n) => `${n.title} ${n.text}`)].join("\n");
+      for (const number of String(point.why).match(/\d[\d,.]*/g) ?? []) {
+        check(where, evidence.includes(number.replace(/[,.]$/, "")), `why mentions "${number}", which is nowhere in the source or its notes`);
+      }
+    }
+    if (point?.flag !== undefined) {
+      check(where, point.why !== undefined, `flag "${point.flag}" has no why (a flag needs grounded evidence)`);
+    }
+
     if (point?.kind === "question") {
       checkOptions(where, point.options);
       const ids = new Set((source.question?.questions ?? []).map((q) => q.id));
@@ -186,6 +216,75 @@ for (const path of files) {
   const drafts = deck.points.filter((p) => p.kind === "draft").length;
   const questions = deck.points.filter((p) => p.kind === "question").length;
   notes.push(`${relative(repo, path)}: ${deck.points.length} points${highs ? `, ${highs} high risk` : ""}${questions ? `, ${questions} question` : ""}${drafts ? `, ${drafts} drafts` : ""}`);
+}
+
+// --- Pinpoint Cloud sample: personas, catch-up lines, transcripts ---------------------------------
+if (!customDir) {
+  const sampleDir = resolve(repo, "demo/sample");
+  const readJson = (file) => {
+    try {
+      return JSON.parse(readFileSync(file, "utf8"));
+    } catch (error) {
+      fail(relative(repo, file), `invalid JSON: ${error.message}`);
+      return null;
+    }
+  };
+  const workspace = readJson(join(sampleDir, "workspace.json"));
+  const catchUp = readJson(join(sampleDir, "catch-up.json"));
+  const transcripts = readJson(join(dir, "transcripts.json"));
+  const PERSONAS = ["mixed", "developer", "everyday"];
+  const EXPECTED = {
+    developer: ["login-fix", "payment-upgrade", "launch-post", "draft-priya"],
+    everyday: ["saturday-plan", "landlord-reply", "school-newsletter"],
+    mixed: ["login-fix", "saturday-plan", "landlord-reply", "launch-post"],
+  };
+  const sampleThreadIds = new Set();
+  if (workspace) {
+    for (const persona of PERSONAS) {
+      const ids = workspace.personas?.[persona];
+      if (!check(`workspace.json ${persona}`, Array.isArray(ids) && ids.length > 0, "persona missing")) continue;
+      check(`workspace.json ${persona}`, JSON.stringify(ids) === JSON.stringify(EXPECTED[persona]),
+        `expected ${EXPECTED[persona].join(", ")} but found ${ids.join(", ")}`);
+      for (const id of ids) {
+        sampleThreadIds.add(id);
+        check(`workspace.json ${persona}`, threadsById.has(id), `thread "${id}" has no fixture`);
+      }
+      const status = workspace.status?.[persona];
+      check(`workspace.json ${persona}`, Number.isInteger(status?.working) && Number.isInteger(status?.doneToday), "status needs integer working and doneToday");
+    }
+  }
+  if (catchUp) {
+    for (const persona of PERSONAS) {
+      const entries = catchUp[persona];
+      if (!check(`catch-up.json ${persona}`, Array.isArray(entries) && entries.length >= 3, "needs at least 3 lines")) continue;
+      for (const [i, entry] of entries.entries()) {
+        const where = `catch-up.json ${persona}[${i}]`;
+        checkGlance(where, entry.line);
+        check(where, threadsById.has(entry.threadRef), `threadRef "${entry.threadRef}" has no fixture`);
+        check(where, String(entry.line).startsWith(`${entry.threadRef}:`), `line should start with "${entry.threadRef}:"`);
+        sampleThreadIds.add(entry.threadRef);
+      }
+    }
+  }
+  if (transcripts) {
+    const have = new Set();
+    for (const [i, note] of (transcripts.notes ?? []).entries()) {
+      const where = `transcripts.json note ${i + 1}`;
+      const found = threadsById.get(note.threadId);
+      if (!check(where, found !== undefined, `thread "${note.threadId}" has no fixture`)) continue;
+      check(where, found.deck.points.some((p) => p.id === note.pointId), `point ${note.pointId} is not in ${note.threadId}`);
+      check(where, typeof note.text === "string" && note.text.trim().length > 0, "text missing");
+      have.add(`${note.threadId}/${note.pointId}`);
+    }
+    // Every flagged line of the sample workspace has a scripted spoken note.
+    for (const id of sampleThreadIds) {
+      for (const point of threadsById.get(id)?.deck.points ?? []) {
+        if (point.flag !== undefined) {
+          check(`transcripts.json ${id}/${point.id}`, have.has(`${id}/${point.id}`), "flagged sample line has no transcript");
+        }
+      }
+    }
+  }
 }
 
 if (!quiet) {

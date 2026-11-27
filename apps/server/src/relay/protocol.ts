@@ -42,6 +42,8 @@ export interface RelayRequest {
   /** Raw query string without the leading "?". */
   query: string;
   contentType?: string;
+  /** Opaque hash of the device id, so the desk can track "since you looked" per phone. */
+  device?: string;
   bodyBase64: string;
 }
 

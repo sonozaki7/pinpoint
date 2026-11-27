@@ -93,7 +93,8 @@
         "kind": "claim",
         "glance": "Available to everyone today?",
         "quote": "Available to every customer starting today.",
-        "flag": "check this"
+        "flag": "check this",
+        "why": "affects every customer"
       },
       {
         "id": "p5",

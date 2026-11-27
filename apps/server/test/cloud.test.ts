@@ -67,7 +67,8 @@ async function cleanup(context: CloudContext): Promise<void> {
 }
 
 function headers(device = DEVICE_A, extra: Record<string, string> = {}): Record<string, string> {
-  return { 'x-pinpoint-device': device, ...extra };
+  // The developer persona is the original four-thread sample these tests were written against.
+  return { 'x-pinpoint-device': device, 'x-pinpoint-sample': 'developer', ...extra };
 }
 
 async function json<T>(response: Response): Promise<T> {
@@ -84,14 +85,18 @@ interface InboxBody {
     pointCount: number;
     draftNotes: number;
     app?: string;
+    kind?: string;
   }[];
+  status?: { needYou: number; working: number; doneToday: number };
   updatedAt: string;
 }
 
+/** The review items only: the "Since you looked" row has its own tests (cloud-final.test.ts). */
 async function inbox(app: ReturnType<typeof createCloudApp>, device = DEVICE_A): Promise<InboxBody> {
   const response = await app.request('/api/inbox', { headers: headers(device) });
   expect(response.status).toBe(200);
-  return json<InboxBody>(response);
+  const body = await json<InboxBody>(response);
+  return { ...body, items: body.items.filter((item) => item.kind !== 'catch-up') };
 }
 
 async function putNotes(
@@ -261,17 +266,17 @@ describe('cloud HTTP surface', () => {
       expect(first.items.every((item) => item.deckReady)).toBe(true);
       expect(first.items.find((item) => item.threadId === 'login-fix')).toMatchObject({
         attention: 'plan',
-        summary: 'plan, 7 steps',
+        summary: '7 steps · 1 needs you',
         pointCount: 7,
       });
       expect(first.items.find((item) => item.threadId === 'launch-post')).toMatchObject({
         app: 'notion',
-        summary: 'page, 7 points',
+        summary: '7 points · 1 needs you',
         pointCount: 7,
       });
       expect(first.items.find((item) => item.threadId === 'draft-priya')).toMatchObject({
         app: 'gmail',
-        summary: '6 drafts',
+        summary: '6 lines · 1 needs you',
         pointCount: 6,
       });
 
@@ -338,10 +343,12 @@ describe('cloud HTTP surface', () => {
 
       await vi.advanceTimersByTimeAsync(5_000);
       const aReply = await inbox(context.app, DEVICE_A);
+      // Objecting to a plan step brings the plan back revised, only that step marked changed.
       expect(aReply.items.at(-1)).toMatchObject({
         threadId: 'login-fix',
-        attention: 'report',
-        summary: 'agent replied',
+        attention: 'plan',
+        summary: '7 steps · 1 needs you',
+        changed: 1,
       });
       const bStill = await inbox(context.app, DEVICE_B);
       expect(bStill.items.map((item) => item.threadId)).toEqual([
@@ -437,7 +444,7 @@ describe('cloud sample send and agent reply', () => {
       const saved = await putNotes(context.app, 'login-fix', [
         {
           pointId: 'p4',
-          verdict: 'object',
+          verdict: 'note',
           text: "Don't sign everyone out. Just fix the broken logins.",
         },
       ]);
@@ -486,7 +493,7 @@ describe('cloud sample send and agent reply', () => {
       }>(deckResponse);
       expect(deck.attention).toBe('report');
 
-      const workspace = context.cloud.workspaceFor(DEVICE_A) as SampleDeviceWorkspace;
+      const workspace = context.cloud.workspaceFor(DEVICE_A, 'developer') as SampleDeviceWorkspace;
       const source = workspace.sourceForThread('login-fix');
       expect(source.kind).toBe('reply');
       expect(source.text).toBe(
@@ -537,7 +544,7 @@ describe('cloud sample send and agent reply', () => {
       expect(await json(response)).toEqual({ ok: true, delivered: 'sample' });
       await vi.advanceTimersByTimeAsync(5_000);
 
-      const workspace = context.cloud.workspaceFor(DEVICE_A) as SampleDeviceWorkspace;
+      const workspace = context.cloud.workspaceFor(DEVICE_A, 'developer') as SampleDeviceWorkspace;
       const source = workspace.sourceForThread('payment-upgrade');
       expect(source.kind).toBe('reply');
       expect(source.text).toBe("Thanks. I'll wait until Monday.");
@@ -678,7 +685,7 @@ describe('cloud sample reset', () => {
       ]);
       expect(restored.items.find((item) => item.threadId === 'login-fix')).toMatchObject({
         attention: 'plan',
-        summary: 'plan, 7 steps',
+        summary: '7 steps · 1 needs you',
         draftNotes: 0,
       });
       expect(restored.items.every((item) => item.draftNotes === 0)).toBe(true);

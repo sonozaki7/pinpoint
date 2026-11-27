@@ -69,6 +69,7 @@ function validRelayRequest(value: unknown): value is RelayRequest {
   if (typeof request.query !== 'string' || request.query.length > 8_000) return false;
   if (request.contentType !== undefined && typeof request.contentType !== 'string') return false;
   if (request.contentType && request.contentType.length > 200) return false;
+  if (request.device !== undefined && !/^[a-f0-9]{8,64}$/.test(String(request.device))) return false;
   if (typeof request.bodyBase64 !== 'string') return false;
   if (request.bodyBase64.length > Math.ceil((RELAY_MAX_BYTES * 4) / 3) + 8) return false;
   return true;
@@ -296,6 +297,7 @@ export class DeskClient {
     try {
       const headers = new Headers();
       if (request.contentType) headers.set('Content-Type', request.contentType);
+      if (request.device) headers.set('X-Pinpoint-Device', `relay-${request.device}`);
       const body =
         request.method === 'GET' || request.method === 'HEAD' || request.bodyBase64.length === 0
           ? undefined

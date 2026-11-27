@@ -130,6 +130,10 @@ export function normalizePoints(
       candidate.risk === 'high' ||
       (candidate.risk === undefined && isHighRiskText(verified.quote) && attention !== 'report');
 
+    // needsYou=false means "routine, leave it unflagged"; a flag without that
+    // gate is still accepted when a why backs it up.
+    const wantsFlag = candidate.needsYou !== false;
+
     seen.add(key);
     points.push({
       kind,
@@ -138,7 +142,11 @@ export function normalizePoints(
       ...(options && options.length >= 2 ? { options } : {}),
       ...(questionId ? { questionId } : {}),
       ...(riskHigh ? { risk: 'high' as const } : {}),
-      ...(normalizeFlag(candidate.flag) ? { flag: normalizeFlag(candidate.flag) } : {}),
+      ...(wantsFlag && normalizeFlag(candidate.flag)
+        ? { flag: normalizeFlag(candidate.flag) }
+        : {}),
+      ...(wantsFlag && text(candidate.why) ? { why: text(candidate.why) } : {}),
+      ...(candidate.changed === true ? { changed: true } : {}),
       ...(text(candidate.anchor) ? { anchor: text(candidate.anchor) } : {}),
     });
   }

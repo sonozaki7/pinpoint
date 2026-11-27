@@ -8,11 +8,12 @@
 // owner mail, notes or model spend.
 
 import path from 'node:path';
+import { DeepseekLlmConnector } from './deepseek.js';
 import { GmailConnector } from './gmail.js';
 import { GoogleAuth, hasGoogleCredentials } from './googleAuth.js';
 import { NotionConnector } from './notion.js';
 import { OpencodeLlmConnector } from './opencode.js';
-import type { Connectors } from './types.js';
+import type { Connectors, LlmConnector } from './types.js';
 
 export * from './types.js';
 export { GmailConnector, stripQuotedHistory } from './gmail.js';
@@ -30,6 +31,12 @@ export {
 export type { GoogleClient, GoogleToken } from './googleAuth.js';
 export { NotionConnector, NOTION_API_VERSION } from './notion.js';
 export { OpencodeLlmConnector } from './opencode.js';
+export {
+  DeepseekLlmConnector,
+  DEEPSEEK_URL,
+  DEEPSEEK_DEFAULT_MODEL,
+  DEEPSEEK_DEFAULT_TIMEOUT_MS,
+} from './deepseek.js';
 
 /**
  * The subset of the server env the connectors read. The real Env object is
@@ -53,6 +60,31 @@ export interface ConnectorEnv {
   NOTION_NOTES_ROOT?: string;
   SPLITTER_MODEL?: string;
   PINPOINT_MODE?: string;
+  deepseekKey?: string;
+  deepseekModel?: string;
+  DEEPSEEK_API_KEY?: string;
+  DEEPSEEK_MODEL?: string;
+}
+
+/**
+ * The desk's one reviewer model, chosen the owner's way:
+ * DeepSeek when its API key is present, otherwise the existing opencode CLI.
+ * Cloud gets no opencode fallback (the public server never spawns a CLI).
+ */
+export function createLlmConnector(env: ConnectorEnv): LlmConnector | undefined {
+  const mode = (setting(env, 'PINPOINT_MODE') || env.mode || 'live').toLowerCase();
+  if (mode === 'demo') return undefined;
+  const deepseekKey = setting(env, 'DEEPSEEK_API_KEY') || env.deepseekKey || '';
+  if (deepseekKey) {
+    return new DeepseekLlmConnector({
+      apiKey: deepseekKey,
+      model: setting(env, 'DEEPSEEK_MODEL') || env.deepseekModel,
+    });
+  }
+  if (mode === 'cloud') return undefined;
+  return new OpencodeLlmConnector({
+    model: setting(env, 'SPLITTER_MODEL') || env.splitterModel,
+  });
 }
 
 export function loadConnectors(env: ConnectorEnv, dataDir: string): Connectors {
@@ -88,9 +120,8 @@ export function loadConnectors(env: ConnectorEnv, dataDir: string): Connectors {
   }
 
   if (mode !== 'demo') {
-    connectors.llm = new OpencodeLlmConnector({
-      model: setting(env, 'SPLITTER_MODEL') || env.splitterModel,
-    });
+    const llm = createLlmConnector(env);
+    if (llm) connectors.llm = llm;
   }
 
   return connectors;

@@ -1,8 +1,10 @@
+import { DeepseekLlmConnector } from '../../connectors/deepseek.js';
+import type { LlmConnector } from '../../connectors/types.js';
 import type { Env } from '../env.js';
 import { errorMessage } from '../errors.js';
 import { findSplitPayload } from './json.js';
 import { naiveSplit } from './naive.js';
-import { buildSplitPrompt, normalizeHeadline } from './prompt.js';
+import { buildSplitPrompt, normalizeHeadline, SYSTEM_PROMPT } from './prompt.js';
 import { runOpencode } from './opencode.js';
 import { splitWithAnthropic } from './httpProviders.js';
 import { rawPointSchema } from '../schemas.js';
@@ -11,8 +13,15 @@ import { SplitterError, type RawSplit, type SplitInput, type Splitter } from './
 export type { Splitter, SplitInput, RawSplit } from './types.js';
 export { SPLITTER_TIMEOUT_MS } from './opencode.js';
 
-function labelFor(provider: Env['splitterProvider'], model: string): string {
+export interface SplitterOptions {
+  /** Desk reviewer model (DeepSeek when its key is set). Tests inject a fake. */
+  llm?: LlmConnector;
+}
+
+function labelFor(provider: Env['splitterProvider'] | 'deepseek', model: string): string {
   switch (provider) {
+    case 'deepseek':
+      return `deepseek:${model.replace(/^deepseek[-:]/i, '')}`;
     case 'opencode':
       return `opencode:${model.replace(/^opencode-go\//, '')}`;
     case 'anthropic':
@@ -26,11 +35,33 @@ function fromModelText(text: string): { headline?: unknown; points: unknown[] } 
   return findSplitPayload(text);
 }
 
-/** Builds the splitter selected by SPLITTER_PROVIDER. Model failures fall back to naive splitting. */
-export function createSplitter(env: Env): Splitter {
-  const provider = env.splitterProvider;
-  const model = provider === 'anthropic' ? env.anthropicModel : env.splitterModel;
+/**
+ * Builds the reviewer used for splitting, sorting and evidence.
+ *
+ * DeepSeek wins whenever DEEPSEEK_API_KEY is set (the owner's choice: about a
+ * second per call). Without the key the existing opencode CLI path stays the
+ * fallback, and `SPLITTER_PROVIDER=fixture` / `anthropic` still means what it says.
+ */
+export function createSplitter(env: Env, options: SplitterOptions = {}): Splitter {
+  const configured = env.splitterProvider;
+  const useDeepseek =
+    env.mode !== 'demo' &&
+    env.deepseekKey.length > 0 &&
+    configured !== 'fixture' &&
+    configured !== 'anthropic';
+  const provider: Env['splitterProvider'] | 'deepseek' = useDeepseek ? 'deepseek' : configured;
+  const model =
+    provider === 'deepseek'
+      ? env.deepseekModel
+      : provider === 'anthropic'
+        ? env.anthropicModel
+        : env.splitterModel;
   const label = labelFor(provider, model);
+  const deepseek =
+    provider === 'deepseek'
+      ? (options.llm ??
+        new DeepseekLlmConnector({ apiKey: env.deepseekKey, model: env.deepseekModel }))
+      : undefined;
 
   return {
     label,
@@ -52,10 +83,19 @@ export function createSplitter(env: Env): Splitter {
       const started = Date.now();
       let text: string;
       try {
-        if (provider === 'opencode') {
+        if (provider === 'deepseek' && deepseek) {
+          text = await deepseek.complete({
+            system: SYSTEM_PROMPT,
+            user: buildSplitPrompt(input),
+            json: true,
+            maxTokens: 2_400,
+          });
+        } else if (provider === 'opencode') {
           text = await runOpencode(buildSplitPrompt(input), model);
-        } else {
+        } else if (provider === 'anthropic') {
           text = await splitWithAnthropic(input, env.anthropicKey, model);
+        } else {
+          return fallback();
         }
       } catch (error) {
         return fallback(errorMessage(error));

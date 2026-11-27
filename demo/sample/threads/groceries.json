@@ -1,0 +1,60 @@
+{
+  "thread": {
+    "threadId": "groceries",
+    "title": "groceries",
+    "project": "Home",
+    "attention": "report",
+    "updatedAt": "2026-11-27T07:55:00.000Z"
+  },
+  "source": {
+    "sourceMessageId": "sample-groceries-1",
+    "kind": "reply",
+    "text": "Your groceries are ordered for Sunday. The delivery window is 10:00 to 12:00, and someone needs to be home to receive the box. The order has 14 items and comes to about ¥8,200. Two items were out of stock, so I swapped in the closest match and listed both swaps in the order. Nothing else changed from your usual list. I'll remind you on Saturday evening."
+  },
+  "deck": {
+    "threadId": "groceries",
+    "sourceMessageId": "sample-groceries-1",
+    "title": "groceries",
+    "attention": "report",
+    "headline": "Groceries ordered for Sunday",
+    "points": [
+      {
+        "id": "p1",
+        "index": 1,
+        "kind": "claim",
+        "glance": "Groceries ordered for Sunday",
+        "quote": "Your groceries are ordered for Sunday."
+      },
+      {
+        "id": "p2",
+        "index": 2,
+        "kind": "claim",
+        "glance": "Delivery 10:00 to 12:00, be home",
+        "quote": "The delivery window is 10:00 to 12:00, and someone needs to be home to receive the box."
+      },
+      {
+        "id": "p3",
+        "index": 3,
+        "kind": "claim",
+        "glance": "14 items, about 8,200 yen",
+        "quote": "The order has 14 items and comes to about ¥8,200."
+      },
+      {
+        "id": "p4",
+        "index": 4,
+        "kind": "claim",
+        "glance": "Two items swapped for the closest",
+        "quote": "Two items were out of stock, so I swapped in the closest match and listed both swaps in the order."
+      },
+      {
+        "id": "p5",
+        "index": 5,
+        "kind": "claim",
+        "glance": "Reminder on Saturday evening",
+        "quote": "I'll remind you on Saturday evening."
+      }
+    ],
+    "createdAt": "2026-11-27T07:55:00.000Z",
+    "splitter": "fixture"
+  }
+}

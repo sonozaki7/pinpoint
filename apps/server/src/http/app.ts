@@ -2,8 +2,8 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { HttpError, errorMessage } from '../core/errors.js';
-import { draftInputSchema, editInputSchema } from '../core/schemas.js';
-import type { PinpointService } from '../core/service.js';
+import { askInputSchema, draftInputSchema, editInputSchema, taskInputSchema } from '../core/schemas.js';
+import { LOCAL_DEVICE, type PinpointService } from '../core/service.js';
 import { MAX_PCM_BYTES } from '../voice/wav.js';
 import { MAX_JSON_BYTES, readBodyCapped } from './body.js';
 
@@ -47,6 +47,16 @@ async function readJson(request: Request): Promise<unknown> {
   }
 }
 
+/**
+ * "Since you looked" is tracked per device. A direct client sends its own
+ * X-Pinpoint-Device UUID; the cloud relay sends `relay-<hash>`; the desk's own
+ * app sends nothing and shares one "local" device.
+ */
+function deviceFrom(request: Request): string {
+  const raw = request.headers.get('x-pinpoint-device')?.trim().toLowerCase() ?? '';
+  return /^[a-z0-9-]{8,64}$/.test(raw) ? raw : LOCAL_DEVICE;
+}
+
 export function createApp(deps: AppDeps): Hono {
   const { service } = deps;
   const app = new Hono();
@@ -62,7 +72,7 @@ export function createApp(deps: AppDeps): Hono {
         return isAllowedLiveOrigin(origin, service.env.allowedOrigins) ? origin : undefined;
       },
       allowMethods: ['GET', 'POST', 'PUT', 'OPTIONS'],
-      allowHeaders: ['Content-Type', 'Authorization', 'X-Point-Id', 'X-Thread-Id'],
+      allowHeaders: ['Content-Type', 'Authorization', 'X-Point-Id', 'X-Thread-Id', 'X-Pinpoint-Device'],
       maxAge: 86_400,
     }),
   );
@@ -75,14 +85,14 @@ export function createApp(deps: AppDeps): Hono {
 
   app.get('/api/inbox', async (c) => {
     try {
-      return c.json(await service.listInbox());
+      return c.json(await service.listInbox(deviceFrom(c.req.raw)));
     } catch (error) {
       throw new HttpError(502, `Could not load inbox: ${errorMessage(error)}`, 't3_error');
     }
   });
 
   app.get('/api/deck/:threadId', async (c) => {
-    const lookup = await service.getDeckHttp(c.req.param('threadId'));
+    const lookup = await service.getDeckHttp(c.req.param('threadId'), deviceFrom(c.req.raw));
     if (lookup.status === 'missing') {
       throw new HttpError(404, 'Unknown thread', 'not_found');
     }
@@ -90,6 +100,32 @@ export function createApp(deps: AppDeps): Hono {
       return c.json({ pending: true }, 202);
     }
     return c.json(lookup.deck);
+  });
+
+  app.post('/api/ask/:threadId', async (c) => {
+    const raw = await readJson(c.req.raw);
+    const parsed = askInputSchema.safeParse(raw);
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      throw new HttpError(
+        400,
+        `Invalid question${issue ? `: ${issue.path.join('.')} ${issue.message}` : ''}`,
+        'bad_request',
+      );
+    }
+    return c.json(
+      await service.ask(c.req.param('threadId'), parsed.data.question, deviceFrom(c.req.raw)),
+    );
+  });
+
+  app.post('/api/task', async (c) => {
+    const raw = await readJson(c.req.raw);
+    const parsed = taskInputSchema.safeParse(raw);
+    if (!parsed.success) {
+      throw new HttpError(400, 'Invalid task: text is required', 'bad_request');
+    }
+    const result = await service.task(parsed.data.text);
+    return c.json(result, result.ok ? 200 : 502);
   });
 
   app.put('/api/review/:threadId', async (c) => {
@@ -103,11 +139,13 @@ export function createApp(deps: AppDeps): Hono {
         'bad_request',
       );
     }
-    return c.json(await service.putDraft(c.req.param('threadId'), parsed.data));
+    return c.json(
+      await service.putDraft(c.req.param('threadId'), parsed.data, deviceFrom(c.req.raw)),
+    );
   });
 
   app.get('/api/review/:threadId', async (c) => {
-    return c.json(await service.getDraft(c.req.param('threadId')));
+    return c.json(await service.getDraft(c.req.param('threadId'), deviceFrom(c.req.raw)));
   });
 
   app.post('/api/edit/:threadId', async (c) => {
@@ -127,11 +165,13 @@ export function createApp(deps: AppDeps): Hono {
   });
 
   app.post('/api/review/:threadId/preview', async (c) => {
-    return c.json(await service.preview(c.req.param('threadId')));
+    return c.json(await service.preview(c.req.param('threadId'), deviceFrom(c.req.raw)));
   });
 
   app.post('/api/review/:threadId/send', async (c) => {
-    const result = await service.send(c.req.param('threadId'));
+    const result = await service.send(c.req.param('threadId'), {
+      deviceId: deviceFrom(c.req.raw),
+    });
     return c.json(result, result.ok ? 200 : 502);
   });
 
