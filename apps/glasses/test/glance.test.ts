@@ -841,3 +841,13 @@ test("mock inbox summaries read exactly like the server's, from the real fixture
   assert.equal(inboxSummary({ attention: "plan" }, undefined), "plan");
   assert.equal(inboxSummary({ app: "gmail", attention: "report" }, [{ kind: "draft", flag: "x" }, { kind: "draft" }]), "2 lines · 1 needs you");
 });
+
+test("the Send row never takes a mail prefix for a name", async () => {
+  const { recipientFor } = await import("../src/display");
+  assert.equal(recipientFor("Re: lease renewal"), null);
+  assert.equal(recipientFor("RE: Fwd: lease renewal"), null);
+  assert.equal(recipientFor("Draft reply to Priya: contract terms"), "Priya");
+  assert.equal(recipientFor("Re: Draft reply to Priya: contract terms"), "Priya");
+  assert.equal(recipientFor("Priya: terms"), "Priya");
+  assert.equal(recipientFor("Fwd: Mr Okada: rent"), "Mr Okada");
+});

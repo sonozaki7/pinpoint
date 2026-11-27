@@ -528,10 +528,14 @@ export function reviewAppOf(state: State): AppId {
   return item?.app ?? "t3";
 }
 
-/** "Draft reply to Priya: contract terms" -> "Priya"; "Priya: terms" -> "Priya". */
+/** Mail subject prefixes ("Re:", "Fwd:", "AW:" …) are never a person's name. */
+const MAIL_PREFIX = /^(?:(?:re|fwd?|aw|wg|sv|vs|antw|tr)\s*:\s*)+/i;
+
+/** "Draft reply to Priya: contract terms" -> "Priya"; "Priya: terms" -> "Priya"; "Re: lease renewal" -> null. */
 export function recipientFor(title: string): string | null {
-  const afterTo = /\bto\s+([^:,·]+)/i.exec(title)?.[1]?.trim();
-  const beforeColon = /^([A-Z][A-Za-z0-9'’-]*(?:\s+[A-Z][A-Za-z0-9'’-]*)?)\s*:/.exec(title)?.[1]?.trim();
+  const subject = title.replace(MAIL_PREFIX, "");
+  const afterTo = /\bto\s+([^:,·]+)/i.exec(subject)?.[1]?.trim();
+  const beforeColon = /^([A-Z][A-Za-z0-9'’-]*(?:\s+[A-Z][A-Za-z0-9'’-]*)?)\s*:/.exec(subject)?.[1]?.trim();
   const name = afterTo ?? beforeColon;
   if (!name || name.length > 20) return null;
   return name;
