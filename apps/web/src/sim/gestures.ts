@@ -1,20 +1,19 @@
 export type Gesture = "up" | "down" | "tap" | "double" | "hold";
 
 const HOLD_MS = 560;
-const TAP_DELAY_MS = 280;
-const DOUBLE_MS = 380;
-const DRAG_STEP = 30;
-const WHEEL_STEP = 36;
+const TAP_DELAY_MS = 250;
+const DOUBLE_MS = 360;
+const DRAG_STEP = 28;
+const WHEEL_STEP = 34;
 
 /**
- * The virtual R1. Wheel or drag vertically to scroll, tap once, tap twice
- * quickly, or press and hold. Explicit buttons use the same path so mouse,
- * touch and keyboard all produce identical gestures.
+ * The physical ring, as a browser control. Wheel or drag vertically to scroll,
+ * tap once, tap twice quickly, or press and hold. The ring's metal face turns a
+ * little as it scrolls, and the button stays a normal focusable control.
  */
 export class RingController {
   private readonly surface: HTMLElement;
   private readonly onGesture: (gesture: Gesture) => void;
-  private readonly buttons: HTMLButtonElement[];
   private holdTimer: ReturnType<typeof setTimeout> | undefined;
   private tapTimer: ReturnType<typeof setTimeout> | undefined;
   private lastTapAt = 0;
@@ -27,26 +26,16 @@ export class RingController {
   private wheelLockedUntil = 0;
   private turn = 0;
 
-  constructor(root: HTMLElement, onGesture: (gesture: Gesture) => void) {
-    this.surface = root.querySelector<HTMLElement>("[data-ring]")!;
+  constructor(surface: HTMLElement, onGesture: (gesture: Gesture) => void) {
+    this.surface = surface;
     this.onGesture = onGesture;
-    this.buttons = [...root.querySelectorAll<HTMLButtonElement>("[data-ring-action]")];
-
-    this.surface.addEventListener("pointerdown", this.onPointerDown);
-    this.surface.addEventListener("pointermove", this.onPointerMove);
-    this.surface.addEventListener("pointerup", this.onPointerUp);
-    this.surface.addEventListener("pointercancel", this.onPointerCancel);
-    this.surface.addEventListener("wheel", this.onWheel, { passive: false });
-    this.surface.addEventListener("keydown", this.onKeyDown);
-    this.surface.addEventListener("contextmenu", (event) => event.preventDefault());
-    for (const button of this.buttons) {
-      button.addEventListener("click", () => this.onButton(button.dataset.ringAction as Gesture));
-    }
-  }
-
-  private updateTurn(): void {
-    this.turn = Math.max(-120, Math.min(120, this.turn));
-    this.surface.style.setProperty("--ring-turn", `${this.turn}deg`);
+    surface.addEventListener("pointerdown", this.onPointerDown);
+    surface.addEventListener("pointermove", this.onPointerMove);
+    surface.addEventListener("pointerup", this.onPointerUp);
+    surface.addEventListener("pointercancel", this.onPointerCancel);
+    surface.addEventListener("wheel", this.onWheel, { passive: false });
+    surface.addEventListener("contextmenu", (event) => event.preventDefault());
+    surface.addEventListener("keydown", this.onKeyDown);
   }
 
   private pulse(direction: Gesture): void {
@@ -60,8 +49,9 @@ export class RingController {
     const now = performance.now();
     if (now < this.wheelLockedUntil) return;
     this.wheelLockedUntil = now + 130;
-    this.turn += direction === "down" ? 16 : -16;
-    this.updateTurn();
+    this.turn += direction === "down" ? 17 : -17;
+    this.turn = Math.max(-140, Math.min(140, this.turn));
+    this.surface.style.setProperty("--ring-turn", `${this.turn}deg`);
     this.pulse(direction === "down" ? "down" : "up");
     this.onGesture(direction);
   }
@@ -149,30 +139,10 @@ export class RingController {
     }, TAP_DELAY_MS);
   }
 
-  private onButton(action: Gesture): void {
-    if (action === "tap") {
-      this.queueTap();
-      return;
-    }
-    if (action === "hold") {
-      this.pulse("hold");
-      this.onGesture("hold");
-      return;
-    }
-    if (action === "double") {
-      clearTimeout(this.tapTimer);
-      this.tapTimer = undefined;
-      this.lastTapAt = 0;
-      this.pulse("double");
-      this.onGesture("double");
-      return;
-    }
-    this.scroll(action === "down" ? "down" : "up");
-  }
-
   private onKeyDown = (event: KeyboardEvent): void => {
     if (event.key === " " || event.key === "Spacebar") {
       event.preventDefault();
+      event.stopPropagation();
       this.queueTap();
     }
   };

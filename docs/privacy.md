@@ -1,6 +1,6 @@
 # Pinpoint privacy
 
-Source text for the privacy page on https://pinpoint.qolso.com. Written in plain language. Last updated: 27 November 2026 (hackathon release 1.0.0).
+Source text for the privacy page on https://pinpoint.qolso.com. Written in plain language. Last updated: 27 November 2026 (hackathon release 1.1.0).
 
 Pinpoint is an app for Even G2 smart glasses. It helps you review work your AI agents have already done, and sends your corrections back to where the work lives.
 
@@ -58,7 +58,7 @@ Pinpoint is useful because it connects to services you already use. Each sees wh
 
 | Service | When | What it receives |
 |---|---|---|
-| **DeepSeek API** | On your desk, when the reviewer model is on (it is how output is sorted and questions are answered) | The text of the work under review (an agent reply, a page, a draft) and your question or edit. Prompts are not logged by Pinpoint. DeepSeek's own terms apply. The sample workspace sends no private text to it. |
+| **DeepSeek API** | On your desk, when the reviewer model is on (it sorts long output and answers questions). In Pinpoint Cloud, to word the answer when you Ask about the sample. | On the desk: the text of the work under review (an agent reply, a page, a draft) and your question or edit. In the cloud sample: the fictional sample text and your transcribed question, at most 20 a minute per device and 2,000 a day in total; past that, the exact source sentence is shown without a model. Prompts are not logged by Pinpoint. DeepSeek's own terms apply. |
 | **T3 Code** | Live desk | Your review, as a normal message in the thread |
 | **Notion** | Live desk | Your note, as a comment on a block; the page status |
 | **Gmail** | Live desk | Your edited draft; Gmail sends it only after you send it |
@@ -90,10 +90,9 @@ Pinpoint is not directed at children.
 
 ## Changes and contact
 
-If this page changes, the date at the top changes. Questions: TODO(lead): add a contact email or GitHub issues link for the privacy page (do not use a personal address by accident). Source: https://github.com/sonozaki7/pinpoint.
+If this page changes, the date at the top changes. Questions: open an issue at https://github.com/sonozaki7/pinpoint/issues. Source: https://github.com/sonozaki7/pinpoint.
 
 ## Notes for maintainers (not part of the site page)
 
 - Everything above is checked against `docs/desk-pairing.md`, `apps/server/CLOUD.md`, `apps/server/src/cloud/limits.ts` and `apps/server/src/voice/service.ts` (temporary audio is removed in a `finally`).
-- TODO(lead): verify that no cloud environment sets `DEEPSEEK_API_KEY` for the sample workspace, or reword the DeepSeek row: `createLlmConnector` can use a key in cloud mode "as the optional answer phraser", which would send the fictional sample text to DeepSeek.
-- TODO(lead): the Even app's own privacy policy and store listing text must cover each permission (network, microphone) before store review; this page can be linked from the listing.
+- Before store review: the Even app's own privacy policy and store listing must cover each permission (network, microphone); this page can be linked from the listing.

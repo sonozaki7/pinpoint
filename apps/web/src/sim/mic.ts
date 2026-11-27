@@ -1,6 +1,21 @@
 /** Target format for Pinpoint Cloud: 16 kHz, mono, signed 16-bit little-endian. */
 export const TARGET_RATE = 16_000;
 export const MAX_CAPTURE_MS = 30_000;
+/** Recording ends after this much quiet, once speech has started (same as the glasses). */
+export const SILENCE_STOP_MS = 1_200;
+export const MIN_SPEECH_MS = 500;
+/** RMS of float samples above this is speech, not room noise. */
+export const SPEECH_RMS = 0.0125;
+
+function floatRms(frame: Float32Array): number {
+  if (frame.length === 0) return 0;
+  let sum = 0;
+  for (let index = 0; index < frame.length; index += 1) {
+    const value = frame[index] ?? 0;
+    sum += value * value;
+  }
+  return Math.sqrt(sum / frame.length);
+}
 
 type AudioContextCtor = typeof AudioContext;
 
@@ -62,6 +77,16 @@ export class MicRecorder {
   private open = false;
   private cancelled = false;
   private starting: Promise<void> | null = null;
+  private speechMs = 0;
+  private silenceMs = 0;
+  private heard = false;
+  private autoStopFired = false;
+
+  /**
+   * Called once when the speaker has been quiet for 1.2 s after speaking.
+   * The main loop then stops recording exactly as if the ring was tapped.
+   */
+  onAutoStop: (() => void) | null = null;
 
   get active(): boolean {
     return this.open;
@@ -91,6 +116,10 @@ export class MicRecorder {
     this.open = true;
     this.chunks = [];
     this.frames = 0;
+    this.speechMs = 0;
+    this.silenceMs = 0;
+    this.heard = false;
+    this.autoStopFired = false;
     const pending = this.openStream();
     this.starting = pending;
     try {
@@ -166,6 +195,25 @@ export class MicRecorder {
     if (chunk.length === 0) return;
     this.chunks.push(chunk);
     this.frames += chunk.length;
+    this.trackSpeech(chunk);
+  }
+
+  /** The glasses' end-of-speech rule, applied to the same float frames. */
+  private trackSpeech(chunk: Float32Array): void {
+    const rate = this.context?.sampleRate ?? TARGET_RATE;
+    const durationMs = (chunk.length / rate) * 1_000;
+    if (floatRms(chunk) >= SPEECH_RMS) {
+      this.speechMs += durationMs;
+      this.silenceMs = 0;
+      if (this.speechMs >= MIN_SPEECH_MS) this.heard = true;
+      return;
+    }
+    if (!this.heard) return;
+    this.silenceMs += durationMs;
+    if (this.autoStopFired || this.silenceMs < SILENCE_STOP_MS) return;
+    this.autoStopFired = true;
+    const callback = this.onAutoStop;
+    if (callback) window.setTimeout(() => callback(), 0);
   }
 
   /** Stops capture and returns PCM. Safe to call while the mic is still starting. */

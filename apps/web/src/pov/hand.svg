@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 400" class="hand-svg" role="img" aria-label="Your right hand wearing the Pinpoint ring; the thumb moves as you control it">
+  <defs>
+    <linearGradient id="hSkin" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0" stop-color="#e6b28f"/>
+      <stop offset="0.5" stop-color="#cf8f68"/>
+      <stop offset="1" stop-color="#a86b4c"/>
+    </linearGradient>
+    <linearGradient id="hSkinDeep" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#c58360"/>
+      <stop offset="1" stop-color="#8c5238"/>
+    </linearGradient>
+    <linearGradient id="hFinger" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e9b996"/>
+      <stop offset="0.55" stop-color="#d49670"/>
+      <stop offset="1" stop-color="#b57854"/>
+    </linearGradient>
+    <linearGradient id="hThumb" x1="0" y1="0" x2="0.2" y2="1">
+      <stop offset="0" stop-color="#f0c3a1"/>
+      <stop offset="0.5" stop-color="#d9a07a"/>
+      <stop offset="1" stop-color="#b87b57"/>
+    </linearGradient>
+    <linearGradient id="hSleeve" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2b3330"/>
+      <stop offset="1" stop-color="#121715"/>
+    </linearGradient>
+    <linearGradient id="hRing" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#6d6c66"/>
+      <stop offset="0.25" stop-color="#d9d8d1"/>
+      <stop offset="0.5" stop-color="#f4f3ee"/>
+      <stop offset="0.72" stop-color="#9c9b94"/>
+      <stop offset="1" stop-color="#5b5a55"/>
+    </linearGradient>
+    <radialGradient id="hLed" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#eafff1"/>
+      <stop offset="0.35" stop-color="#8dffb5"/>
+      <stop offset="1" stop-color="#8dffb5" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="hGlow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#8dffb5" stop-opacity="0.85"/>
+      <stop offset="0.45" stop-color="#5dffa0" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#5dffa0" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="hShadow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#000" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#000" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="hBlur" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="3"/></filter>
+  </defs>
+
+  <ellipse cx="250" cy="372" rx="190" ry="26" fill="url(#hShadow)"/>
+
+  <!-- forearm in a dark sleeve -->
+  <g id="hand-arm">
+    <!-- wrist -->
+    <path d="M262 262 C 300 280 338 282 352 266 L 384 330 C 350 346 292 338 262 312 Z" fill="url(#hSkinDeep)"/>
+    <!-- sleeve and its cuff -->
+    <path d="M300 306 C 336 320 376 344 410 380 L 440 420 L 296 420 L 264 340 Z" fill="url(#hSleeve)"/>
+    <path d="M268 292 C 304 304 348 316 384 330 L 408 380 C 372 352 330 340 286 330 Z" fill="#202825"/>
+    <path d="M270 296 C 306 306 348 318 384 332" fill="none" stroke="#4a5a52" stroke-width="2.4" stroke-linecap="round" opacity="0.9"/>
+    <path d="M300 340 C 336 352 372 372 398 402" fill="none" stroke="#33403a" stroke-width="2" stroke-linecap="round" opacity="0.8"/>
+  </g>
+
+  <g id="hand-body">
+    <!-- palm and back of the hand -->
+    <path d="M214 150 C 258 124 318 134 344 182 C 364 222 350 266 322 290 C 296 310 252 304 224 278 C 196 250 190 186 214 150 Z" fill="url(#hSkin)"/>
+    <path d="M300 144 C 330 160 346 196 340 236" fill="none" stroke="#f2c8a8" stroke-width="3" stroke-linecap="round" opacity="0.4"/>
+    <!-- lower fingers, curled -->
+    <g id="hand-fingers">
+      <path d="M128 262 C 120 248 128 232 148 228 L 214 226 C 232 230 236 250 220 262 C 206 274 160 276 138 274 C 134 272 130 268 128 262 Z" fill="url(#hFinger)"/>
+      <path d="M136 232 C 126 216 134 198 154 194 L 224 192 C 244 196 248 218 230 230 C 214 240 166 244 146 242 C 140 240 138 236 136 232 Z" fill="url(#hFinger)"/>
+      <path d="M142 200 C 130 182 140 162 162 158 L 232 156 C 252 160 256 184 238 196 C 222 206 172 210 152 208 C 146 206 144 204 142 200 Z" fill="url(#hFinger)"/>
+    </g>
+    <!-- index finger (carries the ring) -->
+    <g id="hand-index">
+      <path d="M148 168 C 134 150 142 124 166 118 L 250 112 C 276 112 288 138 270 160 C 254 178 190 190 164 184 C 156 182 152 176 148 168 Z" fill="url(#hFinger)"/>
+      <path d="M160 130 C 176 124 226 120 252 122" fill="none" stroke="#f3cfb2" stroke-width="2" stroke-linecap="round" opacity="0.55"/>
+    </g>
+    <!-- shadow the thumb throws on the fist -->
+    <path d="M300 286 C 280 236 252 196 214 168 C 232 170 262 196 286 230 C 300 252 308 270 312 290 Z" fill="#6b3d28" opacity="0.28" filter="url(#hBlur)"/>
+    <!-- creases -->
+    <g fill="none" stroke="#8e5438" stroke-width="1.6" stroke-linecap="round" opacity="0.45">
+      <path d="M176 236 C 184 242 196 242 206 238"/>
+      <path d="M180 204 C 188 210 200 210 210 206"/>
+      <path d="M238 252 C 232 258 224 260 216 258"/>
+      <path d="M244 214 C 238 220 230 222 222 220"/>
+    </g>
+
+    <!-- the ring -->
+    <g id="hand-ring" transform="rotate(-8 204 150)">
+      <rect x="188" y="110" width="32" height="80" rx="15" fill="#2a2d2e" opacity="0.28" transform="translate(3 4)"/>
+      <rect x="188" y="108" width="32" height="80" rx="15" fill="url(#hRing)"/>
+      <rect x="188.6" y="108.6" width="30.8" height="78.8" rx="14.4" fill="none" stroke="#ffffff" stroke-opacity="0.45" stroke-width="1"/>
+      <rect x="195" y="116" width="6" height="64" rx="3" fill="#ffffff" opacity="0.38"/>
+      <rect x="206" y="116" width="9" height="64" rx="4.5" fill="#000" opacity="0.14"/>
+      <path d="M204 112 L204 184" stroke="#3a3c3c" stroke-width="0.8" opacity="0.35"/>
+      <circle id="hand-led" cx="204" cy="123" r="3.6" fill="#8dffb5"/>
+      <circle id="hand-led-glow" cx="204" cy="123" r="19" fill="url(#hLed)"/>
+    </g>
+    <circle id="hand-hold-glow" cx="206" cy="148" r="70" fill="url(#hGlow)" opacity="0"/>
+
+    <!-- thumb: pivots at its base; the tip rests on the ring -->
+    <g id="hand-thumb">
+      <path d="M338 272 C 318 236 286 186 236 148 C 220 136 196 140 192 158 C 190 172 204 182 220 194 C 250 216 270 252 284 296 C 300 318 336 306 338 272 Z" fill="url(#hThumb)"/>
+      <path d="M198 150 C 206 140 224 140 232 150 C 232 160 220 166 208 162 C 200 158 196 154 198 150 Z" fill="#f4d3bb"/>
+      <path d="M198 150 C 206 140 224 140 232 150" fill="none" stroke="#c98d6a" stroke-width="1.6" stroke-linecap="round" opacity="0.7"/>
+      <path d="M284 196 C 262 168 246 158 232 154" fill="none" stroke="#f8dcc6" stroke-width="3" stroke-linecap="round" opacity="0.5"/>
+    </g>
+  </g>
+</svg>

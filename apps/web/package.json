@@ -8,12 +8,17 @@
   },
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build && node scripts/build-app.mjs",
     "preview": "vite preview --host 127.0.0.1 --port 4174 --strictPort"
   },
   "devDependencies": {
+    "@types/node": "22.15.3",
+    "@types/three": "0.187.0",
+    "qrcode-generator": "^2.0.4",
     "typescript": "5.9.3",
-    "vite": "8.3.6",
-    "@types/node": "22.15.3"
+    "vite": "8.3.6"
+  },
+  "dependencies": {
+    "three": "0.187.0"
   }
 }

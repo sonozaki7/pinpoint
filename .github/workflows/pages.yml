@@ -16,6 +16,7 @@ on:
       - "apps/server/src/core/**"
       - "apps/server/src/cloud/reply.ts"
       - "demo/fixtures/**"
+      - "docs/privacy.md"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -61,6 +62,9 @@ jobs:
           test -f apps/web/dist/index.html
           test -f apps/web/dist/CNAME
           test -f apps/web/dist/media/og.png
+          test -f apps/web/dist/privacy.html
+          test -f apps/web/dist/app/index.html
+          test -f apps/web/dist/media/g2-qr.svg
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
