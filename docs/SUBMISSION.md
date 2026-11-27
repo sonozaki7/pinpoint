@@ -1,6 +1,6 @@
 # DoraHacks BUIDL form: paste-ready
 
-Every field of the Heads Up submission, in form order. Anything in `TODO(lead)` or `RELEASE_URL` / `VIDEO_URL` must be filled in before pressing submit. Steps for the owner: [SUBMIT-CHECKLIST.md](SUBMIT-CHECKLIST.md).
+Every field of the Heads Up submission, in form order. Anything still marked `TODO(lead)` must be filled in before pressing submit. Steps for the owner: [SUBMIT-CHECKLIST.md](SUBMIT-CHECKLIST.md).
 
 ## Project name
 
@@ -33,13 +33,13 @@ Why both: the work comes from AI assistants (T3 Code, Notion, Gmail); Telegram i
 
 ## Special prize note: Best Telegram integration
 
-Telegram is a first-class surface, not a notification hook. Each task, Notion page or Gmail draft gets its own topic in a private forum group, with a status icon in the topic list (❗ needs you, ✅ reviewed, ‼ failed). The topic holds one notifying card with buttons (Agree all, Approve, Send as written with a phone confirmation, answer buttons for an agent's question), the full text collapsed, one **quote-reply on the exact sentence** for each note you spoke on the glasses, and a receipt that links to where it landed (the agent thread, the Notion block, the sent email). "Read on phone" from the glasses posts the paragraph around the line you are on. Tested against a real bot; a dry-run mode runs the same code with no bot. Details: [telegram-setup.md](telegram-setup.md). Real-bot screenshots: `demo/recordings/telegram-*.png`.
+Telegram is a first-class surface, not a notification hook. Each task, Notion page or Gmail draft gets its own topic in a private forum group, with a status icon in the topic list (❗ needs you, ✅ reviewed, ‼ failed). The topic holds one notifying card with buttons (Agree all, Approve, Send as written with a phone confirmation, answer buttons for an agent's question), the full text collapsed, one **quote-reply on the exact sentence** for each note you spoke on the glasses, and a receipt that links to where it landed (the agent thread, the Notion block, the sent email). "Read on phone" from the glasses posts the paragraph around the line you are on. Tested against a real bot; a dry-run mode runs the same code with no bot. Details: [telegram-setup.md](telegram-setup.md). Real-bot screenshots: [`demo/film/public/proof/telegram-v2-*.png`](demo/film/public/proof/).
 
 ## Demo video
 
 - Primary: https://pinpoint.qolso.com/media/pinpoint-demo.mp4
-- GitHub release copy: RELEASE_URL
-- Video URL for the form: VIDEO_URL <!-- TODO(lead): the final public URL, after the video is uploaded (the site path or a release asset) -->
+- Full quality, on the GitHub release: https://github.com/sonozaki7/pinpoint/releases/download/v1.1.0/pinpoint-demo-final.mp4
+- Video URL for the form: https://pinpoint.qolso.com/media/pinpoint-demo.mp4 (2:44, plays in the browser)
 
 ## Repository
 
@@ -51,7 +51,7 @@ https://pinpoint.qolso.com (the page includes a try-it simulator). Cloud API: ht
 
 ## App package
 
-`apps/glasses/pinpoint.ehpk`, also attached to the release: RELEASE_URL. Build it with `npm --prefix apps/glasses run pack`. Package id `com.sonozaki7.pinpoint`, version 1.1.0, SDK 0.0.16.
+`apps/glasses/pinpoint.ehpk`, also attached to the release: https://github.com/sonozaki7/pinpoint/releases/tag/v1.1.0. Build it with `npm --prefix apps/glasses run pack`. Package id `com.sonozaki7.pinpoint`, version 1.1.0, SDK 0.0.16.
 
 ## How to test (for judges)
 
@@ -68,7 +68,7 @@ https://pinpoint.qolso.com (the page includes a try-it simulator). Cloud API: ht
 
 **With your own agents:** `cd apps/server && npm install && npm run desk`, then enter the printed code in the Pinpoint phone page (**Connect your computer**). See [desk-pairing.md](desk-pairing.md). Needs T3 Code running and `T3_PROJECTS` set; Notion and Gmail need your own tokens ([connectors.md](connectors.md)).
 
-**Automated checks:** `npm run check` passes: 340 server tests in 24 files, 116 glasses tests, the browser and SDK-transport check, and 14 fixture decks (82 points, 1,564 quote and layout checks). The package command `npm --prefix apps/glasses run pack` builds `apps/glasses/pinpoint.ehpk` (80,086 bytes).
+**Automated checks:** `npm run check` passes: 340 server tests in 24 files, 118 glasses tests, the browser and SDK-transport check, and 14 fixture decks (82 points, 1,564 quote and layout checks). The package command `npm --prefix apps/glasses run pack` builds `apps/glasses/pinpoint.ehpk` (80,184 bytes).
 
 ## Team
 
@@ -97,7 +97,7 @@ Short form for the form field; full text in [FEATURE_REQUESTS.md](FEATURE_REQUES
 | Category / tags | AI, Productivity, Telegram, Notion, Gmail, AI agents, Voice |
 | Logo | `brand/pinpoint-avatar-512.png` (24×24 Hub icon: `apps/glasses/icon-24.png`) |
 | Cover image | `apps/site/media/og.png` (1200×630) |
-| Screenshots | 3 from `demo/shots/` (inbox, review, note), 1 Telegram topic (`demo/recordings/telegram-v2-card.png`), 1 Notion comment (`demo/recordings/notion-launch-comment.png`) |
+| Screenshots | 3 from `demo/shots/` (inbox, review, note), 1 Telegram topic (`demo/film/public/proof/telegram-v2-card.png`), 1 Notion comment ([`demo/film/public/proof/notion-comment.png`](demo/film/public/proof/notion-comment.png)) |
 | License | MIT |
 | Contact | Discord (see checklist) |
 

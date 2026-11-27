@@ -15,3 +15,6 @@ demo/recordings/
 demo/film/public/audio/*-draft.mp3
 demo/film/.venv/
 demo/film/models/
+
+# Narration master for the final film (30 MB); rebuilt by demo/film/scripts/build-audio-final.mjs
+demo/film/public/audio/final-voice.wav

@@ -41,8 +41,8 @@ Post in the hackathon Discord, in the channel for rules or eligibility questions
 |---|---|
 | Site | https://pinpoint.qolso.com |
 | Repo | https://github.com/sonozaki7/pinpoint |
-| Video | VIDEO_URL (same file as https://pinpoint.qolso.com/media/pinpoint-demo.mp4) |
-| Release (video + `.ehpk`) | RELEASE_URL |
+| Video | https://pinpoint.qolso.com/media/pinpoint-demo.mp4 (full quality: https://github.com/sonozaki7/pinpoint/releases/download/v1.1.0/pinpoint-demo-final.mp4) |
+| Release (video + `.ehpk`) | https://github.com/sonozaki7/pinpoint/releases/tag/v1.1.0 |
 | Glasses app QR | https://pinpoint.qolso.com/app/ |
 | Cloud API (health) | https://pinpoint-api.qolso.com/api/health |
 

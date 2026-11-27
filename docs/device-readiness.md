@@ -24,7 +24,7 @@ Terms used below: **whitelist** = the per-app list of allowed server origins in 
 | 4 | Audio | **OK, one gap** | Format, ordering and cap are right. Add: abort the recording state on `FOREGROUND_EXIT`, re-arm nothing but clear `recordingStartedAt` on `FOREGROUND_ENTER`. | `apps/glasses/src/even.ts:310`, `src/main.ts:233` |
 | 5 | Lifecycle + storage | **BROKEN (one path)** | Cancelling the system exit dialog leaves the glasses **blank** — the host clears the page, our signature cache says "nothing changed", so nothing is repainted. Force one rebuild on the next foreground event after `shutDownPageContainer(1)`. | `apps/glasses/src/even.ts:266`, `:302` |
 | 6 | Display / pixel fit | **BROKEN (2 overflows)** | (a) The 3-option pane needs 81 px, the container allows 80 → the third option is clipped. (b) 62-char inbox rows measure up to 564 px in a 476 px item → clipped. (c) The 44-char cap wastes 30–43 % of every row and shrinks `login-fix` to `log...`. | `apps/glasses/src/even.ts:82`, `src/display.ts:7-9` |
-| 7 | Packaging / store | **RISK** | The current package is 80,086 bytes — confirm the version stamped inside matches `app.json` 1.1.0. The 24×24 icon, listing text and privacy page exist; the whitelist still carries two dead `127.0.0.1` entries. | `apps/glasses/pinpoint.ehpk`, `app.json:14-15` |
+| 7 | Packaging / store | **RISK** | The current package is 80,184 bytes — confirm the version stamped inside matches `app.json` 1.1.0. The 24×24 icon, listing text and privacy page exist; the whitelist still carries two dead `127.0.0.1` entries. | `apps/glasses/pinpoint.ehpk`, `app.json:14-15` |
 | 8 | "Test like a reviewer" | **RISK** | 5-minute lock test, exit-dialog cancel, permission denial, first-run-from-glasses and clean console are all untested on an installed build. | §8 |
 | — | Inbox tap can open the wrong row | **RISK** | A list click that omits `currentSelectItemIndex` (documented for item 0) leaves `state.inboxFocus` stale, and the tap opens that stale index instead of the highlighted row. | `apps/glasses/src/model.ts:504` |
 
@@ -413,7 +413,7 @@ From [App Submission & QA](https://hub.evenrealities.com/docs/ship/app-submissio
 
 ### 7.4 Ship-state hygiene
 
-- `apps/glasses/pinpoint.ehpk` was repacked for v1.1.0 (80,086 bytes) and `dist-even/` rebuilt at the same time, so the artifact is current. Confirm the version **inside** the package is `1.1.0` (the CLI prints the manifest it stamps), and repack again if anyone touches `app.json` or `display.ts` afterwards — an `.ehpk` carrying the old `127.0.0.1`-only whitelist looks exactly like "the backend is broken".
+- `apps/glasses/pinpoint.ehpk` was repacked for v1.1.0 (80,184 bytes) and `dist-even/` rebuilt at the same time, so the artifact is current. Confirm the version **inside** the package is `1.1.0` (the CLI prints the manifest it stamps), and repack again if anyone touches `app.json` or `display.ts` afterwards — an `.ehpk` carrying the old `127.0.0.1`-only whitelist looks exactly like "the backend is broken".
 - Never bundle keys: "anyone can extract its contents". Our device id is generated on device (`device.ts`), no secret in the bundle — good.
 
 ---

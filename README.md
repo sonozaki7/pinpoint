@@ -10,7 +10,7 @@ Pinpoint shows only the work that needs you, sorts long output down to the decis
 
 | | |
 |---|---|
-| **Demo video** | [pinpoint.qolso.com/media/pinpoint-demo.mp4](https://pinpoint.qolso.com/media/pinpoint-demo.mp4) · [GitHub release](RELEASE_URL) <!-- TODO(lead): replace RELEASE_URL with the release asset URL once the video is uploaded --> |
+| **Demo video** | [pinpoint.qolso.com/media/pinpoint-demo.mp4](https://pinpoint.qolso.com/media/pinpoint-demo.mp4) · [full quality on the release](https://github.com/sonozaki7/pinpoint/releases/download/v1.1.0/pinpoint-demo-final.mp4) |
 | **Site and simulator** | https://pinpoint.qolso.com |
 | **Cloud** | https://pinpoint-api.qolso.com |
 | **Tracks** | AI Assistants & Work (main) · Messaging & News (second) · Best Telegram integration |
@@ -21,7 +21,7 @@ Pinpoint shows only the work that needs you, sorts long output down to the decis
 | You have | Do this |
 |---|---|
 | **A browser** | Open https://pinpoint.qolso.com and use the simulator on the page: the real glasses app, a virtual R1 ring, real voice. It runs on a sample workspace, so nothing is needed from you. |
-| **A real G2** | Scan the QR at https://pinpoint.qolso.com/app/ with the Even app (Even Hub tab → developer section → Scan QR), or sideload the `.ehpk` from the [release](RELEASE_URL). Needs Even app 2.2.10 or newer, signed in at hub.evenrealities.com. The glasses start on a private sample workspace. |
+| **A real G2** | Scan the QR at https://pinpoint.qolso.com/app/ with the Even app (Even Hub tab → developer section → Scan QR), or sideload the `.ehpk` from the [release](https://github.com/sonozaki7/pinpoint/releases/tag/v1.1.0). Needs Even app 2.2.10 or newer, signed in at hub.evenrealities.com. The glasses start on a private sample workspace. |
 | **Your own agents** | Desk pairing, three steps (details in [docs/desk-pairing.md](docs/desk-pairing.md)): |
 
 1. On your computer: `cd apps/server && npm install && npm run desk`. It prints a one-time pairing code such as `K7Q4-2MXP`.
@@ -71,9 +71,9 @@ Both audiences use the same screens. The cloud sample serves a default `mixed` i
 | Integration | What Pinpoint does | How it was verified |
 |---|---|---|
 | **T3 Code** (0.1.11) | Reads threads that need you (plan, question, failed run, report). Sends your review as a normal message. Answers agent questions. Never approves shell commands. | Live thread reviewed from the official simulator on Nov 24: open to send **20.4 s**, 2 notes, the agent replied **7.3 s** later ([docs/recording-log.md](docs/recording-log.md), measured on the earlier flow, before the gesture budget). Splitter: 5/5 exact quotes on a real reply, 30/30 across the run ([docs/live-run.md](docs/live-run.md)). |
-| **Notion** | Review pages marked `Needs review`. Each note becomes a **comment on the exact block**; the page status moves to `Changes requested` or `Approved`. | Real block-comment round trip on a real workspace, Nov 27 (screenshot: `demo/recordings/notion-launch-comment.png`). Connector unit tests use a mocked `fetch` ([docs/connectors.md](docs/connectors.md)). |
-| **Gmail drafts** | Reads a draft that already exists (label `pinpoint`). A spoken fix edits **one sentence in place**; send sends that draft. Scope is `gmail.modify` only. | Real draft edited and sent end to end on Nov 27 (screenshot: `demo/recordings/gmail-sent-net45.png`). Tests mock `fetch`. Google consent screen is in Testing mode, so your own desk needs your own OAuth client. |
-| **Telegram** | One topic per task. One notifying card with buttons, the full text collapsed, one **quote-reply per note on the exact sentence**, a receipt with links. Gmail send asks for confirmation on the phone first. | Real bot, private forum group (screenshots: `demo/recordings/telegram-*.png`); `scripts/telegram-verify.mjs` reproduces it. Dry-run mode runs the same code with no bot ([docs/telegram-setup.md](docs/telegram-setup.md)). |
+| **Notion** | Review pages marked `Needs review`. Each note becomes a **comment on the exact block**; the page status moves to `Changes requested` or `Approved`. | Real block-comment round trip on a real workspace, Nov 27 (screenshot: [`demo/film/public/proof/notion-comment.png`](demo/film/public/proof/notion-comment.png)). Connector unit tests use a mocked `fetch` ([docs/connectors.md](docs/connectors.md)). |
+| **Gmail drafts** | Reads a draft that already exists (label `pinpoint`). A spoken fix edits **one sentence in place**; send sends that draft. Scope is `gmail.modify` only. | Real draft edited and sent end to end on Nov 27 (screenshot: [`demo/film/public/proof/gmail-sent.png`](demo/film/public/proof/gmail-sent.png)). Tests mock `fetch`. Google consent screen is in Testing mode, so your own desk needs your own OAuth client. |
+| **Telegram** | One topic per task. One notifying card with buttons, the full text collapsed, one **quote-reply per note on the exact sentence**, a receipt with links. Gmail send asks for confirmation on the phone first. | Real bot, private forum group (screenshots: [`demo/film/public/proof/telegram-v2-*.png`](demo/film/public/proof/)); `scripts/telegram-verify.mjs` reproduces it. Dry-run mode runs the same code with no bot ([docs/telegram-setup.md](docs/telegram-setup.md)). |
 | **DeepSeek API** | The reviewer model on the desk: sorts output into points, flags what needs you, phrases Ask answers, and rewrites one sentence only when the deterministic edit rules cannot. | Every quote and every Ask answer is checked against the source text; a line that cannot be matched is repaired or dropped. The cloud sample uses fixed decks and retrieves the exact sentence; it phrases that answer with DeepSeek only while its small daily budget allows. |
 | **Whisper** | Speech to text. Cloud sample: whisper.cpp on the Pinpoint Cloud server. Paired desk: transcribed on your computer. | Used in the simulator and the website; ~1.8 s on the cloud at deploy. |
 
@@ -176,7 +176,7 @@ npm --prefix apps/web run dev # the website and simulator
 cd apps/server && npm run desk  # pair your own computer (live mode needs T3_PROJECTS in .env)
 ```
 
-Current check results: **340 server tests in 24 files**, **116 glasses tests**, **1 browser and SDK-transport check**, and **14 fixture decks (82 points, 1,564 quote and layout checks)**. The packaged device build is `apps/glasses/pinpoint.ehpk` (80,086 bytes).
+Current check results: **340 server tests in 24 files**, **118 glasses tests**, **1 browser and SDK-transport check**, and **14 fixture decks (82 points, 1,564 quote and layout checks)**. The packaged device build is `apps/glasses/pinpoint.ehpk` (80,184 bytes).
 
 Official simulator, second terminal: `npm --prefix apps/glasses run simulator -- http://127.0.0.1:4173`. Live mode, connectors and Telegram setup: [docs/connectors.md](docs/connectors.md), [docs/telegram-setup.md](docs/telegram-setup.md), [docs/t3-api-notes.md](docs/t3-api-notes.md). Glasses app details: [apps/glasses/README.md](apps/glasses/README.md). Cloud server: [apps/server/CLOUD.md](apps/server/CLOUD.md).
 
