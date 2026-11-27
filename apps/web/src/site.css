@@ -585,9 +585,9 @@ section.statement, section.everyone, section.device { padding: clamp(80px, 12vw,
 .ring-hit {
   position: absolute;
   left: 22%;
-  top: 14%;
+  top: 0;
   width: 56%;
-  height: 62%;
+  height: 65%;
   border-radius: 40%;
   cursor: grab;
   touch-action: none;
@@ -596,10 +596,35 @@ section.statement, section.everyone, section.device { padding: clamp(80px, 12vw,
 }
 .ring-hit:active { cursor: grabbing; }
 .ring-hit:focus-visible { outline: 1px dashed rgba(141, 255, 181, 0.18); outline-offset: 0; }
+.ring-hint {
+  display: none;
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  top: 10%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: min(360px, calc(100vw - 32px));
+  padding: 7px 12px;
+  border-radius: 10px;
+  background: rgba(4, 11, 7, 0.72);
+  border: 1px solid rgba(var(--g), 0.28);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.45;
+  letter-spacing: 0.02em;
+  text-align: center;
+  color: rgba(var(--g), 0.95);
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+}
+.hint-tail { white-space: nowrap; }
 .hand-cap {
   position: absolute;
   left: calc(100% + 6px);
-  top: 26%;
+  top: 4%;
   white-space: nowrap;
   font-family: var(--mono);
   font-size: 11.5px;
@@ -772,13 +797,82 @@ section.statement, section.everyone, section.device { padding: clamp(80px, 12vw,
   .hold-menu { right: 8px; bottom: 8px; min-width: 150px; font-size: 12px; }
 }
 
-@media (hover: none) { .pov-keys { display: none; } }
+/*
+ * Phones, portrait: one vertical composition. The guide, display, switches and
+ * hand are a single flex column, so the hand fills the space left under the
+ * display instead of leaving a dead band of background between them.
+ */
+@media (max-width: 720px) and (orientation: portrait) {
+  .pov { display: flex; flex-direction: column; align-items: center; }
+  .pov-guide {
+    position: relative;
+    top: auto;
+    left: auto;
+    transform: none;
+    flex: none;
+    width: calc(100vw - 28px);
+    margin: max(58px, calc(env(safe-area-inset-top) + 50px)) auto 0;
+    font-size: 15.5px;
+  }
+  .lens-wrap {
+    position: relative;
+    top: auto;
+    left: auto;
+    transform: none;
+    flex: none;
+    width: calc(100vw - 12px);
+    margin: 10px auto 0;
+  }
+  .lens-pane { border-radius: 12px; }
+  .lens-tools { margin-top: 8px; padding-inline: 6px; }
+  .hand-wrap {
+    position: relative;
+    left: auto;
+    bottom: auto;
+    transform: none;
+    flex: 1 1 0;
+    min-height: 0;
+    width: auto;
+    max-height: 109.375vw; /* 175vw wide, keeping the 8 / 5 hand crop */
+    aspect-ratio: 8 / 5;
+    align-self: center;
+    margin-top: auto;
+  }
+  .hand { position: absolute; inset: 0; }
+  .hand-svg { width: 100%; height: 100%; }
+  .ring-hit { left: 24%; top: 0; width: 52%; height: 46%; border-radius: 36%; }
+  .ring-hint { top: 34%; }
+  .hand-cap {
+    left: 50%;
+    top: 34%;
+    transform: translate(-50%, 4px);
+    max-width: calc(100vw - 24px);
+    padding: 5px 9px;
+    border-radius: 8px;
+    background: rgba(4, 11, 7, 0.68);
+    border: 1px solid rgba(var(--g), 0.22);
+    white-space: nowrap;
+    text-align: center;
+  }
+  .hand-cap.is-on { transform: translate(-50%, 0); }
+  .pov-toast { top: auto; bottom: max(14px, env(safe-area-inset-bottom)); }
+}
+
+@media (hover: none), (pointer: coarse) { .pov-keys { display: none; } }
+
+/* The ring is the control on touch; say so once, next to the ring. */
+@media (hover: none) and (pointer: coarse) {
+  .ring-hint { display: block; }
+  .ring-hint.is-gone { display: none; }
+}
 
 @media (max-height: 640px) and (orientation: landscape) {
   .pov-guide { top: 46px; font-size: 15px; }
   .lens-wrap { top: 84px; width: min(520px, 52vw); left: 30%; }
   .hand-wrap { left: auto; right: 3vw; transform: none; width: 220px; }
   .hand-cap { display: none; }
+  /* No room for a second label beside the lens in short landscape. */
+  .ring-hint { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -50,6 +50,7 @@ const el = {
   typeInput: $("#type-input") as HTMLInputElement,
   typeStatus: $("#type-status"),
   ring: $("#ring") as HTMLButtonElement,
+  ringHint: $("#ring-hint"),
   hand: $("#hand"),
   handCap: $("#hand-cap"),
   toast: $("#toast"),
@@ -98,6 +99,8 @@ let lastDoubleAt = 0;
 let clockTimer: ReturnType<typeof setTimeout> | undefined;
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 let resultTimer: ReturnType<typeof setTimeout> | undefined;
+let resizeTimer: ReturnType<typeof setTimeout> | undefined;
+let ringHintSeen = false;
 let sent: Sent | null = null;
 let usedHold = false;
 
@@ -341,6 +344,10 @@ function persistSoon(): void {
 
 async function handleGesture(gesture: Gesture): Promise<void> {
   if (!povOpen) return;
+  if (!ringHintSeen) {
+    ringHintSeen = true;
+    el.ringHint.classList.add("is-gone");
+  }
   hand.play(gesture);
   announce({ up: "Scrolled up", down: "Scrolled down", tap: "Tap", double: "Double-tap", hold: "Hold" }[gesture]);
 
@@ -1172,6 +1179,14 @@ window.addEventListener("keydown", (event) => {
   if (!action) return;
   event.preventDefault();
   void handleGesture(action);
+});
+
+// The panel's drawn type size depends on its rendered width, so redraw when a
+// rotated phone (or a resized desktop window) changes the layout.
+window.addEventListener("resize", () => {
+  if (!povOpen) return;
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => render(), 120);
 });
 
 document.addEventListener("visibilitychange", () => {

@@ -91,6 +91,8 @@ export class LensPainter {
   readonly canvas: HTMLCanvasElement;
   private readonly ctx: CanvasRenderingContext2D;
   private page: PageModel | null = null;
+  private compact = false;
+  private secondary = 13;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -108,6 +110,16 @@ export class LensPainter {
 
   draw(page: PageModel): void {
     this.page = page;
+    // On a phone the whole 576-wide screen is squeezed into ~380 CSS px, so
+    // the 12–13 px secondary lines would land near 8 px. Bump just those two
+    // lines when the rendered panel is small; the desktop panel is unchanged.
+    const cssWidth = this.canvas.getBoundingClientRect().width;
+    this.compact = cssWidth > 0 && cssWidth < 500;
+    // 19 units is ~11.5 CSS px at 348 px wide; on anything narrower (small
+    // phones) raise it just enough to stay near 11 CSS px, capped at 21.
+    this.secondary = this.compact
+      ? Math.min(21, Math.max(19, (11 * W) / Math.max(cssWidth, 1)))
+      : 13;
     const ctx = this.ctx;
     ctx.save();
     ctx.setTransform(SCALE, 0, 0, SCALE, 0, 0);
@@ -118,7 +130,7 @@ export class LensPainter {
 
     this.drawHeader(page);
 
-    let y = page.subtitle ? 82 : 60;
+    let y = page.subtitle ? (this.compact ? 86 : 82) : 60;
     if (page.list && page.list.length > 0) {
       // Five rows fit; the window follows the cursor, as the native list does.
       const focus = page.listFocus ?? 0;
@@ -147,9 +159,10 @@ export class LensPainter {
     }
 
     ctx.shadowBlur = 0;
-    ctx.font = `400 12px ${FONT}`;
+    const footerSize = this.secondary;
+    ctx.font = `400 ${footerSize}px ${FONT}`;
     ctx.fillStyle = `rgba(${GREEN_FAINT}, 0.92)`;
-    ctx.fillText(fit(ctx, page.footer, 530), 22, 280);
+    ctx.fillText(fit(ctx, page.footer, 530), 22, this.compact ? 282 : 280);
     ctx.restore();
   }
 
@@ -159,9 +172,10 @@ export class LensPainter {
     ctx.fillStyle = `rgba(${GREEN}, 0.98)`;
     ctx.fillText(fit(ctx, page.title, 532), 22, 30);
     if (page.subtitle) {
-      ctx.font = `400 13px ${FONT}`;
-      ctx.fillStyle = `rgba(${GREEN_DIM}, 0.82)`;
-      ctx.fillText(fit(ctx, page.subtitle, 532), 22, 51);
+      const size = this.compact ? this.secondary : 13;
+      ctx.font = `400 ${size}px ${FONT}`;
+      ctx.fillStyle = `rgba(${GREEN_DIM}, ${this.compact ? 0.9 : 0.82})`;
+      ctx.fillText(fit(ctx, page.subtitle, 532), 22, this.compact ? 56 + Math.max(0, size - 19) : 51);
     }
   }
 
