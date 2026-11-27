@@ -53,7 +53,7 @@ export interface PinpointApi {
 
 export const LOCAL_SERVER = "http://127.0.0.1:8787";
 /** Keep in sync with app.json and package.json. */
-export const APP_VERSION = "1.0.0";
+export const APP_VERSION = "1.1.0";
 
 const env = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env ?? {};
 export const DEVICE_BUILD = env.MODE === "evenhub";

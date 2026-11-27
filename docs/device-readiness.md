@@ -19,12 +19,12 @@ Terms used below: **whitelist** = the per-app list of allowed server origins in 
 | # | Item | Verdict | Fix | Primary location |
 |---|---|---|---|---|
 | 1 | Network whitelist + CORS | **RISK** | Whitelist entry is right, but every request now carries `X-Pinpoint-Device`, so **every** call preflights. Server must answer `OPTIONS` with `Access-Control-Allow-Origin: *` **and** `Access-Control-Allow-Headers: content-type, x-pinpoint-device`. Verify with the curl in §1.3. | `apps/glasses/src/api.ts:93`, `apps/glasses/app.json:12` |
-| 2 | How a judge installs it | **RISK** | No judge-facing install path exists in the README, and `…/app/` is not deployed. Ship a **beta build** (best: lock-survival + glasses-menu entry); keep QR as the 60-second fallback. Store review is not viable before Dec 3. | `apps/glasses/README.md` (Permissions and packaging) |
+| 2 | How a judge installs it | **RISK** | README has a judge-facing install path and `…/app/` is deployed. A QR sideload still stops when the phone locks, so ship a **beta build** (best: lock-survival + glasses-menu entry); keep QR as the 60-second fallback. Store review is not viable before Dec 3. | `apps/glasses/README.md` (Permissions and packaging) |
 | 3 | Input on hardware | **RISK → BROKEN if taps carry no `eventSource`** | Default `sysEvent` with a missing `eventType` to CLICK **inside** the envelope check, as the official ASR template does. Also handle LONG_PRESS (9/10) and SYSTEM_EXIT/ABNORMAL_EXIT (6/7). Swipe on the review screen is unproven (see §3.4). | `apps/glasses/src/events.ts:38` |
 | 4 | Audio | **OK, one gap** | Format, ordering and cap are right. Add: abort the recording state on `FOREGROUND_EXIT`, re-arm nothing but clear `recordingStartedAt` on `FOREGROUND_ENTER`. | `apps/glasses/src/even.ts:310`, `src/main.ts:233` |
 | 5 | Lifecycle + storage | **BROKEN (one path)** | Cancelling the system exit dialog leaves the glasses **blank** — the host clears the page, our signature cache says "nothing changed", so nothing is repainted. Force one rebuild on the next foreground event after `shutDownPageContainer(1)`. | `apps/glasses/src/even.ts:266`, `:302` |
 | 6 | Display / pixel fit | **BROKEN (2 overflows)** | (a) The 3-option pane needs 81 px, the container allows 80 → the third option is clipped. (b) 62-char inbox rows measure up to 564 px in a 476 px item → clipped. (c) The 44-char cap wastes 30–43 % of every row and shrinks `login-fix` to `log...`. | `apps/glasses/src/even.ts:82`, `src/display.ts:7-9` |
-| 7 | Packaging / store | **RISK** | Repacked at 00:25 by a concurrent session (54,599 bytes) — confirm the version stamped inside matches `app.json` 1.0.0. No 24×24 icon, no listing text or privacy policy, and the whitelist still carries two dead `127.0.0.1` entries. | `apps/glasses/pinpoint.ehpk`, `app.json:14-15` |
+| 7 | Packaging / store | **RISK** | The current package is 80,086 bytes — confirm the version stamped inside matches `app.json` 1.1.0. The 24×24 icon, listing text and privacy page exist; the whitelist still carries two dead `127.0.0.1` entries. | `apps/glasses/pinpoint.ehpk`, `app.json:14-15` |
 | 8 | "Test like a reviewer" | **RISK** | 5-minute lock test, exit-dialog cancel, permission denial, first-run-from-glasses and clean console are all untested on an installed build. | §8 |
 | — | Inbox tap can open the wrong row | **RISK** | A list click that omits `currentSelectItemIndex` (documented for item 0) leaves `state.inboxFocus` stale, and the tap opens that stale index instead of the highlighted row. | `apps/glasses/src/model.ts:504` |
 
@@ -385,11 +385,11 @@ Required by the schema (`main.js`, mirrored in [Packaging](https://hub.evenreali
 
 Not in `app.json`: **icon, tagline, description, category, screenshots, privacy policy**. Those live in the portal (or `evenhub create/update`): name 1–20, tagline 1–50, description 1–2000, icon **exactly 24×24 PNG**, every visible pixel opaque `#F4F4F4`, lit pixels must form complete 2×2 blocks (CLI `pl()` validation). `min_app_version` is derived at pack time from the SDK (`minAppVersion: "2.2.10"` in `even_hub_sdk@0.0.16`), so **judges must run Even app ≥ 2.2.10** or the app is blocked at open.
 
-Our `app.json`: package id valid, edition valid, name valid, version `1.0.0`, `min_sdk_version 0.0.16`, permissions used and described, `supported_languages ["en"]`. Two cleanups: drop the two `127.0.0.1` whitelist entries (dead on a phone; they read as "this only works with a laptop"), and keep the network `desc` honest about the cloud (it already is in the current file).
+Our `app.json`: package id valid, edition valid, name valid, version `1.1.0`, `min_sdk_version 0.0.16`, permissions used and described, `supported_languages ["en"]`. Two cleanups: drop the two `127.0.0.1` whitelist entries (dead on a phone; they read as "this only works with a laptop"), and keep the network `desc` honest about the cloud (it already is in the current file).
 
 ### 7.2 Size limits
 
-Hard CLI cap on upload: **100 MiB** for `.ehpk`, 1 MiB for the icon. Practical cap per the FAQ: **~10 MB** — "larger packages still upload but degrade install UX over BLE". Our package is ~55 kB. Not a concern.
+Hard CLI cap on upload: **100 MiB** for `.ehpk`, 1 MiB for the icon. Practical cap per the FAQ: **~10 MB** — "larger packages still upload but degrade install UX over BLE". Our package is ~80 kB. Not a concern.
 
 ### 7.3 What the reviewer actually checks (and where we stand)
 
@@ -399,12 +399,12 @@ From [App Submission & QA](https://hub.evenrealities.com/docs/ship/app-submissio
 |---|---|
 | Manifest validity, name ≤ 20 and no "Even" | pass |
 | **Every declared permission is used** | pass (`network`, `g2-microphone` both used) |
-| Icon legible, 24×24, 1-bit, 2×2 blocks, foreground **and** background supplied | **fail — no icon asset exists in the repo** |
+| Icon legible, 24×24, 1-bit, 2×2 blocks, foreground **and** background supplied | pass — `apps/glasses/icon-24.png` is 24×24, one color, 2×2 blocks (tested) |
 | Screenshots must come from the simulator, 576×288, monochrome | **partial** — 14 simulator captures exist in `demo/shots/` (`glasses-01-inbox.png` …), but no curated listing set at the store's aspect and density |
 | Display name matches `app.json` and the on-glasses name | pass ("Pinpoint") |
-| Privacy policy covers every permission | **missing**; and "backend service domains … documented and traceable to the developer" → document `pinpoint-api.qolso.com` |
+| Privacy policy covers every permission | present at `/privacy.html` and `docs/privacy.md`; link it in the listing and name `pinpoint-api.qolso.com` |
 | No black screen on first run | pass (we paint "Checking your agents…" before the inbox lands) |
-| CORS correctly configured on the API | **unverified** (§1.3) |
+| CORS correctly configured on the API | pass — `OPTIONS /api/inbox` returns `access-control-allow-origin: *` and `x-pinpoint-device` (checked Nov 27) |
 | Root double-tap → system exit dialog (#1 rejection cause) | pass (`model.ts:549` → `even.ts:302`, mode 1) |
 | Locked-phone: renders, core flow on glasses + ring, 2 min idle alive | **untested**; Private builds "don't pass the 5-minute lock test", so this needs a beta build |
 | After confirming exit, the phone-side WebView closes | not verifiable from the app side |
@@ -413,7 +413,7 @@ From [App Submission & QA](https://hub.evenrealities.com/docs/ship/app-submissio
 
 ### 7.4 Ship-state hygiene
 
-- `apps/glasses/pinpoint.ehpk` was repacked at 00:25 (54,599 bytes) and `dist-even/` rebuilt at the same time, so the artifact is current. Confirm the version **inside** the package is `1.0.0` (the CLI prints the manifest it stamps), and repack again if anyone touches `app.json` or `display.ts` afterwards — an `.ehpk` carrying the old `127.0.0.1`-only whitelist looks exactly like "the backend is broken".
+- `apps/glasses/pinpoint.ehpk` was repacked for v1.1.0 (80,086 bytes) and `dist-even/` rebuilt at the same time, so the artifact is current. Confirm the version **inside** the package is `1.1.0` (the CLI prints the manifest it stamps), and repack again if anyone touches `app.json` or `display.ts` afterwards — an `.ehpk` carrying the old `127.0.0.1`-only whitelist looks exactly like "the backend is broken".
 - Never bundle keys: "anyone can extract its contents". Our device id is generated on device (`device.ts`), no secret in the bundle — good.
 
 ---

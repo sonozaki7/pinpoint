@@ -27,7 +27,7 @@ Every claim below is checked against [device-readiness.md](device-readiness.md),
 
 ## 4. Even Hub SDK: rich text and range emphasis in a text container
 
-- **Problem:** brightness is per container (`textColor` 0–4), a page holds at most 8 text containers, and one font is available. To mark "this is the sentence the answer comes from" inside a paragraph, we need one container per sentence or a full rebuild that flashes. Pinpoint's review page already sits at exactly 8 containers, so it cannot grow.
+- **Problem:** brightness is per container (`textColor` 0–4), a page holds at most 8 text containers, and one font is available. To mark "this is the sentence the answer comes from" inside a paragraph, we need one container per sentence or a full rebuild that flashes. Pinpoint's review page already uses seven of its eight containers, with one per visible row, so it cannot add range emphasis without rebuilding.
 - **Proposal:** `textContainerUpgrade` with `ranges: [{ start, length, emphasis: "invert" | "bright" | "dim" }]`, plus `scrollToRange(containerID, start)`. A bold weight or a larger size for one line would also remove a dependence on drawing symbols.
 - **Benefit:** the cited sentence stays visible in its paragraph, with fewer containers, no rebuild flicker (≈165 ms each) and a layout that does not jump while the user swipes.
 - **Evidence:** [device-readiness.md](device-readiness.md) §6.5 (container budget, rebuild versus upgrade timings, brightness range); Even Display docs.

@@ -57,15 +57,17 @@ and keep it in SDK storage.
 
 Each UUID gets a private sample workspace:
 
-- Inbox order comes from `demo/sample/workspace.json` (`login-fix`,
-  `payment-upgrade`, `inbox-morning`); decks are the verified fixture decks, so
-  every thread is ready immediately.
+- Inbox order comes from `demo/sample/workspace.json` for the chosen story:
+  `mixed` by default (login-fix, saturday-plan, flight-price, landlord-reply,
+  launch-post), or `developer` / `everyday` via `X-Pinpoint-Sample`. Decks are
+  the verified fixture decks, so every thread is ready immediately, and unseen
+  "Since you looked" lines appear first.
 - Saving a review, sending it, the inbox status and the sample agent's reply are
   all scoped to that UUID. Sending a review removes the thread; after
   `PINPOINT_SAMPLE_REPLY_MS` (default 5000 ms) the agent replies under the same
   title as a report, and that reply has its own 1–4 point deck.
-- `POST /api/sample/reset` (204) restores the three starting threads and
-  cancels a pending reply.
+- `POST /api/sample/reset` (204) restores the story's starting threads and
+  cancels pending replies and tasks.
 - `GET /api/health` returns `workspace: "sample"` and `pairing: true`.
 
 ### Paired to a desk

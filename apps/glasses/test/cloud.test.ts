@@ -24,7 +24,7 @@ function sampleState(): State {
     demo: false,
     cloud: true,
     workspace: "sample",
-    serverVersion: "1.0.0",
+    serverVersion: "1.1.0",
   };
 }
 

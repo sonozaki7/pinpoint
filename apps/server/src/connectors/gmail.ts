@@ -99,7 +99,7 @@ export class GmailConnector implements MailConnector, DraftConnector {
         const mapped = mapThread(full, entry.id);
         if (mapped) threads.push(mapped);
       } catch (error) {
-        // One malformed thread must not hide the rest of the morning brief.
+        // One malformed thread must not hide the rest of the inbox.
         if (threads.length === 0 && entries.length === 1) throw error;
       }
       if (threads.length >= max) break;

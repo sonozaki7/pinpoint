@@ -103,7 +103,7 @@ Permission approvals (`kind === 'command'`) are out of scope; Even's Terminal Mo
 - Input: the source text (markdown). Output: `Point[]` (zod-validated JSON).
 - Prompt rules: 4–10 points; for plans, one point per step, in order; `glance` ≤ 44 chars, plain ASCII (no emoji, no markdown) because the G2 font is limited; `quote` = verbatim substring of the source, ≤ 200 chars, copied exactly; questions get 2–4 `options` (≤ 24 chars, recommended first); mark destructive or irreversible steps `risk: 'high'`; `kind` from `step | claim | question | risk | draft`.
 - **Quote verification:** keep a point only if its quote is found in the source (exact, then whitespace/markdown-normalized). Otherwise replace it with the best-matching source sentence, or drop the point. Never invent text.
-- Providers via `SPLITTER_PROVIDER`: `opencode` (default: spawn `opencode run` with model `opencode-go/deepseek-v4.1-flash`), `anthropic` (`ANTHROPIC_API_KEY`), `openrouter` (`OPENROUTER_API_KEY`), `fixture` (precomputed decks in `demo/fixtures`). 60 s timeout; fallback is a naive sentence/list split.
+- Reviewer providers: DeepSeek wins when `DEEPSEEK_API_KEY` is set; otherwise `SPLITTER_PROVIDER=opencode` (default: spawn `opencode run` with model `opencode-go/deepseek-v4.1-flash`), `anthropic` (`ANTHROPIC_API_KEY`), or `fixture` (precomputed decks in `demo/fixtures`). 60 s timeout; fallback is a naive sentence/list split. There is no OpenRouter path.
 - Cache decks in memory plus `apps/server/.data/decks/*.json`, keyed by `sourceMessageId`. Pre-build decks as soon as a thread enters the inbox, so opening one is instant.
 
 ## 8. Composer (`src/core/composer`, deterministic, no LLM)

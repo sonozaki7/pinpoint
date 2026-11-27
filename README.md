@@ -4,9 +4,9 @@
 
 Pinpoint shows only the work that needs you, sorts long output down to the decisions, and lets you point at the exact line with the ring and say the fix. Silence means agree. Your words land where they belong: the agent thread, a Notion comment on the exact block, the Gmail sentence edited in place, a Telegram quote-reply.
 
-[![Pinpoint review screen in the Even Hub simulator](demo/shots/glasses-02-review.png)](https://pinpoint.qolso.com/media/pinpoint-demo.mp4)
+[![Pinpoint inbox in the website simulator](docs/media/pinpoint-inbox.png)](https://pinpoint.qolso.com/media/pinpoint-demo.mp4)
 
-*Simulator capture, not physical glasses.*
+*The website simulator with the real glasses app: the status line, one inbox across agents, Notion and Gmail, and "Since you looked". Not physical glasses.*
 
 | | |
 |---|---|
@@ -45,10 +45,10 @@ Pinpoint is built around the opposite rule. It never writes anything from nothin
 | # | Capability | What you see | Gestures |
 |---|---|---|---|
 | 1 | **Glance status and "Since you looked"** | One line across every agent: `2 need you · 3 working · 4 done today`. A catch-up item lists one line per update since you last looked. | 0 to read; tap a catch-up line to open it |
-| 2 | **Sorted to the decisions** | A long plan becomes `7 steps · 1 needs you`. The flagged line says why, grounded in your own text: `Your notes say net-45 (Acme, Nov 12)`. A step that changed since your last review is marked. Opening an item puts the cursor on the first flagged line. | 0 scrolls to reach the flagged line |
+| 2 | **Sorted to the decisions** | A long plan becomes `7 steps · 1 needs you`. The flagged line says why, grounded in your own text: `Can't be undone: every customer must sign in again`. A step that changed since your last review is marked. Opening an item puts the cursor on the first flagged line. | 0 scrolls to reach the flagged line |
 | 3 | **Point and say the fix** | Ring swipe to the line, tap, say one sentence, it stops on its own. Silence on every other line means agree. A draft sentence shows the new text in place (`Now: …`). | One flagged mistake: **3 taps + 1 voice** (phone: 10+ taps and typing). Agent question: 2 taps |
 | 4 | **Ask** | Hold menu → Ask → say a question. The answer is one short line plus the **exact sentence** from the source that supports it, and jumps to that line. With no good match it says so. | Hold, tap, 1 voice |
-| 5 | **Hand off a new task by voice** | "Find a dentist open Saturday…" starts a real agent in an allowed T3 Code project. It appears in your inbox only when it needs you. | Hold, tap, 1 voice <!-- TODO(lead): verify "New task" is in the glasses hold menu and /api/task is on the desk; shared/contract.ts defines TaskResult, but at the time of writing apps/server had no /api/task route --> |
+| 5 | **Hand off a new task by voice** | "Find a dentist open Saturday…" starts a real agent in an allowed T3 Code project. It appears in your inbox only when it needs you. | Hold, tap, 1 voice |
 
 Send is a 5 second **"Sending… tap to undo"** countdown, not a second confirmation screen. After a send, the app returns to the next item that needs you.
 
@@ -62,9 +62,9 @@ Full gesture budgets per flow, with the phone comparison: [docs/ux-budget.md](do
 
 **Everyday people** who have an assistant doing errands and drafts: a Saturday plan, a reply to the landlord, the school newsletter.
 
-> In the sample workspace (a freelancer's version of the same idea): an assistant drafted a six-sentence reply to Priya about an invoice. One sentence says "net-60", but the freelancer's own notes say net-45 (flagged, with that evidence). You say "net-45, not net-60". The sentence changes in place, shown on the glasses, and the draft sends after the undo countdown. A landlord or school email works the same way; those are intended uses, not sample content yet.
+> In the sample workspace (a freelancer's version of the same idea): an assistant drafted a six-sentence reply to Priya about an invoice. One sentence says "net-60", but the freelancer's own notes say net-45 (flagged, with that evidence). You say "net-45, not net-60". The sentence changes in place, shown on the glasses, and the draft sends after the undo countdown. The everyday story also includes a landlord reply and a school newsletter page.
 
-Both audiences use the same screens. The cloud sample can serve a `developer`, `everyday` or `mixed` inbox (`X-Pinpoint-Sample` header in [shared/contract.ts](shared/contract.ts)). <!-- TODO(lead): verify the persona header is implemented in apps/server/src/cloud and that the sample inbox has everyday items (landlord, Saturday plan, school newsletter) before keeping those words -->
+Both audiences use the same screens. The cloud sample serves a default `mixed` inbox and two focused stories, `developer` and `everyday` (`X-Pinpoint-Sample` header in [shared/contract.ts](shared/contract.ts)); the glasses hold menu can switch between all three.
 
 ## Integrations: what is real, and how it was checked
 
@@ -74,7 +74,7 @@ Both audiences use the same screens. The cloud sample can serve a `developer`, `
 | **Notion** | Review pages marked `Needs review`. Each note becomes a **comment on the exact block**; the page status moves to `Changes requested` or `Approved`. | Real block-comment round trip on a real workspace, Nov 27 (screenshot: `demo/recordings/notion-launch-comment.png`). Connector unit tests use a mocked `fetch` ([docs/connectors.md](docs/connectors.md)). |
 | **Gmail drafts** | Reads a draft that already exists (label `pinpoint`). A spoken fix edits **one sentence in place**; send sends that draft. Scope is `gmail.modify` only. | Real draft edited and sent end to end on Nov 27 (screenshot: `demo/recordings/gmail-sent-net45.png`). Tests mock `fetch`. Google consent screen is in Testing mode, so your own desk needs your own OAuth client. |
 | **Telegram** | One topic per task. One notifying card with buttons, the full text collapsed, one **quote-reply per note on the exact sentence**, a receipt with links. Gmail send asks for confirmation on the phone first. | Real bot, private forum group (screenshots: `demo/recordings/telegram-*.png`); `scripts/telegram-verify.mjs` reproduces it. Dry-run mode runs the same code with no bot ([docs/telegram-setup.md](docs/telegram-setup.md)). |
-| **DeepSeek API** | The reviewer model on the desk: sorts output into points, flags what needs you, phrases Ask answers, and rewrites one sentence only when the deterministic edit rules cannot. | Every quote and every Ask answer is checked against the source text; a line that cannot be matched is repaired or dropped. The cloud sample uses fixed decks and deterministic retrieval. |
+| **DeepSeek API** | The reviewer model on the desk: sorts output into points, flags what needs you, phrases Ask answers, and rewrites one sentence only when the deterministic edit rules cannot. | Every quote and every Ask answer is checked against the source text; a line that cannot be matched is repaired or dropped. The cloud sample uses fixed decks and retrieves the exact sentence; it phrases that answer with DeepSeek only while its small daily budget allows. |
 | **Whisper** | Speech to text. Cloud sample: whisper.cpp on the Pinpoint Cloud server. Paired desk: transcribed on your computer. | Used in the simulator and the website; ~1.8 s on the cloud at deploy. |
 
 Pinpoint is not a Notion, Gmail or Telegram client. Each is a place your words are delivered, and a source of work to review.
@@ -123,7 +123,7 @@ Plain-language version: [docs/privacy.md](docs/privacy.md).
 | **Rate limits** | Cloud: 300 requests/min per IP, 120/min per device, 20 voice requests/min per device, 5 pairing attempts per 10 min. Bodies capped at 64 KB (JSON), 30 s of audio, 2 MB on the relay. |
 | **Scope** | Live mode reads only the T3 projects you list in `T3_PROJECTS`. Gmail scope is `gmail.modify` (no permanent delete). Pinpoint never approves command or permission prompts. |
 | **No replies from nothing** | Pinpoint reviews work that exists. Your spoken fix is applied by exact rules first ("net-45, not net-60"); only otherwise is one sentence rewritten, and the server checks that nothing else changed. |
-| **Undo** | 5 second undo before any send. Gmail from Telegram asks "Send to Priya as written?" first. A Notion review changes a status and adds comments; it deletes nothing. |
+| **Undo** | A send from the glasses has a 5 second undo. A Gmail send from Telegram asks "Send to Priya as written?" on the phone first. A Notion review changes a status and adds comments; it deletes nothing. |
 | **What leaves your computer** | The text under review goes to the DeepSeek API for sorting and Ask, and to your own private Telegram group if you enable it. See [docs/privacy.md](docs/privacy.md). |
 
 ## Business model
@@ -171,9 +171,12 @@ Node.js 22.13 or newer.
 ```sh
 npm run demo                  # demo server (8787) + glasses preview (4173), no keys needed
 npm run check                 # server tests, typecheck, glasses tests, build, UI check, fixture checker
+npm --prefix apps/glasses run pack  # build apps/glasses/pinpoint.ehpk (version 1.1.0)
 npm --prefix apps/web run dev # the website and simulator
 cd apps/server && npm run desk  # pair your own computer (live mode needs T3_PROJECTS in .env)
 ```
+
+Current check results: **340 server tests in 24 files**, **116 glasses tests**, **1 browser and SDK-transport check**, and **14 fixture decks (82 points, 1,564 quote and layout checks)**. The packaged device build is `apps/glasses/pinpoint.ehpk` (80,086 bytes).
 
 Official simulator, second terminal: `npm --prefix apps/glasses run simulator -- http://127.0.0.1:4173`. Live mode, connectors and Telegram setup: [docs/connectors.md](docs/connectors.md), [docs/telegram-setup.md](docs/telegram-setup.md), [docs/t3-api-notes.md](docs/t3-api-notes.md). Glasses app details: [apps/glasses/README.md](apps/glasses/README.md). Cloud server: [apps/server/CLOUD.md](apps/server/CLOUD.md).
 

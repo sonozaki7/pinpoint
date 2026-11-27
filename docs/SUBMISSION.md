@@ -12,13 +12,13 @@ The attention layer for your AI agents, on Even G2 + R1.
 
 (Alternative, 50 characters: *Point at the line. Say the fix. Silence agrees.*)
 
-## Short description (limit 300 words; about 290 words)
+## Short description (limit 300 words; 299 words)
 
-AI agents now do real work all day, but they still need a person several times a day. Their tools are text-heavy and offer approve or decline. With many projects running, you lose track, miss the moment an agent needs you, and miss the one wrong detail inside a plan you approved.
+AI agents do real work all day but still need a person several times a day. Their tools are text-heavy and offer approve or decline. With many projects running, you lose track, miss the moment an agent needs you, and miss the one wrong detail in a plan you approved.
 
-Pinpoint is the attention layer for your agents on Even G2 + R1. It shows only what needs you, with a glance status ("2 need you · 3 working") and a "since you looked" catch-up. It sorts long output down to the decisions: "7 steps · 1 needs you", with a grounded reason on the flagged line, such as "Your notes say net-45". You point at the exact line with the ring and say the fix. Silence means agree. You can ask a question and get the exact sentence that answers it, and hand off a new task by one spoken sentence.
+Pinpoint is the attention layer for your agents on Even G2 + R1. It shows only what needs you, with a glance status ("2 need you · 3 working") and a "since you looked" catch-up. It sorts long output down to the decisions: "7 steps · 1 needs you", with a grounded reason on the flagged line, such as "Can't be undone: every customer must sign in again". Point at the line with the ring and say the fix; silence means agree. Ask a question and get the exact source sentence; hand off a new task in one spoken sentence.
 
-Your words land where they belong: the agent's thread in T3 Code (Codex and Claude Code), a Notion comment on the exact block, the Gmail sentence edited in place, a Telegram quote-reply on the same sentence. Pinpoint never writes a reply from nothing; it reviews work that exists. Each flow takes fewer gestures than a phone, and tests enforce that: a flagged mistake takes 3 taps and 1 spoken sentence. Every send has a 5 second undo.
+Your words land where they belong: the agent's T3 Code thread (Codex or Claude Code), a Notion comment on the exact block, the Gmail sentence edited in place, a Telegram quote-reply. Pinpoint never writes a reply from nothing; it reviews work that exists. Each flow takes fewer gestures than a phone, and tests enforce that: a flagged mistake takes 3 taps and 1 spoken sentence. A send from the glasses has a 5 second undo; a Gmail send from Telegram asks for confirmation on the phone first.
 
 It works out of the box on a sample workspace through Pinpoint Cloud, and pairs with your own computer in three steps. It is for developers running agents across projects, and for anyone with an assistant drafting emails and plans.
 
@@ -51,7 +51,7 @@ https://pinpoint.qolso.com (the page includes a try-it simulator). Cloud API: ht
 
 ## App package
 
-`apps/glasses/pinpoint.ehpk`, also attached to the release: RELEASE_URL. Build it with `npm --prefix apps/glasses run pack`. Package id `com.sonozaki7.pinpoint`, version 1.0.0, SDK 0.0.16.
+`apps/glasses/pinpoint.ehpk`, also attached to the release: RELEASE_URL. Build it with `npm --prefix apps/glasses run pack`. Package id `com.sonozaki7.pinpoint`, version 1.1.0, SDK 0.0.16.
 
 ## How to test (for judges)
 
@@ -64,11 +64,11 @@ https://pinpoint.qolso.com (the page includes a try-it simulator). Cloud API: ht
 
 **Official Even Hub simulator:** `git clone https://github.com/sonozaki7/pinpoint && cd pinpoint && npm run demo`, then in a second terminal `npm --prefix apps/glasses run simulator -- http://127.0.0.1:4173`. Needs Node.js 22.13 or newer. No keys.
 
-**Real G2:** scan the QR at https://pinpoint.qolso.com/app/ from the Even app's Even Hub tab (developer section → Scan QR), or load the `.ehpk`. Needs Even app 2.2.10 or newer, with your Even account signed in at hub.evenrealities.com and the app restarted once. QR builds stop when the phone locks (Even's documented dev-mode limit); keep the phone awake. The app starts on its own sample workspace through Pinpoint Cloud, so nothing else is needed. <!-- TODO(lead): verify https://pinpoint.qolso.com/app/ serves the glasses build and the packaged whitelist matches before submit -->
+**Real G2:** scan the QR at https://pinpoint.qolso.com/app/ from the Even app's Even Hub tab (developer section → Scan QR), or load the `.ehpk`. Needs Even app 2.2.10 or newer, with your Even account signed in at hub.evenrealities.com and the app restarted once. QR builds stop when the phone locks (Even's documented dev-mode limit); keep the phone awake. The app starts on its own sample workspace through Pinpoint Cloud, so nothing else is needed.
 
 **With your own agents:** `cd apps/server && npm install && npm run desk`, then enter the printed code in the Pinpoint phone page (**Connect your computer**). See [desk-pairing.md](desk-pairing.md). Needs T3 Code running and `T3_PROJECTS` set; Notion and Gmail need your own tokens ([connectors.md](connectors.md)).
 
-**Automated checks:** `npm run check`. <!-- TODO(lead): fill in final test counts after the last commit (apps/server vitest, apps/glasses node test) -->
+**Automated checks:** `npm run check` passes: 340 server tests in 24 files, 116 glasses tests, the browser and SDK-transport check, and 14 fixture decks (82 points, 1,564 quote and layout checks). The package command `npm --prefix apps/glasses run pack` builds `apps/glasses/pinpoint.ehpk` (80,086 bytes).
 
 ## Team
 
@@ -96,7 +96,7 @@ Short form for the form field; full text in [FEATURE_REQUESTS.md](FEATURE_REQUES
 |---|---|
 | Category / tags | AI, Productivity, Telegram, Notion, Gmail, AI agents, Voice |
 | Logo | `brand/pinpoint-avatar-512.png` (24×24 Hub icon: `apps/glasses/icon-24.png`) |
-| Cover image | `apps/site/media/og.png` (1200×630) <!-- TODO(lead): confirm this is the final cover image --> |
+| Cover image | `apps/site/media/og.png` (1200×630) |
 | Screenshots | 3 from `demo/shots/` (inbox, review, note), 1 Telegram topic (`demo/recordings/telegram-v2-card.png`), 1 Notion comment (`demo/recordings/notion-launch-comment.png`) |
 | License | MIT |
 | Contact | Discord (see checklist) |

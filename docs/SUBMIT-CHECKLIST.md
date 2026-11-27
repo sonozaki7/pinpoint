@@ -48,10 +48,10 @@ Post in the hackathon Discord, in the channel for rules or eligibility questions
 
 ## 3. Even developer portal: upload a beta build (15 to 20 minutes, optional but recommended)
 
-The reason: a beta build is the only install that **survives a locked phone** and appears on the glasses menu. A QR sideload stops when the phone locks ([device-readiness.md](device-readiness.md) §2). Store review has no published turnaround, so do not wait on it. Menu names below come from Even's docs ([Testing Modes](https://hub.evenrealities.com/docs/test/), [App Submission](https://hub.evenrealities.com/docs/ship/app-submission)); TODO(lead): confirm the labels while you click.
+The reason: a beta build is the only install that **survives a locked phone** and appears on the glasses menu. A QR sideload stops when the phone locks ([device-readiness.md](device-readiness.md) §2). Store review has no published turnaround, so do not wait on it. Menu names below come from Even's docs ([Testing Modes](https://hub.evenrealities.com/docs/test/), [App Submission](https://hub.evenrealities.com/docs/ship/app-submission)); confirm the current labels while you click.
 
 1. Sign in at https://hub.evenrealities.com/login with the **same email** as your Even Realities phone app. Force-quit and reopen the phone app so the developer section appears.
-2. Rebuild the package: `npm --prefix apps/glasses run pack`. Check `apps/glasses/app.json` first: `package_id` `com.sonozaki7.pinpoint`, `version` 1.0.0 (a new upload needs a higher version), name `Pinpoint` (20 characters or fewer, no "Even").
+2. Rebuild the package: `npm --prefix apps/glasses run pack`. Check `apps/glasses/app.json` first: `package_id` `com.sonozaki7.pinpoint`, `version` 1.1.0 (a new upload needs a higher version), name `Pinpoint` (20 characters or fewer, no "Even").
 3. In the portal, create the app (or use `evenhub create` from `apps/glasses`) with:
    - Name `Pinpoint`; tagline (50 characters or fewer): `Your AI agents' attention layer`
    - Description (up to 2,000 characters): paste the short description from SUBMISSION.md.

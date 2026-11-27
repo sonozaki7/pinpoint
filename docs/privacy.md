@@ -10,7 +10,7 @@ Pinpoint is an app for Even G2 smart glasses. It helps you review work your AI a
 - When you connect your own computer, the cloud **passes your data through** and does not store or log it.
 - Your **voice** is turned into text and then thrown away. Pinpoint does not keep recordings.
 - Your **accounts and tokens** (T3 Code, Notion, Gmail, Telegram) stay on your own computer.
-- Pinpoint never sends an email, posts a comment or changes a page without your gesture, and every send has a 5 second undo.
+- Pinpoint never sends an email, posts a comment or changes a page without your gesture. Sends from the glasses have a 5 second undo, and a Gmail send from Telegram asks for confirmation on your phone first.
 - There are no accounts, no ads and no analytics.
 
 ## What Pinpoint is made of
@@ -71,7 +71,7 @@ Pinpoint reads only what you point it at: the T3 projects named in `T3_PROJECTS`
 
 - **Pinpoint does not write from nothing.** It reviews work that exists. A correction you speak is applied by exact rules first ("net-45, not net-60"). If a model has to rewrite one sentence, the server checks that nothing else changed.
 - **Everything shown can be traced.** Each line is an exact quote of the source. Answers to your questions quote the sentence they came from, or say they found none.
-- **Undo.** A 5 second countdown precedes every send. A Gmail send from Telegram asks for a second confirmation on your phone.
+- **Undo.** A 5 second countdown precedes every send from the glasses. A Gmail send from Telegram asks for a second confirmation on your phone.
 - **No command approvals.** Pinpoint never approves shell commands or permission prompts for an agent.
 - **Rate limits** protect the service: 300 requests a minute per IP, 120 per device, 20 voice requests per minute per device, 5 pairing attempts per 10 minutes. Request bodies are capped (64 KB JSON, 30 seconds of audio, 2 MB through the relay).
 - **Isolation.** Every device has its own sample workspace. One device cannot see another's.
