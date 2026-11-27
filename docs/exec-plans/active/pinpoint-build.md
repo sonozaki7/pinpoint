@@ -1,6 +1,6 @@
 # Goal: Pinpoint submission-ready for Heads Up (deadline Mon Nov 30 04:59 JST)
 
-Status: active · Delivery boundary: public repo + live site with a try-it simulator + demo video + .ehpk + DoraHacks submission (the submission itself needs the owner)
+Status: submission-ready (owner steps left) · Delivery boundary: public repo + live site with a try-it simulator + demo video + .ehpk + DoraHacks submission (the submission itself needs the owner)
 Spec: `docs/SPEC.md` · Host advice: `docs/host-qa-notes.md` · Device risks: `docs/device-readiness.md`
 
 ## Run card
@@ -41,10 +41,10 @@ Delegation rule from 22:30 JST: Claude for at most 1–2 subagents (the video); 
 |---|---|---|
 | F1 | Server: DeepSeek-API sorting/evidence/Ask, changed, glance status, catch-up, new task by voice, everyday + persona samples, cloud secrets | done (8407ec8), cloud redeployed |
 | F2 | Glasses: needs-you collapse + Why, Ask, status line, catch-up, New task, sample persona, budgets | done (3be2c16) |
-| F3 | Website: minimal 3D hero + POV outdoors, animated hand controller, Developer/Everyday switch, privacy page, /app/ + QR | done and live (1c5c806); phone layout + Firefox polish running (DeepSeek) |
-| F4 | Video: attention-layer story, developer walk + everyday parent, real Codex runs, real Notion/Gmail/Telegram proof | running (Claude Sonnet, resumed in its own thread after network + limit failures) |
-| F5 | README, SUBMISSION, FEATURE_REQUESTS, privacy, stale docs, submit checklist | done (26795b7); v1.1.0 release prep + final QA running (DeepSeek) |
-| F6 | Lead: integrate, deploy cloud (+DeepSeek key on server), release (ehpk + video), site deploy, sandbox thread cleanup, QA | after F1–F5 |
+| F3 | Website: minimal 3D hero + POV outdoors, animated hand controller, Developer/Everyday switch, privacy page, /app/ + QR | done and live (1c5c806, phone polish af255f3; Chromium, Firefox, WebKit) |
+| F4 | Video: attention-layer story, developer walk + everyday parent, real Codex runs, real Notion/Gmail/Telegram proof | done: 2:44 film (1166076), on the site and the v1.1.0 release |
+| F5 | README, SUBMISSION, FEATURE_REQUESTS, privacy, stale docs, submit checklist | done (26795b7, 3c4acf5, 1f1f59f); only the team line waits on the owner |
+| F6 | Lead: integrate, deploy cloud (+DeepSeek key on server), release (ehpk + video), site deploy, sandbox thread cleanup, QA | done: one inbox order (4be7eb9, cloud redeployed), Send-row fix (fbe17b0), release v1.1.0, 10 test threads archived, temp copies removed |
 
 ## Decisions
 
@@ -61,3 +61,4 @@ Delegation rule from 22:30 JST: Claude for at most 1–2 subagents (the video); 
 - 2026-11-27 02:30 | gesture budget rule added (docs/ux-budget.md); Telegram redesign live; review sources done; cloud redeployed with 4 sample items.
 - 2026-11-27 01:50 | owner: no AI slop, check existing apps. Landscape research → scope locked to review sources (agents, Notion, Gmail drafts). Notion token saved; Google client + DNS record pending from owner.
 - 2026-11-27 22:40 | website live (1c5c806: hint lines match the fixtures, dentist task asks instead of booking, privacy DeepSeek row covers cloud Ask); video resumed; DeepSeek on phone polish and release prep/QA.
+- 2026-11-27 23:50 | release v1.1.0 published (ehpk 80,184 B + 2:44 film); site serves the film; cloud uses the shared inbox order; owner steps left: team line, Discord post, DoraHacks form, optional Even portal beta.
