@@ -1,7 +1,10 @@
 import {
   CLOUD_URL,
   DEVICE_HEADER,
+  SAMPLE_HEADER,
   TOKEN_HEADER,
+  type AgentStatus,
+  type AskResult,
   type Deck,
   type EditResult,
   type Health,
@@ -10,12 +13,14 @@ import {
   type PreviewResult,
   type ReviewDraft,
   type SendResult,
+  type TaskResult,
 } from "../../../shared/contract";
 import { getDeskToken, getDeviceId } from "./device";
+import { DEFAULT_PERSONA, type SamplePersona } from "./model";
 
 export interface PinpointApi {
   readonly mode: "live" | "demo";
-  inbox(): Promise<{ items: InboxItem[]; updatedAt: string }>;
+  inbox(): Promise<{ items: InboxItem[]; updatedAt: string; status?: AgentStatus }>;
   health(): Promise<Health>;
   deck(threadId: string): Promise<Deck | { pending: true }>;
   putReview(draft: ReviewDraft): Promise<ReviewDraft>;
@@ -23,9 +28,20 @@ export interface PinpointApi {
   send(threadId: string): Promise<SendResult>;
   /** Apply one spoken note to a 'draft' sentence; the reply carries the new sentence. */
   edit(threadId: string, pointId: string, text: string): Promise<EditResult>;
+  /** Ask about the output; the answer cites an exact source sentence and its point. */
+  ask?(threadId: string, question: string): Promise<AskResult>;
+  /** Hand a new job to an agent ("Find a dentist open Saturday..."). */
+  task?(text: string): Promise<TaskResult>;
+  /** Choose the cloud sample story (sent as X-Pinpoint-Sample). Mock and cloud only. */
+  setSample?(persona: SamplePersona): void;
+  /**
+   * Turn speech into text. `purpose` only matters to the offline demo, which has no
+   * microphone and must say something sensible; a real server just transcribes.
+   */
   voice(
     pcm: Uint8Array,
-    context?: { threadId: string; pointId: string },
+    context?: { threadId: string; pointId?: string },
+    purpose?: "note" | "ask" | "task",
   ): Promise<{ text: string; verdict?: "object" | "note" }>;
   phone(threadId: string, pointId: string): Promise<{ ok: boolean; link?: string }>;
   resetSample(): Promise<void>;
@@ -60,6 +76,8 @@ export const TIMEOUTS = {
   deck: 65_000,
   send: 15_000,
   voice: 30_000,
+  ask: 20_000,
+  task: 20_000,
   phone: 10_000,
   pair: 15_000,
 } as const;
@@ -120,6 +138,8 @@ export interface HttpApiOptions {
   token?: () => Promise<string | null>;
   /** Force the header on or off; by default every request tries it. */
   deviceHeader?: boolean;
+  /** The saved sample story; 'mixed' is the server default and is never sent. */
+  sample?: SamplePersona;
 }
 
 export class HttpPinpointApi implements PinpointApi {
@@ -128,8 +148,10 @@ export class HttpPinpointApi implements PinpointApi {
   private device: () => Promise<string>;
   private token: () => Promise<string | null>;
   private deviceHeader: boolean;
+  private sample: SamplePersona;
 
   constructor(base: string, options: HttpApiOptions = {}) {
+    this.sample = options.sample ?? DEFAULT_PERSONA;
     this.base = base.replace(/\/+$/, "");
     this.device = options.device ?? getDeviceId;
     // The desk token is a cloud credential; local simulator builds never read it.
@@ -148,6 +170,8 @@ export class HttpPinpointApi implements PinpointApi {
     if (withDeviceHeader) headers.set(DEVICE_HEADER, await this.device());
     const token = await this.token();
     if (token) headers.set(TOKEN_HEADER, token);
+    // Only a non-default story adds a header, so the default flow adds nothing new to CORS.
+    if (this.sample !== DEFAULT_PERSONA && !token) headers.set(SAMPLE_HEADER, this.sample);
     let response: Response;
     try {
       response = await fetch(this.base + path, {
@@ -268,6 +292,26 @@ export class HttpPinpointApi implements PinpointApi {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ pointId, text }),
     }, TIMEOUTS.review);
+  }
+
+  ask(threadId: string, question: string) {
+    return this.json<AskResult>(`/api/ask/${encodeURIComponent(threadId)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question }),
+    }, TIMEOUTS.ask);
+  }
+
+  task(text: string) {
+    return this.json<TaskResult>("/api/task", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    }, TIMEOUTS.task);
+  }
+
+  setSample(persona: SamplePersona) {
+    this.sample = persona;
   }
 
   async voice(pcm: Uint8Array) {

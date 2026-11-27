@@ -315,6 +315,18 @@ export async function connectEven(
   if (typeof window !== "undefined") {
     window.addEventListener("pagehide", (event) => { if (!event.persisted) unsubscribe(); });
   }
+  // Wear status (DeviceStatus.isWearing). The first report only seeds it; later flips are events.
+  let lastWorn: boolean | undefined;
+  const reportWear = (worn: boolean | undefined) => {
+    if (typeof worn !== "boolean" || worn === lastWorn) return;
+    lastWorn = worn;
+    onInput({ kind: "wear", worn });
+  };
+  const unsubscribeWear = bridge.onDeviceStatusChanged?.((status) => reportWear(status.isWearing));
+  void bridge.getDeviceInfo?.().then((info) => reportWear(info?.status.isWearing)).catch(() => undefined);
+  if (typeof window !== "undefined") {
+    window.addEventListener("pagehide", (event) => { if (!event.persisted) unsubscribeWear?.(); });
+  }
   const connected = "Glasses connected";
   setHostStatus(connected);
   console.info("[pinpoint] ready");

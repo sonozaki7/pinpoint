@@ -95,6 +95,23 @@ interface EvidenceConflict {
   note: { title: string; text: string; url?: string };
 }
 
+// Words that say nothing about the subject of a sentence (dates, filler).
+const NOT_SUBJECT = new Set(
+  ('that this with from will have been they them their there what when where which while about after ' +
+    'before into over than then also just only very more most some such each every once your ours ' +
+    'monday tuesday wednesday thursday friday saturday sunday today tomorrow january february march ' +
+    'april june july august september october november december agreed agree says said note notes ' +
+    'happy please thanks would could should').split(' '),
+);
+
+function subjectWords(text: string): Set<string> {
+  const words = text.toLowerCase().match(/[a-z][a-z'-]{3,}/g) ?? [];
+  return new Set(words.map((word) => word.replace(/'s$/, '')).filter((word) => !NOT_SUBJECT.has(word)));
+}
+
+/** Families specific enough to compare without a shared subject (payment terms). */
+const SELF_EVIDENT_FAMILIES = new Set(['net']);
+
 function evidenceConflict(
   quote: string,
   notes: SourceEvidence['notes'],
@@ -102,12 +119,25 @@ function evidenceConflict(
   if (!notes || notes.length === 0) return undefined;
   const sentence = numberMentions(quote);
   if (sentence.size === 0) return undefined;
+  const quoteWords = subjectWords(quote);
 
   for (const note of notes) {
-    const noteValues = numberMentions(`${note.title}\n${note.text}`);
+    // Compare against the note's own sentences, and only those about the same subject:
+    // "bake sale on Saturday the 13th" must not flag "class photo day: Tuesday".
+    const noteSentences = `${note.title}\n${note.text}`.split(/(?<=[.!?;\n])\s+/);
+    const titleShared = [...subjectWords(note.title)].filter((word) => quoteWords.has(word)).length;
     for (const [family, values] of sentence) {
-      const known = noteValues.get(family);
-      if (!known || known.length === 0) continue;
+      const relevant = noteSentences.filter((noteSentence) => {
+        if (!numberMentions(noteSentence).has(family)) return false;
+        if (SELF_EVIDENT_FAMILIES.has(family)) return true;
+        // Same subject: a word from the note's title ("Bake sale plan"), or two words from the
+        // note's sentence. One generic shared word ("school") is not enough.
+        const shared = [...subjectWords(noteSentence)].filter((word) => quoteWords.has(word)).length;
+        return titleShared > 0 || shared >= 2;
+      });
+      if (relevant.length === 0) continue;
+      const known = [...new Set(relevant.flatMap((noteSentence) => numberMentions(noteSentence).get(family) ?? []))];
+      if (known.length === 0) continue;
       const conflict = values.find((value) => !known.includes(value));
       if (!conflict) continue;
       const preferred = known.find((value) => value !== conflict) ?? known[0]!;
@@ -207,16 +237,24 @@ export function decoratePoints(
     ...(source.history ? { history: source.history } : {}),
   };
 
-  return points.map((point) => {
+  // Which rule produced each flag: evidence (a note or the user's own words) and grounded model
+  // flags always stay; generic heuristics ("money or date", risky claim) are only kept when rare.
+  const origins: Array<'model' | 'evidence' | 'heuristic' | undefined> = [];
+
+  const decorated = points.map((point, index) => {
     const next: Point = { ...point };
     let flag = next.flag;
     let why = next.why ? groundedWhy(next.why, context) : undefined;
+    origins[index] = flag && why ? 'model' : undefined;
 
     // A model flag is kept only with grounded evidence. When the model forgot
     // the why, a named heuristic for the quote may stand in for it.
     if (flag && !why) {
       const heuristic = heuristicFor(next.quote);
-      if (heuristic) why = heuristic;
+      if (heuristic) {
+        why = heuristic;
+        origins[index] = 'heuristic';
+      }
     }
     if (flag && !why) flag = undefined;
 
@@ -228,11 +266,13 @@ export function decoratePoints(
       if (conflict) {
         flag = conflict;
         why = evidenceWhy(next.quote, source.evidence?.notes);
+        origins[index] = 'evidence';
       } else if (app === 'notion') {
         const found = riskyClaimFlag(next.quote);
         if (found) {
           flag = found;
           why = riskyClaimWhy(next.quote);
+          origins[index] = 'heuristic';
         }
       } else if (app !== 'gmail' && next.risk === 'high') {
         const heuristic = heuristicFor(next.quote);
@@ -240,6 +280,7 @@ export function decoratePoints(
         if (found && heuristic) {
           flag = found;
           why = heuristic;
+          origins[index] = 'heuristic';
         }
       }
     }
@@ -259,6 +300,22 @@ export function decoratePoints(
       const block = blockForQuote(next.quote, source.blocks);
       if (block) next.anchor = block.id;
     }
+    return next;
+  });
+
+  // If everything is flagged, nothing is. Generic heuristic flags are dropped when a better-grounded
+  // flag exists, and at most one survives otherwise (a newsletter is full of dates; a plan has one
+  // irreversible step). Evidence and model flags are never dropped.
+  const strong = origins.some((origin) => origin === 'evidence' || origin === 'model');
+  let keptHeuristic = 0;
+  return decorated.map((point, index) => {
+    if (origins[index] !== 'heuristic' || !point.flag) return point;
+    keptHeuristic += 1;
+    if (!strong && keptHeuristic === 1) return point;
+    const next = { ...point };
+    delete next.flag;
+    if (next.changed) next.why = CHANGED_WHY;
+    else delete next.why;
     return next;
   });
 }

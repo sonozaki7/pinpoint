@@ -1,4 +1,5 @@
 import { waitForEvenAppBridge } from "@evenrealities/even_hub_sdk";
+import { DEFAULT_PERSONA, isSamplePersona, type SamplePersona } from "./model";
 
 /** Cloud workspace key: the SDK storage is the durable copy, localStorage is the fast cache. */
 export const DEVICE_STORAGE_KEY = "pinpoint.device-id";
@@ -193,4 +194,43 @@ export function resetDeskTokenCacheForTests(): void {
   tokenGeneration += 1;
   tokenCache = undefined;
   tokenPending = undefined;
+}
+
+/** The cloud sample story the user picked in the hold menu; kept like the device id. */
+export const PERSONA_STORAGE_KEY = "pinpoint.sample-persona";
+
+function readPersonaLocal(): SamplePersona | null {
+  try {
+    if (typeof window === "undefined") return null;
+    const value = window.localStorage.getItem(PERSONA_STORAGE_KEY);
+    return isSamplePersona(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The saved sample story, or the default ('mixed') on a first run. */
+export async function getSamplePersona(): Promise<SamplePersona> {
+  const local = readPersonaLocal();
+  if (local) return local;
+  const stored = await withinBudget(
+    waitForEvenAppBridge().then((bridge) => bridge.getLocalStorage(PERSONA_STORAGE_KEY)),
+    STORAGE_BUDGET_MS,
+  );
+  return isSamplePersona(stored) ? stored : DEFAULT_PERSONA;
+}
+
+/** Remember the choice across runs, in localStorage and the glasses' own storage. */
+export async function setSamplePersona(persona: SamplePersona): Promise<void> {
+  try {
+    if (typeof window !== "undefined") window.localStorage.setItem(PERSONA_STORAGE_KEY, persona);
+  } catch {
+    // The choice still holds for this run.
+  }
+  try {
+    const bridge = await waitForEvenAppBridge();
+    await bridge.setLocalStorage(PERSONA_STORAGE_KEY, persona);
+  } catch {
+    // localStorage still carries it when the host storage is unavailable.
+  }
 }

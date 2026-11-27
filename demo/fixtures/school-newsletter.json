@@ -1,7 +1,7 @@
 {
   "thread": {
     "threadId": "school-newsletter",
-    "title": "PTA newsletter, December (draft)",
+    "title": "PTA newsletter",
     "project": "Notion",
     "attention": "report",
     "updatedAt": "2026-11-27T08:30:00.000Z",
@@ -63,7 +63,7 @@
   "deck": {
     "threadId": "school-newsletter",
     "sourceMessageId": "notion-pta-newsletter-1",
-    "title": "PTA newsletter, December (draft)",
+    "title": "PTA newsletter",
     "attention": "report",
     "headline": "PTA newsletter, December: 7 points",
     "points": [

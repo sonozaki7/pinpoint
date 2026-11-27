@@ -496,8 +496,8 @@ describe('cloud personas, status, catch-up and everyday fixtures', () => {
     try {
       const expected: Record<string, string[]> = {
         developer: ['login-fix', 'payment-upgrade', 'launch-post', 'draft-priya'],
-        everyday: ['saturday-plan', 'landlord-reply', 'school-newsletter'],
-        mixed: ['login-fix', 'saturday-plan', 'landlord-reply', 'launch-post'],
+        everyday: ['saturday-plan', 'flight-price', 'landlord-reply', 'school-newsletter'],
+        mixed: ['login-fix', 'saturday-plan', 'flight-price', 'landlord-reply', 'launch-post'],
       };
       for (const [persona, ids] of Object.entries(expected)) {
         const body = (await (await cloud.app.request('/api/inbox', { headers: cloudHeaders(persona) })).json()) as InboxResponse;

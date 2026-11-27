@@ -7,15 +7,17 @@ import {
 } from "./api";
 import { MockPinpointApi } from "./mock";
 import {
-  adoptInbox, applyEdit, applyHealth, applyVoice, cancelCountdown, clearFlash, clearNotes, countdownDue, deckFailed, doubleTap,
-  draftFor, endRecording, finishSend, focusedPoint, initialState, markLoading, markOffline, markSending,
-  mergeDeck, moveFocus, noteFor, openDeck, press, receiptDue, recordingOnSurface, recordingTickDelay,
-  resetWorkspace, sendFailed, setFlash, setInboxFocus, shouldAcceptSwipe, showReceipt, startCountdown,
-  startInboxCountdown, startReview, RECEIPT_HOLD_MS,
-  type Effect, type State,
+  adoptInbox, applyAsk, applyEdit, applyHealth, applyTask, applyVoice, askFailed, beginAsk,
+  beginAskLoading, beginTask, beginTaskTranscribing, cancelCountdown, cancelTask, clearFlash, clearNotes,
+  countdownDue, deckFailed, doubleTap, draftFor, endRecording, finishSend, focusedPoint, initialState,
+  isCatchUp, markLoading, markOffline, markSending, mergeDeck, moveFocus, noteFor, openDeck, press,
+  receiptDue, recordingFailed, recordingOnSurface, recordingTickDelay, resetWorkspace, routineGroupFocused,
+  sendFailed, setFlash, setInboxFocus, setPersona, shouldAcceptSwipe, showReceipt, startCountdown,
+  startInboxCountdown, startMarkSeen, startReview, taskDue, taskFailed, taskHeard, RECEIPT_HOLD_MS,
+  TASK_HOLD_MS, wearChanged, type Effect, type SamplePersona, type State,
 } from "./model";
-import { pageFor, type PageModel } from "./display";
-import { setDeskToken } from "./device";
+import { MENU, pageFor, personaForMenu, type PageModel } from "./display";
+import { getSamplePersona, setDeskToken, setSamplePersona } from "./device";
 import { connectEven } from "./even";
 import type { Input } from "./events";
 import { PcmRecorder, SilenceGate } from "./voice";
@@ -24,7 +26,8 @@ const params = new URLSearchParams(location.search);
 const forceMock = params.get("mock") === "1";
 const bootedAt = Date.now();
 
-let api: PinpointApi = new MockPinpointApi({ extended: forceMock });
+// ?mock=1 is the website's offline demo; add &sample=1 to also get the sample-only menu entries.
+let api: PinpointApi = new MockPinpointApi({ extended: forceMock, sample: params.get("sample") === "1" });
 let state = initialState({ demo: forceMock, loading: true, cloud: SERVER_IS_CLOUD });
 const recorder = new PcmRecorder();
 const silence = new SilenceGate();
@@ -33,6 +36,8 @@ let clockTimer: ReturnType<typeof setTimeout> | undefined;
 let tapTimer: ReturnType<typeof setTimeout> | undefined;
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 let lastMenuAt = 0;
+/** The menu overlay closing reports a foreground change up to this long after the choice. */
+const MENU_SURFACE_GRACE_MS = 1_500;
 let lastDoubleAt = 0;
 let lastSwipeAt = Number.NEGATIVE_INFINITY;
 let lastForegroundRefresh = 0;
@@ -64,6 +69,7 @@ const el = {
   tap: document.querySelector<HTMLButtonElement>("#btn-tap")!,
   double: document.querySelector<HTMLButtonElement>("#btn-double")!,
   menuButton: document.querySelector<HTMLButtonElement>("#btn-menu")!,
+  wear: document.querySelector<HTMLButtonElement>("#btn-wear")!,
   modeLink: document.querySelector<HTMLAnchorElement>("#mode-link")!,
   phoneStatus: document.getElementById("phone-status")!,
   phoneServer: document.getElementById("phone-server")!,
@@ -134,8 +140,17 @@ function renderBrowser(page: PageModel) {
 function updateButtons() {
   const record = state.recordingStartedAt !== null;
   const sendRow = state.screen === "review" && state.deck !== null && state.focus >= state.deck.points.length;
+  const ask = state.ask;
+  const catchUp = isCatchUp(state);
+  const catchLine = catchUp ? state.deck?.points[state.focus] : undefined;
   setText(el.tap, state.screen === "inbox"
     ? "Open"
+    : state.screen === "task"
+      ? state.task?.phase === "confirm"
+        ? "Start"
+        : state.task?.phase === "recording"
+          ? "Stop"
+          : state.task?.phase === "error" ? "Retry" : state.task?.phase === "started" ? "Inbox" : "Wait"
     : state.screen === "options"
       ? "Choose"
       : state.screen === "countdown"
@@ -150,7 +165,15 @@ function updateButtons() {
               ? "Retry"
               : record
                 ? "Stop"
-                : sendRow ? "Send" : focusedPoint(state)?.kind === "question" ? "Options" : "Talk");
+                : state.askLoading
+                  ? "Wait"
+                  : catchUp
+                  ? catchLine ? (catchLine.threadRef ? "Open" : "Read") : "Mark seen"
+                  : ask
+                    ? ask.pointId ? "Go to line" : "Close"
+                    : routineGroupFocused(state)
+                      ? "Expand"
+                      : sendRow ? "Send" : focusedPoint(state)?.kind === "question" ? "Options" : "Talk");
   setText(el.double, state.screen === "countdown"
     ? "Undo"
     : state.screen === "receipt"
@@ -161,6 +184,8 @@ function updateButtons() {
           ? "Send"
           : state.screen === "inbox" ? "Exit" : "Back");
   setText(el.menuButton, "Hold menu");
+  setText(el.wear, state.worn === false ? "Put on" : "Take off");
+  el.wear.hidden = DEVICE_BUILD;
   el.up.disabled = ifInboxEmpty();
   el.down.disabled = ifInboxEmpty();
   el.note.textContent = state.demo
@@ -356,6 +381,14 @@ function scheduleClock() {
     clockTimer = setTimeout(() => render(), Math.max(60, 1_000 - (elapsed % 1_000) + 30));
     return;
   }
+  if (state.screen === "task" && state.task?.phase === "started" && state.task.startedAt !== undefined) {
+    if (taskDue(state, now)) {
+      finishTask();
+      return;
+    }
+    clockTimer = setTimeout(finishTask, state.task.startedAt + TASK_HOLD_MS - now);
+    return;
+  }
   if (state.screen === "receipt" && state.receiptAt !== null) {
     if (receiptDue(state, now)) {
       finishSent();
@@ -390,6 +423,12 @@ function handleInput(input: Input) {
     console.info(`[pinpoint] hold ${input.phase}`);
     return;
   }
+  if (input.kind === "wear") {
+    clearTimeout(tapTimer);
+    tapTimer = undefined;
+    void applyWear(input.worn);
+    return;
+  }
   if (input.kind === "exit") {
     console.info(`[pinpoint] exit reason=${input.reason} abnormal=${input.abnormal}`);
     clearTimeout(tapTimer);
@@ -404,6 +443,13 @@ function handleInput(input: Input) {
     // event; a queued tap must not land under that overlay.
     clearTimeout(tapTimer);
     tapTimer = undefined;
+    // Choosing a hold-menu entry that starts the microphone (Ask, New task) is followed by the menu
+    // overlay closing, which the host reports as a foreground change. That is not a reason to stop.
+    if (state.recordingStartedAt !== null && Date.now() - lastMenuAt < MENU_SURFACE_GRACE_MS) {
+      console.info(`[pinpoint] surface enter=${input.enter} ignored right after a menu choice`);
+      render();
+      return;
+    }
     if (input.enter) {
       onForeground();
     } else if (abortRecording("Recording stopped")) {
@@ -507,7 +553,54 @@ async function runEffect(effect: Effect) {
     case "retry-deck":
       await retryDeck();
       break;
+    case "mark-seen":
+      await markSeen();
+      break;
+    case "task-start":
+      await startTask();
+      break;
+    case "record-discard":
+      discardRecording();
+      break;
+    case "wear-refresh":
+      await loadInbox(true);
+      break;
   }
+}
+
+/**
+ * On/off the head. Off mid-recording drops the audio; on lands on the inbox with the status line and
+ * "Since you looked" and reloads it, with no gesture. ?mock=1 has no sensor: simulateWear() is the switch.
+ */
+async function applyWear(worn: boolean) {
+  const before = state;
+  const result = wearChanged(state, worn);
+  state = result.state;
+  console.info(`[pinpoint] wear=${worn ? "on" : "off"}${before.screen !== state.screen ? ` screen ${before.screen}->${state.screen}` : ""}`);
+  maybePersist(before, state);
+  render();
+  if (result.effect) await runEffect(result.effect);
+}
+
+/** For the browser preview and the website: a stand-in for the wear sensor. */
+export function simulateWear(worn: boolean) {
+  const mock = api as { simulateWear?: (on: boolean) => void };
+  mock.simulateWear?.(worn);
+  void applyWear(worn);
+}
+
+declare global {
+  interface Window { pinpoint?: { simulateWear: (worn: boolean) => void; worn: () => boolean | null } }
+}
+window.pinpoint = { simulateWear, worn: () => state.worn };
+
+// ?mock=1&wear=2000 : two seconds after boot, take the glasses off and put them on (for the simulator).
+const wearDemo = Number(params.get("wear"));
+if (forceMock && Number.isFinite(wearDemo) && wearDemo > 0) {
+  setTimeout(() => {
+    simulateWear(false);
+    setTimeout(() => simulateWear(true), 600);
+  }, wearDemo);
 }
 
 function unreachableText(): string {
@@ -536,7 +629,11 @@ async function loadInbox(silent: boolean) {
     }
     const [inboxResult, healthResult] = await Promise.allSettled([api.inbox(), api.health()]);
     if (inboxResult.status === "fulfilled") {
-      state = adoptInbox(state, inboxResult.value.items, { demo: api.mode === "demo", offline: false });
+      state = adoptInbox(state, inboxResult.value.items, {
+        demo: api.mode === "demo",
+        offline: false,
+        status: inboxResult.value.status ?? null,
+      });
       if (healthResult.status === "fulfilled") state = applyHealth(state, healthResult.value);
     } else {
       console.warn("[pinpoint] inbox", inboxResult.reason);
@@ -556,12 +653,15 @@ async function loadInbox(silent: boolean) {
 
 async function boot() {
   console.info(`[pinpoint] server=${forceMock ? "mock" : SERVER_URL}`);
+  const persona = await getSamplePersona();
+  state = { ...state, persona };
   if (!forceMock) {
-    api = new HttpPinpointApi(SERVER_URL);
+    api = new HttpPinpointApi(SERVER_URL, { sample: persona });
     await loadInbox(false);
   } else {
+    api.setSample?.(persona);
     const [result, health] = await Promise.all([api.inbox(), api.health()]);
-    state = adoptInbox(state, result.items, { demo: true, offline: false });
+    state = adoptInbox(state, result.items, { demo: true, offline: false, status: result.status ?? null });
     state = applyHealth(state, health);
     render();
   }
@@ -639,7 +739,7 @@ async function startRecording() {
   const ok = await hardware?.mic(true);
   if (ok === false) {
     recorder.stop();
-    state = endRecording(setFlash(state, "Mic unavailable. Tap to retry.", Date.now()));
+    state = recordingFailed(state, "Mic unavailable. Tap to retry.", Date.now());
     render();
   }
 }
@@ -652,21 +752,41 @@ function discardRecording() {
 
 async function stopRecording() {
   if (state.recordingStartedAt === null) return;
-  const point = focusedPoint(state);
+  const asking = state.asking;
+  const tasking = state.task?.phase === "recording";
+  const point = asking || tasking ? undefined : focusedPoint(state);
   const threadId = state.deck?.threadId;
   state = endRecording(state);
   // No silent waits: transcription can take a moment on the live server.
-  state = setFlash(state, "Working...", Date.now(), 60_000);
+  state = tasking
+    ? beginTaskTranscribing(state)
+    : asking
+      ? beginAskLoading(state)
+      : setFlash(state, "Working...", Date.now(), 60_000);
   render();
   await hardware?.mic(false);
   const pcm = recorder.stop();
-  console.info(`[pinpoint] voice pcm-bytes=${pcm.length}`);
+  console.info(`[pinpoint] voice pcm-bytes=${pcm.length}${asking ? " ask" : tasking ? " task" : ""}`);
   const before = state;
   try {
+    const purpose = tasking ? "task" : asking ? "ask" : "note";
     const { text, verdict } = await api.voice(
       pcm,
-      point && threadId ? { threadId, pointId: point.id } : undefined,
+      point && threadId ? { threadId, pointId: point.id } : threadId ? { threadId } : undefined,
+      purpose,
     );
+    if (tasking) {
+      // A double-tap while transcribing cancelled the task; drop the late words.
+      if (state.task?.phase !== "transcribing") return;
+      state = taskHeard(state, text, Date.now());
+      console.info(`[pinpoint] task heard="${text}"`);
+      render();
+      return;
+    }
+    if (asking) {
+      await answerQuestion(threadId, text);
+      return;
+    }
     state = applyVoice(state, text, Date.now(), verdict);
     maybePersist(before, state);
     const noted = point ? noteFor(state, point.id) : undefined;
@@ -675,12 +795,122 @@ async function stopRecording() {
     console.info(`[pinpoint] review-header="${pageFor(state, Date.now()).title}"`);
   } catch (error) {
     console.warn("[pinpoint] voice", error);
-    state = setFlash(
+    const message = isNetworkFailure(error)
+      ? (state.cloud ? "Can't reach Pinpoint Cloud. Try again." : "Can't reach the local server. Try again.")
+      : "Voice failed. Try again.";
+    if (tasking) {
+      if (state.task?.phase === "transcribing") state = setFlash(cancelTask(state), message, Date.now());
+    } else if (asking) {
+      state = askFailed(state, message, Date.now());
+    } else {
+      state = setFlash(state, message, Date.now());
+    }
+  }
+  render();
+}
+
+/** The spoken question goes to POST /api/ask; its answer stays above the review. */
+async function answerQuestion(threadId: string | undefined, question: string) {
+  // A double-tap while "Looking..." dismissed the question; a late answer must not reopen it.
+  if (!state.askLoading || state.deck?.threadId !== threadId) return;
+  if (!threadId || !api.ask) {
+    state = askFailed(state, "Ask is not available here.", Date.now());
+    render();
+    return;
+  }
+  try {
+    const result = await api.ask(threadId, question);
+    if (!state.askLoading) return;
+    state = applyAsk(state, question, result);
+    console.info(`[pinpoint] ask ok=${result.ok} point=${result.pointId ?? "none"} text="${question}"`);
+  } catch (error) {
+    console.warn("[pinpoint] ask", error);
+    if (!state.askLoading) return;
+    state = askFailed(
       state,
-      isNetworkFailure(error) ? (state.cloud ? "Can't reach Pinpoint Cloud. Try again." : "Can't reach the local server. Try again.") : "Voice failed. Try again.",
+      isNetworkFailure(error)
+        ? state.cloud
+          ? "Can't reach Pinpoint Cloud. Try again."
+          : "Can't reach the local server. Try again."
+        : "Ask failed. Try again.",
       Date.now(),
     );
   }
+  render();
+}
+
+/** One tap on "Start": POST /api/task, then say which agent took it. */
+async function startTask() {
+  const text = state.task?.text;
+  if (!text) return;
+  if (!api.task) {
+    state = taskFailed(state, "New task is not available here.");
+    render();
+    return;
+  }
+  try {
+    const result = await api.task(text);
+    if (state.task?.phase !== "starting") return;
+    state = applyTask(state, result, Date.now());
+    console.info(`[pinpoint] task ok=${result.ok} agent=${result.agent ?? "none"} title="${result.title ?? ""}"`);
+  } catch (error) {
+    console.warn("[pinpoint] task", error);
+    state = taskFailed(
+      state,
+      isNetworkFailure(error) ? shortUnreachable() : "Couldn't start it. Try again.",
+    );
+  }
+  render();
+}
+
+/** "Started · Codex" has been up long enough; the inbox comes back by itself. */
+function finishTask() {
+  if (state.screen !== "task" || state.task?.phase !== "started") return;
+  state = cancelTask(state);
+  render();
+  console.info(`[pinpoint] screen=inbox items=${state.inbox.length} after-task`);
+  void loadInbox(true);
+}
+
+/** "Mark seen" on a "Since you looked" list: one tap, no countdown, back to the inbox. */
+async function markSeen(threadId = state.deck?.threadId ?? state.pendingSend?.threadId) {
+  if (!threadId || sendInFlight) return;
+  sendInFlight = true;
+  try {
+    const result = await api.send(threadId);
+    if (!result.ok) {
+      state = sendFailed({ ...state, pendingSend: null }, "Couldn't mark seen. Try again.", Date.now());
+      render();
+      return;
+    }
+    state = setFlash(finishSend(state), "Marked seen", Date.now(), 2_500);
+    render();
+    console.info(`[pinpoint] marked-seen=${threadId}`);
+    void loadInbox(true);
+  } catch (error) {
+    console.warn("[pinpoint] mark seen", error);
+    state = sendFailed(
+      { ...state, pendingSend: null },
+      isNetworkFailure(error) ? shortUnreachable() : "Couldn't mark seen. Try again.",
+      Date.now(),
+    );
+    render();
+  } finally {
+    sendInFlight = false;
+  }
+}
+
+/** Sample only: Everyday, Developer or Mixed. Remember it and reload the inbox from that story. */
+async function choosePersona(persona: SamplePersona) {
+  if (state.workspace !== "sample" || persona === state.persona || sendInFlight || state.sending) return;
+  samplePoll++;
+  api.setSample?.(persona);
+  void setSamplePersona(persona);
+  state = setPersona(state, persona);
+  render();
+  console.info(`[pinpoint] sample-persona=${persona}`);
+  await loadInbox(false);
+  state = setFlash(state, `Sample: ${persona}`, Date.now(), 2_500);
   render();
 }
 
@@ -829,19 +1059,50 @@ async function handleMenu(id: number) {
   const now = Date.now();
   if (now - lastMenuAt < 300) return;
   lastMenuAt = now;
-  if (id === 5) {
+  if (id === MENU.reset) {
     await resetSampleWorkspace();
     return;
   }
+  const persona = personaForMenu(id);
+  if (persona) {
+    if (state.screen === "inbox") await choosePersona(persona);
+    return;
+  }
   if (state.screen === "inbox") {
-    if (id === 4) await loadInbox(false);
-    if (id === 6) {
+    if (id === MENU.refresh) await loadInbox(false);
+    if (id === MENU.agree) {
       const item = state.inbox[state.inboxFocus];
-      if (item && item.attention !== "question") {
+      if (item && item.attention !== "question" && item.kind !== "catch-up") {
         state = startInboxCountdown(state, item, now);
         render();
         console.info(`[pinpoint] agree-send=${item.threadId}`);
       }
+    }
+    if (id === MENU.markSeen) {
+      const item = state.inbox[state.inboxFocus];
+      if (item?.kind === "catch-up") {
+        state = startMarkSeen(state, item);
+        render();
+        await markSeen(item.threadId);
+      }
+    }
+    if (id === MENU.newTask) {
+      // The next sentence is the request; it stops by itself when you stop talking.
+      state = beginTask(state, now);
+      if (state.screen !== "task") return;
+      render();
+      console.info("[pinpoint] task-start");
+      await startRecording();
+    }
+    return;
+  }
+  if (isCatchUp(state)) {
+    if (id === MENU.markSeen && state.deck && !state.sending) {
+      state = { ...state, sending: true };
+      render();
+      await markSeen();
+    } else if (id === MENU.refresh) {
+      await refreshCurrent();
     }
     return;
   }
@@ -866,8 +1127,16 @@ async function handleMenu(id: number) {
       render();
       break;
     }
-    case 4:
+    case MENU.refresh:
       await refreshCurrent();
+      break;
+    case MENU.ask:
+      // Ask: the same microphone as a note, but the words become a question.
+      if (state.screen !== "review" || !state.deck || state.recordingStartedAt !== null) break;
+      state = beginAsk(state, Date.now());
+      render();
+      console.info("[pinpoint] ask-start");
+      await startRecording();
       break;
   }
 }
@@ -937,6 +1206,7 @@ el.up.addEventListener("click", () => emit("up"));
 el.down.addEventListener("click", () => emit("down"));
 el.tap.addEventListener("click", () => emit("tap"));
 el.double.addEventListener("click", () => emit("double"));
+el.wear.addEventListener("click", () => simulateWear(state.worn === false));
 el.menuButton.addEventListener("click", () => {
   el.menu.hidden = !el.menu.hidden;
   if (!el.menu.hidden) renderMenu();
@@ -981,6 +1251,7 @@ window.addEventListener("keydown", (event) => {
   else if (event.key === "ArrowDown") emit("down");
   else if (event.key === "Enter") emit("tap");
   else if (event.key === "Escape" || event.key === "Backspace") emit("double");
+  else if (event.key === "w" || event.key === "W") simulateWear(state.worn === false);
   else return;
   event.preventDefault();
 });

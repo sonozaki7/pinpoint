@@ -9,7 +9,9 @@ export type Input =
   | { kind: "audio"; pcm: Uint8Array }
   | { kind: "surface"; enter: boolean }
   | { kind: "hold"; phase: "start" | "release" }
-  | { kind: "exit"; reason: number; abnormal: boolean };
+  | { kind: "exit"; reason: number; abnormal: boolean }
+  /** The glasses went on (true) or off (false) the head: DeviceStatus.isWearing. */
+  | { kind: "wear"; worn: boolean };
 
 /**
  * Normalize the three envelopes the SDK can use for one gesture.

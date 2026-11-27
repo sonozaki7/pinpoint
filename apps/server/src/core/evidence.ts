@@ -1,5 +1,12 @@
 import type { Point } from '../../../../shared/contract.js';
+import {
+  formatNeedsSummary as formatSharedSummary,
+  needsYou,
+  needsYouCount,
+} from '../../../../shared/summary.js';
 import { clipText, oneLine, toAscii } from './text.js';
+
+export { needsYou, needsYouCount };
 
 /**
  * Evidence rules for a flagged line.
@@ -160,22 +167,10 @@ export function heuristicWhy(quote: string): string | undefined {
   return heuristicFor(quote);
 }
 
-/** Does this point need the reviewer? A changed line counts even with no new flag. */
-export function needsYou(point: Point): boolean {
-  return Boolean(point.flag || point.changed);
-}
-
-export function needsYouCount(points: readonly Point[] | undefined): number {
-  return (points ?? []).filter(needsYou).length;
-}
-
 /**
  * "7 steps · 1 needs you" — the G2 firmware has the middle dot (U+00B7), so it
  * can carry this one non-ASCII character. Everything else stays plain ASCII.
  */
 export function formatNeedsSummary(base: string, needs: number, max = 30): string {
-  const clean = toAscii(oneLine(base));
-  if (needs <= 0) return clipText(clean, max).trim();
-  const tail = `${needs} ${needs === 1 ? 'needs' : 'need'} you`;
-  return clipText(`${clean} \u00b7 ${tail}`, max).trim();
+  return formatSharedSummary(toAscii(oneLine(base)), needs, max);
 }

@@ -3,8 +3,8 @@ import { test } from "node:test";
 import {
   OsEventTypeList, StartUpPageCreateResult, Sys_ItemEvent, type EvenAppBridge, type EvenHubEvent,
 } from "@evenrealities/even_hub_sdk";
-import { createDemoInbox } from "../src/mock";
-import { adoptInbox, initialState, type State } from "../src/model";
+import { createDemoInbox, createLoginDeck } from "../src/mock";
+import { adoptInbox, initialState, moveFocus, openDeck, startReview, type State } from "../src/model";
 import { pageFor } from "../src/display";
 import { connectEven, exitDialogStep } from "../src/even";
 
@@ -15,8 +15,9 @@ function inboxState(): State {
   });
 }
 
-function fakeBridge() {
+function fakeBridge(initialWorn: boolean | undefined = undefined) {
   let listener: ((event: EvenHubEvent) => void) | undefined;
+  let wearListener: ((status: { isWearing?: boolean }) => void) | undefined;
   const calls: string[] = [];
   const bridge = {
     createStartUpPageContainer: async () => StartUpPageCreateResult.success,
@@ -37,10 +38,16 @@ function fakeBridge() {
       return true;
     },
     audioControl: async () => true,
+    onDeviceStatusChanged: (next: (status: { isWearing?: boolean }) => void) => {
+      wearListener = next;
+      return () => undefined;
+    },
+    getDeviceInfo: async () => ({ status: { isWearing: initialWorn } }),
   } as unknown as EvenAppBridge;
   return {
     bridge,
     calls,
+    wear: (isWearing: boolean) => wearListener?.({ isWearing }),
     emit: (event: EvenHubEvent) => listener?.(event),
   };
 }
@@ -111,4 +118,36 @@ test("a real system exit closes the dialog flag without a repaint", async () => 
   await settle();
   assert.deepEqual(host.calls, []);
   assert.deepEqual(inputs, ["exit"]);
+});
+
+test("wear status from the glasses reaches the app once per change", async () => {
+  const host = fakeBridge(false);
+  const worn: boolean[] = [];
+  const page = pageFor(inboxState(), 1_000);
+  await connectEven(
+    () => page,
+    (input) => { if (input.kind === "wear") worn.push(input.worn); },
+    () => undefined,
+    { bridge: host.bridge },
+  );
+  await settle();
+  host.wear(false); // same as the seed: ignored
+  host.wear(true);
+  host.wear(true); // a battery update repeats the flag: ignored
+  host.wear(false);
+  assert.deepEqual(worn, [false, true, false]);
+});
+
+test("moving the cursor in a review changes brightness with upgrades only, never a rebuild", async () => {
+  const host = fakeBridge();
+  const inbox = inboxState();
+  const item = inbox.inbox.find((entry) => entry.threadId === "login-fix")!;
+  let state = openDeck(startReview(inbox, item), createLoginDeck());
+  const hardware = await connectEven(() => pageFor(state, 1_000), () => undefined, () => undefined, { bridge: host.bridge });
+  await hardware.render(pageFor(state, 1_000)); // unchanged: nothing written
+  assert.deepEqual(host.calls, []);
+  state = moveFocus(state, 1); // the cursor leaves the flagged line for the routine row
+  await hardware.render(pageFor(state, 1_000));
+  assert.ok(host.calls.length > 0);
+  assert.ok(host.calls.every((call) => call === "upgrade"), host.calls.join(","));
 });

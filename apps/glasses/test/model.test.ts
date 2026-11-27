@@ -34,7 +34,8 @@ function reviewState(threadId = "login-fix"): State {
   const deck = threadId === "login-fix" ? createLoginDeck() : createPaymentDeck();
   // These tests exercise the list from line 1; the "start where it matters"
   // focus is covered by budget.test.ts.
-  return { ...openDeck(startReview(state, item), deck), screen: "review", focus: 0 };
+  // They also exercise the full list, so the routine rows are open (the collapsed list has its own tests).
+  return { ...openDeck(startReview(state, item), deck), screen: "review", focus: 0, routineOpen: true };
 }
 
 function assertPageFits(page: ReturnType<typeof pageFor>): void {
@@ -124,14 +125,17 @@ test("the inbox header counts every listed thread and the review header reads as
   assert.match(fitted, /\.\.\. · 4 of 7 · 1 change · 1 note$/);
 });
 
-test("the focused row is brighter and carries the only cursor", () => {
+test("the cursor row carries the only '> ' and brightness follows importance", () => {
+  // login-fix with the routine rows open: p4 needs you, the other six are routine.
   const state = { ...reviewState(), focus: 2 };
   const page = pageFor(state, 1_000);
   const focused = page.rows.filter((row) => row.text.startsWith("> "));
   assert.equal(focused.length, 1);
-  assert.equal(focused[0]?.brightness, 4);
-  for (const row of page.rows.filter((entry) => entry !== focused[0])) {
-    assert.equal(row.brightness, 2, row.text);
+  assert.equal(focused[0]?.brightness, 2, "a routine row under the cursor stays dim");
+  const flagged = page.rows.find((row) => row.text.includes("CHECK"));
+  assert.equal(flagged?.brightness, 4, "the row that needs you is bright even when not selected");
+  for (const row of page.rows.filter((entry) => entry !== focused[0] && entry !== flagged)) {
+    assert.ok(row.brightness === 1 || row.brightness === 2, `${row.text} is dim`);
     assert.match(row.text, /^ {3}/, row.text);
     assert.ok(textWidth(row.text) <= ROW_MAX_PX, row.text);
   }

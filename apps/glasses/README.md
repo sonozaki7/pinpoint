@@ -61,6 +61,12 @@ npm run dev
 
 Open `http://127.0.0.1:4173/?mock=1` (or just `http://127.0.0.1:4173/`; an unreachable server falls back to demo data). The page mirrors the 576 × 288 glasses canvas and has buttons for swipe, tap, double-tap and the hold menu, plus keyboard arrows, Enter, Escape and Backspace. The header shows `demo data` whenever the in-memory demo is active.
 
+### Wear detection and brightness
+
+- The app listens to the host's `DeviceStatus.isWearing`. Taken off mid-recording: the recording and the microphone stop and nothing is sent. Put on again: the inbox reloads and lands on the status line plus "Since you looked · N updates", with no gesture (the line goes away when you open something).
+- Brightness is importance, per text container: rows that need you are 4, answered rows 3, routine rows 2 (under the cursor) or 1. The cursor is the `>` marker. Rows only change through `textContainerUpgrade`, and the review keeps its 8 containers.
+- Mock/browser: the **Take off / Put on** button, key **W**, `window.pinpoint.simulateWear(true|false)`, or `?mock=1&wear=<ms>` (off, then on, that many ms after boot). The website can also call `wearChanged(state, worn)` from `src/model.ts` and `MockPinpointApi.simulateWear()`.
+
 ### Official Even Hub simulator
 
 The check below runs against a real Pinpoint server in demo mode, on port 8788 so it never collides with another server on the default 8787. Run terminal 2, 3 and 4 from this folder (`apps/glasses`):

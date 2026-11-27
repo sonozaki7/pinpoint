@@ -31,7 +31,11 @@ function sampleState(): State {
 test("the sample workspace names itself, offers Reset sample, and explains the empty inbox", () => {
   const state = sampleState();
   assert.equal(pageFor(state, 1_000).title, "Sample · 3 need you");
-  assert.deepEqual(pageFor(state, 1_000).menu.map((item) => item.label), ["Refresh", "Reset sample"]);
+  assert.deepEqual(pageFor(state, 1_000).menu.map((item) => item.label), [
+    "New task",
+    "Sample: Everyday", "Sample: Developer", "Sample: Mixed (now)",
+    "Refresh", "Reset sample",
+  ]);
 
   const empty = adoptInbox(state, [], { demo: false, offline: false });
   assert.equal(pageFor(empty, 1_000).title, "Sample");
@@ -43,14 +47,16 @@ test("the sample workspace names itself, offers Reset sample, and explains the e
   const review = openDeck(startReview(state, item), createLoginDeck());
   assert.deepEqual(
     pageFor(review, 1_000).menu.map((entry) => entry.label),
-    ["Send review", "Read on phone", "Clear notes", "Refresh", "Reset sample"],
+    ["Ask", "Send review", "Read on phone", "Clear notes", "Refresh", "Reset sample"],
   );
 });
 
 test("the ordinary demo keeps its own header and menu", () => {
   const state = inboxState();
   assert.equal(pageFor(state, 1_000).title, "Pinpoint · 3 need you");
-  assert.deepEqual(pageFor(state, 1_000).menu.map((item) => item.label), ["Refresh"]);
+  assert.deepEqual(pageFor(state, 1_000).menu.map((item) => item.label), [
+    "New task", "Refresh",
+  ]);
 });
 
 test("a short inbox notice replaces the footer until it expires", () => {

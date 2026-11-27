@@ -4,6 +4,7 @@
     "mixed": [
       "login-fix",
       "saturday-plan",
+      "flight-price",
       "landlord-reply",
       "launch-post"
     ],
@@ -15,6 +16,7 @@
     ],
     "everyday": [
       "saturday-plan",
+      "flight-price",
       "landlord-reply",
       "school-newsletter"
     ]

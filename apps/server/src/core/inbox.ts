@@ -7,7 +7,8 @@ import type { Env } from './env.js';
 import type { DeckStore } from './decks.js';
 import { buildDeck, deckFromPrecomputed } from './decks.js';
 import { errorMessage } from './errors.js';
-import { formatNeedsSummary, needsYouCount } from './evidence.js';
+import { needsYouCount } from './evidence.js';
+import { inboxSummary } from '../../../../shared/summary.js';
 import type { ReviewStore } from './reviews.js';
 import { clearChanges, RevisionTracker } from './revisions.js';
 import type { Splitter } from './splitter/types.js';
@@ -445,30 +446,7 @@ export class InboxService {
   }
 
   private summary(thread: AttentionThread, deck: Deck | undefined): string {
-    const drafts = deck?.points.filter((point) => point.kind === 'draft').length ?? 0;
-    const points = deck?.points.length ?? 0;
-    let base: string;
-    if (thread.app === 'gmail') {
-      base = deck ? `${drafts} line${drafts === 1 ? '' : 's'}` : 'draft';
-    } else if (thread.app === 'notion') {
-      base = deck ? `${points} points` : 'page review';
-    } else {
-      switch (thread.attention) {
-        case 'plan':
-          base = deck ? `${points} steps` : 'plan';
-          break;
-        case 'question':
-          base = 'question';
-          break;
-        case 'failed':
-          base = 'run failed';
-          break;
-        case 'report':
-          base = deck ? (drafts > 0 ? `${drafts} draft${drafts === 1 ? '' : 's'}` : `${points} points`) : 'report';
-          break;
-      }
-    }
-    return formatNeedsSummary(base, needsYouCount(deck?.points));
+    return inboxSummary(thread, deck?.points);
   }
 
   /** The review was sent: remember its deck and clear its "changed" marks. */

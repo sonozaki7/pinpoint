@@ -235,8 +235,8 @@ if (!customDir) {
   const PERSONAS = ["mixed", "developer", "everyday"];
   const EXPECTED = {
     developer: ["login-fix", "payment-upgrade", "launch-post", "draft-priya"],
-    everyday: ["saturday-plan", "landlord-reply", "school-newsletter"],
-    mixed: ["login-fix", "saturday-plan", "landlord-reply", "launch-post"],
+    everyday: ["saturday-plan", "flight-price", "landlord-reply", "school-newsletter"],
+    mixed: ["login-fix", "saturday-plan", "flight-price", "landlord-reply", "launch-post"],
   };
   const sampleThreadIds = new Set();
   if (workspace) {
