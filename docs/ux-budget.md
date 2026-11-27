@@ -26,6 +26,11 @@ Gestures: **scroll** (ring swipe), **tap**, **double-tap** (back), **hold** (men
 | Gmail draft or Notion page, nothing wrong | ≈ 5 taps | open + read (scrolls) + 1 tap; or from the inbox: hold → Agree (2 gestures) |
 | Notion page, one comment | ≈ 8 taps + typing | 3 taps + 1 voice |
 | Back to the next item after sending | n/a | 0 (automatic) |
+| Mistake on a routine (folded) line | same as above | + 1 tap (open "+6 routine") |
+| Ask a question about the output | scroll and search the text | hold + tap + 1 voice |
+| Hand off a new task to an agent | unlock, open the agent app, type | hold + tap + 1 voice + tap |
+| Catch up ("Since you looked"), mark seen | open each agent's thread | open + read, hold + tap |
+| Put the glasses on and see what needs you | unlock, open an app | 0 (wear detection) |
 
 ## Where the first version broke the budget (all fixed, Nov 27)
 

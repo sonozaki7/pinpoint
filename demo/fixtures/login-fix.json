@@ -47,7 +47,7 @@
         "quote": "Sign out every customer once, to clear out the broken logins.",
         "risk": "high",
         "flag": "signs out everyone",
-        "why": "Step 4: sign out every customer once"
+        "why": "Can't be undone: every customer must sign in again"
       },
       {
         "id": "p5",
