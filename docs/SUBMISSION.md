@@ -97,7 +97,7 @@ Short form for the form field; full text in [FEATURE_REQUESTS.md](FEATURE_REQUES
 | Category / tags | AI, Productivity, Telegram, Notion, Gmail, AI agents, Voice |
 | Logo | `brand/pinpoint-avatar-512.png` (24×24 Hub icon: `apps/glasses/icon-24.png`) |
 | Cover image | `apps/site/media/og.png` (1200×630) |
-| Screenshots | 3 from `demo/shots/` (inbox, review, note), 1 Telegram topic (`demo/film/public/proof/telegram-v2-card.png`), 1 Notion comment ([`demo/film/public/proof/notion-comment.png`](demo/film/public/proof/notion-comment.png)) |
+| Screenshots | 3 frames from the final film in `docs/media/` (`shot-1-glance.jpg`, `shot-2-why.jpg`, `shot-3-in-place.jpg`), the website inbox (`docs/media/pinpoint-inbox.png`), 1 Telegram topic (`demo/film/public/proof/telegram-v2-card.png`), 1 Notion comment ([`demo/film/public/proof/notion-comment.png`](demo/film/public/proof/notion-comment.png)) |
 | License | MIT |
 | Contact | Discord (see checklist) |
 
