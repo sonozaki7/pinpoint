@@ -1,0 +1,205 @@
+{
+ "tts": "kokoro",
+ "voice": "af_heart",
+ "speed": 1.0,
+ "lang": "en-us",
+ "duration": 0,
+ "voiceFile": "final-voice.wav",
+ "sampleRate": 48000,
+ "note": "PinpointFinal narration. Narrator af_heart; the user's spoken notes use am_michael with a light phone-mic EQ. 'at' is seconds, or an anchor into the recordings ('walk.on@0.5' = mark + offset, 'scene:proof@0.9' = scene start + offset); build-audio-final.mjs resolves anchors from layout.generated.json, measures each line, and writes captions.generated.json. 'caption' is the short burned-in text (omit for none).",
+ "lines": [
+  {
+   "id": "h1",
+   "at": 0.9,
+   "caption": "AI agents work all day.",
+   "text": "AI agents now work all day, across all your projects."
+  },
+  {
+   "id": "h2",
+   "at": 5.6,
+   "caption": "A few times a day, they need you.",
+   "text": "And a few times a day, they need you."
+  },
+  {
+   "id": "h3",
+   "at": 9.4,
+   "text": "Too much text. Too many threads. You miss what matters."
+  },
+  {
+   "id": "p1",
+   "at": 16.4,
+   "caption": "Approve / Decline isn't feedback.",
+   "text": "Approve or decline isn't feedback."
+  },
+  {
+   "id": "p2",
+   "at": 20.0,
+   "text": "The work is almost right. A risky step. A wrong number. A promise you can't keep."
+  },
+  {
+   "id": "p3",
+   "at": 27.6,
+   "text": "You need to point at the detail."
+  },
+  {
+   "id": "i1",
+   "at": 32.2,
+   "text": "Pinpoint is the attention layer on your glasses."
+  },
+  {
+   "id": "i2",
+   "at": 36.6,
+   "text": "Only what needs you. Point at the line. Say the fix."
+  },
+  {
+   "id": "w1",
+   "at": 41.9,
+   "caption": "Morning walk. Agents keep working.",
+   "text": "A morning walk. Your agents keep working."
+  },
+  {
+   "id": "w2",
+   "at": "walk.on@0.5",
+   "caption": "4 need you · 3 working · 7 done today",
+   "text": "Glasses on. Four need you. Three are working. Seven are done today."
+  },
+  {
+   "id": "w3",
+   "at": "walk.catchup-focus@1.6",
+   "caption": "Since you looked: what changed",
+   "text": "Since you looked, here is what changed."
+  },
+  {
+   "id": "w4",
+   "at": "walk.login-open@0.1",
+   "caption": "Opens on the step that needs you",
+   "text": "The login fix opens on the one step that needs you."
+  },
+  {
+   "id": "w4b",
+   "at": "walk.login-open@3.2",
+   "caption": "Why: it can't be undone",
+   "text": "And why. It can't be undone."
+  },
+  {
+   "id": "u0",
+   "at": "walk.deck@0.9",
+   "voice": "am_michael",
+   "eq": "phone",
+   "text": "Why sign everyone out?"
+  },
+  {
+   "id": "w5",
+   "at": "walk.ask-listen@2.0",
+   "caption": "Answered with the exact sentence",
+   "text": "Pinpoint answers with the exact sentence."
+  },
+  {
+   "id": "u1",
+   "at": "walk.back-on-line@0.3",
+   "voice": "am_michael",
+   "eq": "phone",
+   "text": "Don't sign everyone out. Just fix the broken logins."
+  },
+  {
+   "id": "w6",
+   "at": "walk.noted@0.2",
+   "caption": "Send. Five seconds to undo.",
+   "text": "Tap send. Five seconds to undo."
+  },
+  {
+   "id": "w7",
+   "at": "walk.sent@0.6",
+   "caption": "The real agent replies in 3 s",
+   "text": "Then the real agent replies. Three seconds."
+  },
+  {
+   "id": "w8",
+   "at": "walk.sent@4.7",
+   "caption": "Not Approve or Decline. The exact fix.",
+   "text": "Not approve or decline. The exact fix."
+  },
+  {
+   "id": "e1",
+   "at": "scene:everyday@0.2",
+   "caption": "Same gestures. A Saturday for the family.",
+   "text": "Same gestures, for a parent. A Saturday plan."
+  },
+  {
+   "id": "e2",
+   "at": "everyday.plan-open@0.6",
+   "caption": "Flagged: 9°C and windy",
+   "text": "One line is flagged. Nine degrees, and windy."
+  },
+  {
+   "id": "u2",
+   "at": "everyday.plan-deck@0.3",
+   "voice": "am_michael",
+   "eq": "phone",
+   "text": "Skip the picnic. Find an indoor lunch."
+  },
+  {
+   "id": "e3",
+   "at": "everyday.plan-sent@0.5",
+   "caption": "The real agent swaps it",
+   "text": "The real agent swaps in lunch indoors."
+  },
+  {
+   "id": "e4",
+   "at": "everyday.draft-open@1.0",
+   "caption": "A draft to your landlord",
+   "text": "A draft to your landlord says five percent."
+  },
+  {
+   "id": "u3",
+   "at": "everyday.draft-deck@0.3",
+   "voice": "am_michael",
+   "eq": "phone",
+   "text": "Three percent, not five percent."
+  },
+  {
+   "id": "e5",
+   "at": "everyday.draft-noted@0.0",
+   "caption": "Changed in place. Then sent.",
+   "text": "Changed in place. Then sent. Now hand off a job by voice."
+  },
+  {
+   "id": "u4",
+   "at": "everyday.inbox-after-draft@0.5",
+   "voice": "am_michael",
+   "eq": "phone",
+   "text": "Find a dentist near the office open Saturday morning."
+  },
+  {
+   "id": "e7",
+   "at": "everyday.dentist-open@-1.8",
+   "caption": "Later: 3 dentists. One tap.",
+   "text": "Later: three dentists open Saturday. Which one? One tap."
+  },
+  {
+   "id": "r1",
+   "at": "scene:proof@0.9",
+   "text": "It's real. A Notion comment on the exact paragraph. A Gmail reply, sent. Cards in Telegram."
+  },
+  {
+   "id": "r2",
+   "at": "scene:proof@10.3",
+   "text": "Real Codex runs. Answers in three seconds, and eight."
+  },
+  {
+   "id": "c1",
+   "at": "scene:close@1.0",
+   "text": "Steer every agent, from your glasses."
+  },
+  {
+   "id": "c2",
+   "at": "scene:close@4.2",
+   "text": "Ring for where. Voice for what."
+  },
+  {
+   "id": "c3",
+   "at": "scene:close@7.2",
+   "text": "Try it in your browser. Works on Even G2 and R1. Open source."
+  }
+ ]
+}

@@ -1,0 +1,211 @@
+{
+ "scenes": {
+  "walk": {
+   "start": 41,
+   "end": 85.885,
+   "segs": [
+    {
+     "id": "wear",
+     "src": "clips/final-walk.mp4",
+     "at": 3,
+     "dur": 10.408,
+     "from": 4.606,
+     "rate": 1
+    },
+    {
+     "id": "login",
+     "src": "clips/final-walk.mp4",
+     "at": 13.408,
+     "dur": 4.628,
+     "from": 18.182,
+     "rate": 1
+    },
+    {
+     "id": "asklisten",
+     "src": "clips/final-walk.mp4",
+     "at": 18.036,
+     "dur": 3.202,
+     "from": 22.81,
+     "rate": 1
+    },
+    {
+     "id": "ask",
+     "src": "clips/final-walk.mp4",
+     "at": 21.238,
+     "dur": 3.716,
+     "from": 26.012,
+     "rate": 1.4
+    },
+    {
+     "id": "toline",
+     "src": "clips/final-walk.mp4",
+     "at": 24.954,
+     "dur": 1.501,
+     "from": 31.214,
+     "rate": 1
+    },
+    {
+     "id": "talk",
+     "src": "clips/final-walk.mp4",
+     "at": 26.455,
+     "dur": 5.409,
+     "from": 32.715,
+     "rate": 1
+    },
+    {
+     "id": "send",
+     "src": "clips/final-walk.mp4",
+     "at": 31.864,
+     "dur": 3.551,
+     "from": 38.124,
+     "rate": 2
+    },
+    {
+     "id": "after",
+     "src": "clips/final-walk.mp4",
+     "at": 35.415,
+     "dur": 8.471,
+     "from": 45.226,
+     "rate": 0.85
+    }
+   ]
+  },
+  "everyday": {
+   "start": 85.885,
+   "end": 136.715,
+   "segs": [
+    {
+     "id": "inbox",
+     "src": "clips/final-everyday.mp4",
+     "at": 0.5,
+     "dur": 2.179,
+     "from": 6.011,
+     "rate": 1.6
+    },
+    {
+     "id": "plan1",
+     "src": "clips/final-everyday.mp4",
+     "at": 2.679,
+     "dur": 5.528,
+     "from": 9.198,
+     "rate": 1
+    },
+    {
+     "id": "plan2",
+     "src": "clips/final-everyday.mp4",
+     "at": 8.207,
+     "dur": 5.005,
+     "from": 14.726,
+     "rate": 1
+    },
+    {
+     "id": "plan3",
+     "src": "clips/final-everyday.mp4",
+     "at": 13.212,
+     "dur": 3.003,
+     "from": 19.731,
+     "rate": 2.2
+    },
+    {
+     "id": "after1",
+     "src": "clips/final-everyday.mp4",
+     "at": 16.216,
+     "dur": 1.2,
+     "from": 26.338,
+     "rate": 1
+    },
+    {
+     "id": "draft1",
+     "src": "clips/final-everyday.mp4",
+     "at": 17.416,
+     "dur": 5.721,
+     "from": 35.009,
+     "rate": 1
+    },
+    {
+     "id": "draft2",
+     "src": "clips/final-everyday.mp4",
+     "at": 23.137,
+     "dur": 6.208,
+     "from": 40.73,
+     "rate": 1
+    },
+    {
+     "id": "draft3",
+     "src": "clips/final-everyday.mp4",
+     "at": 29.345,
+     "dur": 3.001,
+     "from": 46.938,
+     "rate": 2.2
+    },
+    {
+     "id": "task1a",
+     "src": "clips/final-everyday.mp4",
+     "at": 32.346,
+     "dur": 3.768,
+     "from": 57.842,
+     "rate": 0.85
+    },
+    {
+     "id": "task1b",
+     "src": "clips/final-everyday.mp4",
+     "at": 36.114,
+     "dur": 4.807,
+     "from": 61.045,
+     "rate": 1.5
+    },
+    {
+     "id": "dentist",
+     "src": "clips/final-everyday.mp4",
+     "at": 40.921,
+     "dur": 8.909,
+     "from": 82.859,
+     "rate": 1.7
+    }
+   ]
+  },
+  "proof": {
+   "start": 136.715,
+   "end": 151.215
+  },
+  "close": {
+   "start": 151.215,
+   "end": 164.215
+  },
+  "hook": {
+   "start": 0,
+   "end": 41
+  }
+ },
+ "marks": {
+  "walk.on": 44.3,
+  "walk.status": 48.5,
+  "walk.catchup-focus": 48.5,
+  "walk.catchup": 52.706,
+  "walk.inbox-again": 54.108,
+  "walk.login-open": 54.808,
+  "walk.deck": 59.036,
+  "walk.ask-listen": 62.238,
+  "walk.ask-answer": 65.954,
+  "walk.back-on-line": 67.455,
+  "walk.noted": 72.864,
+  "walk.sent": 76.265,
+  "walk.end": 84.885,
+  "everyday.plan-open": 88.564,
+  "everyday.plan-deck": 93.092,
+  "everyday.plan-noted": 98.697,
+  "everyday.plan-sent": 102.01,
+  "everyday.draft-open": 103.601,
+  "everyday.draft-deck": 107.822,
+  "everyday.draft-noted": 114.83,
+  "everyday.draft-sent": 118.14,
+  "everyday.inbox-after-draft": 118.231,
+  "everyday.task-listen": 121.999,
+  "everyday.task-heard": 123.734,
+  "everyday.task-started": 125.872,
+  "everyday.dentist-open": 128.745,
+  "everyday.dentist-options": 131.242,
+  "everyday.dentist-chosen": 134.303
+ },
+ "total": 164.215
+}

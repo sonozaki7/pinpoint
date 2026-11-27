@@ -1,0 +1,23 @@
+{
+  "note": "Exact data read from two real T3 Code threads in project pinpoint (provider Codex, model gpt-6-luna), run 2026-11-27 13:48-13:49 UTC. The plan text is the sample plan's text, so the reply matches what the glasses show. Seconds are run requestedAt -> completedAt of the review run.",
+  "login": {
+    "threadId": "mcp:bf0c7e44-871d-4bac-b46c-e30581cfa316",
+    "title": "Fix random logouts (plan)",
+    "reviewSent": "2026-11-27T13:49:21.252Z",
+    "replyDone": "2026-11-27T13:49:24.368Z",
+    "seconds": 3.1,
+    "reviewText": "Review from G2 (Pinpoint) — 7 points\n✗ 4. \"4. Sign out every customer once, to clear out the broken logins.\" → Don't sign everyone out. Just fix the broken logins.\n✓ Agreed: 1, 2, 3, 5, 6, 7. Continue.",
+    "before": "4. Sign out every customer once, to clear out the broken logins.",
+    "after": "4. Fix the broken logins without signing everyone out."
+  },
+  "saturday": {
+    "threadId": "mcp:e6e4824b-1e98-4b45-93e2-4e1aff8b9d10",
+    "title": "Saturday with the kids: Ueno (plan)",
+    "reviewSent": "2026-11-27T13:48:52.608Z",
+    "replyDone": "2026-11-27T13:49:00.263Z",
+    "seconds": 7.7,
+    "reviewText": "Review from G2 (Pinpoint) — 6 points\n✗ 3. \"3. Picnic lunch on the park lawn after the zoo.\" → Skip the picnic. Find an indoor lunch.\n✓ Agreed: 1, 2, 4, 5, 6. Continue.",
+    "before": "3. Picnic lunch on the park lawn after the zoo.",
+    "after": "3. Have lunch indoors after the zoo."
+  }
+}

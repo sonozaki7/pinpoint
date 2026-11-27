@@ -1,0 +1,165 @@
+{
+ "note": "How the real simulator recordings are cut into the film. 'from'/'to' are mark labels in demo/recordings/final-<clip>.timeline.json; 'rate' speeds a silent stretch up.",
+ "hookEnd": 41,
+ "footage": {
+  "walk": {
+   "clip": "walk",
+   "tail": 1.0,
+   "segs": [
+    {
+     "id": "wear",
+     "from": "on",
+     "fromOff": -0.3,
+     "to": "inbox-again",
+     "toOff": 0.3,
+     "at": 3.0,
+     "rate": 1.0
+    },
+    {
+     "id": "login",
+     "from": "login-open",
+     "fromOff": -0.4,
+     "to": "deck",
+     "gap": 0.0,
+     "rate": 1.0
+    },
+    {
+     "id": "asklisten",
+     "from": "deck",
+     "to": "ask-listen",
+     "rate": 1.0
+    },
+    {
+     "id": "ask",
+     "from": "ask-listen",
+     "to": "ask-answer",
+     "rate": 1.4
+    },
+    {
+     "id": "toline",
+     "from": "ask-answer",
+     "to": "back-on-line",
+     "rate": 1.0
+    },
+    {
+     "id": "talk",
+     "from": "back-on-line",
+     "to": "noted",
+     "rate": 1.0
+    },
+    {
+     "id": "send",
+     "from": "noted",
+     "to": "sent",
+     "toOff": 0.3,
+     "rate": 2.0
+    },
+    {
+     "id": "after",
+     "from": "sent",
+     "fromOff": 0.3,
+     "to": "end",
+     "rate": 0.85
+    }
+   ]
+  },
+  "everyday": {
+   "clip": "everyday",
+   "tail": 1.0,
+   "segs": [
+    {
+     "id": "inbox",
+     "from": "inbox",
+     "to": "plan-open",
+     "fromOff": 0.4,
+     "rate": 1.6,
+     "at": 0.5
+    },
+    {
+     "id": "plan1",
+     "from": "plan-open",
+     "fromOff": -0.3,
+     "to": "plan-deck",
+     "toOff": 1.0,
+     "rate": 1.0
+    },
+    {
+     "id": "plan2",
+     "from": "plan-deck",
+     "fromOff": 1.0,
+     "to": "plan-noted",
+     "toOff": 0.4,
+     "rate": 1.0
+    },
+    {
+     "id": "plan3",
+     "from": "plan-noted",
+     "fromOff": 0.4,
+     "to": "plan-sent",
+     "toOff": 0.2,
+     "rate": 2.2
+    },
+    {
+     "id": "after1",
+     "from": "plan-sent",
+     "fromOff": 0.2,
+     "to": "plan-sent",
+     "toOff": 1.4,
+     "rate": 1.0
+    },
+    {
+     "id": "draft1",
+     "from": "draft-open",
+     "fromOff": -0.3,
+     "to": "draft-deck",
+     "toOff": 1.2,
+     "gap": 0.0,
+     "rate": 1.0
+    },
+    {
+     "id": "draft2",
+     "from": "draft-deck",
+     "fromOff": 1.2,
+     "to": "draft-noted",
+     "toOff": 0.4,
+     "rate": 1.0
+    },
+    {
+     "id": "draft3",
+     "from": "draft-noted",
+     "fromOff": 0.4,
+     "to": "draft-sent",
+     "toOff": 0.2,
+     "rate": 2.2
+    },
+    {
+     "id": "task1a",
+     "from": "inbox-after-draft",
+     "to": "task-listen",
+     "gap": 0.0,
+     "rate": 0.85
+    },
+    {
+     "id": "task1b",
+     "from": "task-listen",
+     "to": "task-started",
+     "toOff": 1.4,
+     "rate": 1.5
+    },
+    {
+     "id": "dentist",
+     "from": "task-question",
+     "fromOff": 3.0,
+     "to": "dentist-chosen",
+     "toOff": 2.4,
+     "gap": 0.0,
+     "rate": 1.7
+    }
+   ]
+  }
+ },
+ "after": {
+  "proof": 14.5,
+  "close": 13.0
+ }
+}

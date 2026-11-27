@@ -105,6 +105,8 @@ const NOTE_POINT4 = "No. Don't log everyone out. Migrate the existing sessions i
 const NOTE_POINT6 = "Use a request queue. A mutex deadlocks with the retry path.";
 const NOTE_MORNING = "Make it Thursday, not Tuesday.";
 const NOTE_LOGIN = "Don't sign everyone out. Just fix the broken logins.";
+const NOTE_NET = "Net forty-five, not net sixty.";
+const NOTE_LAUNCH = "Say ten percent today, and everyone by Friday.";
 
 const SCENES = [
   {
@@ -282,6 +284,74 @@ const SCENES = [
       { action: "click", label: "send to agent", hold: 1900 },
       { mark: "morning3:sent" },
       { wait: 1100, label: "Sent to agent" },
+    ],
+  },
+  // ---- v5 (PinpointStory): one walk, three reviews -------------------------
+  // Cloud sample workspace order is login-fix, payment-upgrade, draft-priya,
+  // launch-post. Each review is opened at its CHECK line, corrected by voice,
+  // and sent with the undo countdown. No double-tap from the inbox: that is
+  // the exit gesture.
+  {
+    id: "v5-login",
+    title: "login-fix: opens on step 4, note, send",
+    steps: [
+      { wait: 700, label: "settle after boot" },
+      { mark: "v5a:inbox" },
+      { wait: 1400, label: "hold the inbox" },
+      { action: "click", label: "open login-fix", hold: 2000 },
+      { mark: "v5a:deck" },
+      { wait: 2200, label: "read step 4, CHECK" },
+      { note: NOTE_LOGIN },
+      { wait: 1400, label: "read the note and the Send row" },
+      { action: "click", label: "tap Send", hold: 1400 },
+      { mark: "v5a:countdown" },
+      { wait: 4000, label: "countdown" },
+      { wait: 1400, label: "sending, then the receipt" },
+      { mark: "v5a:sent" },
+      { wait: 1800, label: "hold the receipt" },
+      { wait: 700, label: "auto-return to the inbox" },
+    ],
+  },
+  {
+    id: "v5-priya",
+    title: "draft-priya: net-60 -> net-45, send",
+    steps: [
+      { wait: 900, label: "back at the inbox" },
+      { mark: "v5b:inbox" },
+      { action: "down", label: "row 2, draft-priya", hold: 900 },
+      { action: "click", label: "open draft-priya", hold: 2000 },
+      { mark: "v5b:deck" },
+      { wait: 2200, label: "read the net-60 line, CHECK" },
+      { note: NOTE_NET },
+      { wait: 2400, label: "Now: net-45" },
+      { action: "click", label: "tap Send", hold: 1400 },
+      { mark: "v5b:countdown" },
+      { wait: 4000, label: "countdown" },
+      { wait: 1400, label: "sending, then the receipt" },
+      { mark: "v5b:sent" },
+      { wait: 1800, label: "hold the receipt" },
+      { wait: 700, label: "auto-return to the inbox" },
+    ],
+  },
+  {
+    id: "v5-launch",
+    title: "launch-post: staged rollout, send",
+    steps: [
+      { wait: 900, label: "back at the inbox" },
+      { mark: "v5c:inbox" },
+      { action: "down", label: "row 2, launch-post", hold: 900 },
+      { action: "click", label: "open launch-post", hold: 2000 },
+      { mark: "v5c:deck" },
+      { wait: 2200, label: "read the rollout line, CHECK" },
+      { note: NOTE_LAUNCH },
+      { wait: 2400, label: "Now: ten percent today" },
+      { action: "click", label: "tap Send", hold: 1400 },
+      { mark: "v5c:countdown" },
+      { wait: 4000, label: "countdown" },
+      { wait: 1400, label: "sending, then the receipt" },
+      { mark: "v5c:sent" },
+      { wait: 1800, label: "hold the receipt" },
+      { wait: 700, label: "auto-return to the inbox" },
     ],
   },
 ];

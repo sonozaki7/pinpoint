@@ -52,3 +52,26 @@ None. The film is voice-only, so there is no music license to clear.
 The Pinpoint mark is drawn from the project's own `apps/site/favicon.svg`
 geometry. The ring, arrow, pulses, and microphone are original line art made
 for this film. No Even, Telegram, or other brand icon files are bundled.
+
+
+---
+
+# Final cut (`demo/out/pinpoint-demo-final.mp4`) — additions
+
+## POV photos (Pexels License: free to use and modify, no attribution required; credited anyway)
+
+| File in `public/stills/final/` | Pexels photo | Photographer (Pexels profile) | Used for |
+|---|---|---|---|
+| `walk-street.jpg` | [Empty Urban Street with Modern Buildings at Dawn, 31846889](https://www.pexels.com/photo/empty-urban-street-with-modern-buildings-at-dawn-31846889/) | Dr. Mohammad Hoque (@dr-mohammad-hoque-86842308) | Morning walk, first POV |
+| `walk-crossing.jpg` | [Pedestrian Crossing in Partially Sun Shadow, 17318333](https://www.pexels.com/photo/pedestrian-crossing-in-partially-sun-shadow-17318333/) | Alvin Chelsea (@alvin-chelsea-230969113) | Morning walk, second POV |
+| `cafe.jpg` | [Cup of Coffee on a Table by the Window Facing the Street in a Cafe, 5865683](https://www.pexels.com/photo/cup-of-coffee-on-a-table-by-the-window-facing-the-street-in-a-cafe-5865683/) | Rachel Claire (@rachel-claire) | Everyday, café POV |
+
+Each is cropped to 16:9 and darkened and tinted in the edit. No identifiable person is the subject. Photographer names are as listed on each Pexels page (checked 2026-11-27).
+
+## Footage and proofs
+
+- **Glasses footage**: the official Even Hub simulator 0.9.5 running the real Pinpoint glasses app from the frozen commit `3be2c16` ("Glasses final"), against the real Pinpoint server in its built-in sample workspace (`PINPOINT_MODE=cloud`, scripted voice). Recorded with `demo/scripts/record-final.mjs`. The simulator cannot send the OS hold-menu choice, so `demo/scripts/apply-record-aid.mjs` adds a ~20-line file-poll to the frozen copy that delivers the same `menu` event (and the wear on/off); the film draws the hold menu itself and says so on screen.
+- **Real T3 Code runs** (project pinpoint, Codex): `src/pinpoint-final/t3-real.json`.
+- **Real Notion, Gmail, Telegram** screenshots: `public/proof/`.
+- The landlord line is changed by the server's AI fallback (DeepSeek API, key from the owner's own `.env`, never shown).
+- Voices: Kokoro-82M (Apache-2.0), `af_heart` narrator and `am_michael` for the spoken notes. No music.
